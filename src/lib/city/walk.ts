@@ -181,17 +181,30 @@ const crossingAt = (x: number, y: number, axis: Axis): Crossing | undefined => {
 };
 const isParkCell = (col: number, row: number) => col >= 4 && row >= 2;
 
+/** 人行横道：两端的人行道转角，以及是否有信号灯。 */
+export interface Crosswalk {
+  a: Point;
+  b: Point;
+  signal: boolean;
+}
+
+export const crosswalks: Crosswalk[] = [];
+const cross = (a: number, b: number, crossing?: Crossing) => {
+  link(a, b, crossing);
+  crosswalks.push({ a: nodes[a], b: nodes[b], signal: Boolean(crossing) });
+};
+
 for (const ring of rings) {
   const col = Math.floor(ring.rect.x / GRID.width);
   const row = Math.floor(ring.rect.y / GRID.height);
-  const [sw, se, ne, nw] = ring.corners;
+  const [, se, ne, nw] = ring.corners;
   const eastX = (col + 1) * GRID.width;
   const northY = (row + 1) * GRID.height;
   // 东侧：穿过南北向街道（行人东西向通行）
   const east = ringAt(col + 1, row);
   if (east) {
-    link(se, east.corners[0], crossingAt(eastX, row * GRID.height, 'ew'));
-    link(ne, east.corners[3], crossingAt(eastX, northY, 'ew'));
+    cross(se, east.corners[0], crossingAt(eastX, row * GRID.height, 'ew'));
+    cross(ne, east.corners[3], crossingAt(eastX, northY, 'ew'));
   } else if (isParkCell(col + 1, row)) {
     const x = eastX + GRID.street / 2 + SIDEWALK;
     for (const [corner, y] of [
@@ -200,14 +213,14 @@ for (const ring of rings) {
     ] as const) {
       const landing = addNode(nearestOnPolygon({ x, y: nodes[corner].y }, PARK_RING));
       parkNodes.push(landing);
-      link(corner, landing, crossingAt(eastX, y, 'ew'));
+      cross(corner, landing, crossingAt(eastX, y, 'ew'));
     }
   }
   // 北侧：穿过东西向街道（行人南北向通行）
   const north = ringAt(col, row + 1);
   if (north) {
-    link(nw, north.corners[0], crossingAt(col * GRID.width, northY, 'ns'));
-    link(ne, north.corners[1], crossingAt(eastX, northY, 'ns'));
+    cross(nw, north.corners[0], crossingAt(col * GRID.width, northY, 'ns'));
+    cross(ne, north.corners[1], crossingAt(eastX, northY, 'ns'));
   } else if (isParkCell(col, row + 1)) {
     const y = northY + GRID.street / 2 + SIDEWALK;
     for (const [corner, x] of [
@@ -216,7 +229,7 @@ for (const ring of rings) {
     ] as const) {
       const landing = addNode(nearestOnPolygon({ x: nodes[corner].x, y }, PARK_RING));
       parkNodes.push(landing);
-      link(corner, landing, crossingAt(x, northY, 'ns'));
+      cross(corner, landing, crossingAt(x, northY, 'ns'));
     }
   }
 }

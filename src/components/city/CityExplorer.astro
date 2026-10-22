@@ -213,9 +213,24 @@ const presets = [
         </div>
       </div>
       <div class="timeline-tools">
-        <button type="button" data-city-view aria-pressed="false" aria-label="切换分层视图">
-          <Icon name="layers" size={16} />
-          <span data-label>城市</span>
+        <div class="view-switch" role="group" aria-label="视图">
+          <button type="button" data-city-view="city" aria-pressed="true">
+            <Icon name="map" size={15} />
+            <span>城市</span>
+          </button>
+          <button type="button" data-city-view="layers" aria-pressed="false">
+            <Icon name="layers" size={15} />
+            <span>分层</span>
+          </button>
+        </div>
+        <button
+          type="button"
+          data-city-night
+          aria-pressed="true"
+          aria-label="夜景显示"
+          title="夜景显示：已开启"
+        >
+          <Icon name="moon" size={16} />
         </button>
         <button type="button" data-city-reset aria-label="复位视角">
           <Icon name="home" size={16} />
@@ -224,6 +239,20 @@ const presets = [
           <Icon name="maximize" size={16} class="when-normal" />
           <Icon name="minimize" size={16} class="when-full" />
         </button>
+        <div class="view-hint" data-city-hint role="note" hidden>
+          <p class="view-hint-title">分层视图</p>
+          <p>
+            查询结果按来源分层展示：底层是八个独立的数据源，经映射汇入虚拟知识图谱，顶层是本体。由多个数据源描述的同一实体在图谱层合并为一个节点。
+          </p>
+          <div class="view-hint-actions">
+            <button type="button" class="view-hint-go" data-city-hint-go>
+              查看分层视图
+            </button>
+            <button type="button" class="view-hint-later" data-city-hint-close>
+              稍后再看
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -407,6 +436,12 @@ const presets = [
     color: var(--muted);
   }
 
+  .detail-card :global(.card-actions) {
+    display: flex;
+    flex: none;
+    gap: 2px;
+  }
+
   .detail-card :global(.card-close:hover) {
     background: var(--surface-2);
     color: var(--ink);
@@ -461,6 +496,75 @@ const presets = [
     margin-top: 10px;
     font-size: 12px;
     color: var(--faint);
+  }
+
+  .detail-card :global(.card-foot .to-layers) {
+    margin-top: 4px;
+  }
+
+  /* 卡片中的实体名称：点击跳转到该实体 */
+  .detail-card :global(.card-link) {
+    display: inline;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: var(--accent-ink);
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .detail-card :global(.card-link:hover) {
+    text-decoration-style: solid;
+  }
+
+  .detail-card :global(.card-back) {
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .detail-card :global(.card-back:hover) {
+    color: var(--accent-ink);
+  }
+
+  /* 收起后只保留标题，选中与跟随不变 */
+  .detail-card:global(.is-collapsed) {
+    padding-block: 10px;
+  }
+
+  .detail-card:global(.is-collapsed) :global(.card-head) {
+    cursor: pointer;
+  }
+
+  .detail-card:global(.is-collapsed) :global(.card-title) {
+    font-size: 15px;
+  }
+
+  .detail-card:global(.is-collapsed) :global(.card-iri),
+  .detail-card:global(.is-collapsed) :global(.card-rows),
+  .detail-card:global(.is-collapsed) :global(.card-truth),
+  .detail-card:global(.is-collapsed) :global(.card-foot) {
+    display: none;
+  }
+
+  /* 模拟实况：不属于任何数据源 */
+  .detail-card :global(.card-truth) {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr);
+    gap: 10px;
+    margin-top: 4px;
+    padding: 6px 8px 6px 10px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 8px;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--ink-2);
+  }
+
+  .detail-card :global(.card-truth span) {
+    color: var(--muted);
   }
 
   /* 查询列表较长：只在选中的查询下显示所需数据源 */
@@ -864,8 +968,10 @@ const presets = [
   }
 
   .timeline-tools {
+    position: relative;
     display: flex;
     flex: none;
+    align-items: center;
     gap: 4px;
   }
 
@@ -886,9 +992,144 @@ const presets = [
     color: var(--ink);
   }
 
-  .timeline-tools [data-city-view][aria-pressed='true'] {
+  .timeline-tools [data-city-night][aria-pressed='true'] {
     border-color: color-mix(in srgb, var(--accent) 50%, transparent);
     color: var(--accent-ink);
+  }
+
+  /* 视图切换：城市与分层，当前视图高亮 */
+  .view-switch {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+  }
+
+  .timeline-tools .view-switch button {
+    position: relative;
+    height: 30px;
+    padding: 0 11px;
+    border: 0;
+  }
+
+  .timeline-tools .view-switch button[aria-pressed='true'] {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+
+  /* 尚未看过分层视图时，分层按钮带一圈缓慢扩散的光环 */
+  .view-switch :global(button.is-new)::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: inherit;
+    border: 2px solid var(--accent);
+    opacity: 0;
+    animation: view-pulse 2.4s var(--ease) infinite;
+    pointer-events: none;
+  }
+
+  @keyframes view-pulse {
+    0% {
+      opacity: 0.7;
+      transform: scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(1.18);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .view-switch :global(button.is-new)::after {
+      animation: none;
+      opacity: 0.6;
+    }
+  }
+
+  .view-hint {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 14px);
+    z-index: 5;
+    width: 300px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--ink-2);
+    animation: card-in 0.35s var(--ease);
+  }
+
+  .view-hint[hidden] {
+    display: none;
+  }
+
+  /* 指向分层按钮的小三角 */
+  .view-hint::after {
+    content: '';
+    position: absolute;
+    right: var(--arrow, 120px);
+    bottom: -7px;
+    width: 12px;
+    height: 12px;
+    translate: 50% 0;
+    rotate: 45deg;
+    border-right: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+    background: var(--surface);
+  }
+
+  .view-hint-title {
+    margin-bottom: 4px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .view-hint-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .timeline-tools .view-hint-actions button {
+    height: 30px;
+    padding: 0 12px;
+    font-size: 12.5px;
+  }
+
+  .timeline-tools .view-hint-go {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #041015;
+    font-weight: 600;
+  }
+
+  .timeline-tools .view-hint-go:hover {
+    color: #041015;
+    filter: brightness(1.08);
+  }
+
+  /* 结果与详情卡片中的分层入口；分层视图中不再显示 */
+  .city :global(.to-layers) {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--accent-ink);
+  }
+
+  .city :global(.to-layers:hover) {
+    text-decoration: underline;
+  }
+
+  .city:global([data-view='layers']) :global(.to-layers) {
+    display: none;
   }
 
   [data-city-fullscreen][aria-pressed='true'] :global(.when-normal),
@@ -1024,8 +1265,10 @@ const presets = [
       linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0 / 40px 40px;
   }
 
-  .city :global(.stage.is-fallback) [data-city-view],
-  .city :global(.stage.is-fallback) [data-city-reset] {
+  .city :global(.stage.is-fallback) .view-switch,
+  .city :global(.stage.is-fallback) [data-city-reset],
+  .city :global(.stage.is-fallback) .view-hint,
+  .city :global(.stage.is-fallback) :global(.to-layers) {
     display: none;
   }
 
@@ -1074,8 +1317,12 @@ const presets = [
       margin-left: auto;
     }
 
-    .timeline-tools span {
+    .timeline-tools > button span {
       display: none;
+    }
+
+    .view-hint {
+      width: min(300px, calc(100vw - 48px));
     }
 
     .panel-sources {

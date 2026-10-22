@@ -182,7 +182,7 @@ function driveSeconds(path: number[]): number {
  * 这里多留出一个信号周期与几十米的余量。
  */
 const carLead = (p: Point, node: number, person: Person) =>
-  walkSeconds(walkRoute(p, curbAt(nodePoint(nodeById.get(node)!))), person.pace) + 105;
+  walkSeconds(walkRoute(p, curbAt(nodePoint(nodeById.get(node)!))), person.pace) + 160;
 
 const routeNodes = (from: number, to: number) => {
   const gateFrom = gates.find((g) => g.id === from);

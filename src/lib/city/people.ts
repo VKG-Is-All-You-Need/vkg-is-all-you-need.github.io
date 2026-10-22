@@ -8,7 +8,7 @@
  */
 import { city, type Building } from '../geo/city';
 import { rectCenter, seededRandom, type Point } from '../geo/spatial';
-import { DAY, DAYS, at, dayOf, hours } from './time';
+import { DAY, DAYS, at, hours } from './time';
 
 const byName = (name: string) => city.buildings.find((b) => b.name === name)!;
 const center = (building: Building) => rectCenter(building.footprint);

@@ -70,6 +70,8 @@ export interface Leg {
   vehicle?: string;
   /** 室内停留所在的建筑。 */
   building?: number;
+  /** 步行的目的地建筑。 */
+  destination?: number;
   /** 购物：商店与消费金额。 */
   shop?: number;
   amount?: number;
@@ -139,7 +141,6 @@ function loopFrom(p: Point): Point[] {
 
 const nodeAt = (x: number, y: number) =>
   [...nodeById.values()].find((n) => n.x === x && n.y === y)!;
-const pointOf = (node: { x: number; y: number }): Point => ({ x: node.x, y: node.y });
 const shopNamed = (name: string) => shops.find((s) => s.name === name)!;
 const shopCenter = (shop: Shop) => rectCenter(buildingById.get(shop.buildingId)!.footprint);
 const nearestShop = (p: Point, category: Shop['category']) =>
@@ -212,7 +213,14 @@ const walkLeg = (path: TimedPath, label: string): Leg => ({
   path: path.points,
   times: path.times,
   label,
+  destination: buildingAt(path.points.at(-1)!)?.id,
 });
+
+/** 沿人行道走到 to 的步行段（具名人物的手写行程按给定时长走完）。 */
+const scriptedWalk = (from: Point, to: Point, end: number, label: string): Omit<Leg, 'start'> => {
+  const path = walkPoints(from, to);
+  return { end, mode: 'walk', path, label, destination: buildingAt(path.at(-1)!)?.id };
+};
 
 // ── 按安排落实行程 ──
 /** 不一致之处（应当为 0），供校验脚本检查。 */
@@ -535,7 +543,7 @@ function schedule(id: string, day: number) {
       add({ end: cursor + minutes * 60, mode, path, label }),
     /** 沿人行道步行若干分钟。 */
     walk: (minutes: number, to: Point, label: string) =>
-      add({ end: cursor + minutes * 60, mode: 'walk', path: walkPoints(pos, to), label }),
+      add(scriptedWalk(pos, to, cursor + minutes * 60, label)),
     /** 待到当天结束。 */
     rest: (place: Point, label = '在家') =>
       add({ end: time(24), mode: 'home', path: [place], label, building: inside(place) }),
@@ -549,7 +557,7 @@ function schedule(id: string, day: number) {
       if (t.pickup > cursor) add({ end: t.pickup, mode: 'wait', path: [pos], label: '上车' });
       add({ end: t.arrive, mode: 'drive', path: [t.from, t.to], label, vehicle: t.vehicle });
       pos = curbOf(t.vehicle, t.arrive - 0.5)!;
-      add({ end: cursor + 120, mode: 'walk', path: walkPoints(pos, to), label: '停车后步行' });
+      add(scriptedWalk(pos, to, cursor + 120, '停车后步行'));
     },
     /** 打车：在路边等车，上车后随车行驶，下车后步行进入目的地。 */
     taxi: (tripId: string, label: string) => {
@@ -559,7 +567,7 @@ function schedule(id: string, day: number) {
       add({ end: t.pickup, mode: 'wait', path: [pickup], label: '等候网约车' });
       add({ end: t.arrive, mode: 'taxi', path: [t.from, t.to], label, vehicle: t.vehicle });
       pos = curbOf(t.vehicle, t.arrive - 0.5)!;
-      add({ end: cursor + 60, mode: 'walk', path: walkPoints(pos, t.to), label: '下车后步行' });
+      add(scriptedWalk(pos, t.to, cursor + 60, '下车后步行'));
     },
     /** 公交：在站台等第一班车，到站下车。 */
     bus: (from: number, to: number, label: string) => {
@@ -908,6 +916,15 @@ export function personAt(id: string, t: number): PersonState | null {
   }
   if (!current.path.length) return null;
   return { ...legPosition(current, t), leg: current };
+}
+
+/** t 时在某栋建筑里的人。 */
+export function peopleInside(building: number, t: number): string[] {
+  const inside: string[] = [];
+  for (const [id, legs] of dayPeople(dayOf(t)).legs) {
+    if (legAt(legs, t)?.building === building) inside.push(id);
+  }
+  return inside;
 }
 
 export interface Pedestrian {

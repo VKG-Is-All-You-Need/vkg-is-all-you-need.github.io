@@ -3,24 +3,27 @@
  * 由 scripts/city/controller.ts 在场景进入视口后按需加载；渲染基础设施见 scripts/three。
  *
  * 两种视图：
- * - 城市：按模拟时间呈现信号灯、车辆、商店客流、温湿度传感器、天气（雨、雾、阴天、雷电）与昼夜。各数据源贡献的内容以该数据源的颜色标识，
- *   关闭数据源后相应内容淡出。
+ * - 城市：按模拟时间呈现信号灯、车辆、行人、温湿度传感器、天气（雨、雾、阴天、雷电）与昼夜。各数据源贡献的内容以该数据源的颜色标识，
+ *   关闭数据源后相应内容淡出。行人是模拟中的实况，不属于任何数据源，始终显示；点击行人可查看各数据源中关于此人的记录。
  * - 分层：底部是八个独立的数据源，向上依次为映射、虚拟知识图谱与本体。查询结果中的每个实体都连到
  *   描述它的数据源；连到多个数据源的实体，就是融合的结果。
  */
 import * as THREE from 'three';
 import type { Line2 } from 'three/addons/lines/Line2.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CITY, city, type Building } from '../../lib/geo/city';
+import { CITY, GRID, city, type Building } from '../../lib/geo/city';
 import { pointInPolygon, rectCenter, seededRandom, type Point } from '../../lib/geo/spatial';
-import { footfallRate, shopById, shops, type Shop } from '../../lib/city/commerce';
-import { hasItinerary, isRide, personAt } from '../../lib/city/mobility';
+import { shopById, shops, type Shop } from '../../lib/city/commerce';
+import { hasItinerary, isRide, pedestriansAt, personAt } from '../../lib/city/mobility';
+import { platformOf } from '../../lib/city/plans';
 import { companies, companyById, events, personById, personas } from '../../lib/city/people';
 import { busLoad, presence } from '../../lib/city/records';
 import type { CityResult, FusionEntity, FusionRelation, Highlight } from '../../lib/city/queries';
 import {
+  BUS_LOOP,
   edgeById,
   nodeById,
+  previousStop,
   roads,
   signalState,
   type Axis,
@@ -31,6 +34,7 @@ import { ENV_SENSORS, STATION, readingAt, sensorById } from '../../lib/city/sens
 import { at, dayOf, hours, timeOfDay } from '../../lib/city/time';
 import { queuesAt, statesAt, tripsOf, type VehicleState } from '../../lib/city/traffic';
 import { vehicles, type Vehicle } from '../../lib/city/vehicles';
+import { crosswalks } from '../../lib/city/walk';
 import { cloudAt, fogAt, observationAt, rainAt, stormAt, windAt } from '../../lib/city/weather';
 import { createStage, type Pin } from '../three/stage';
 import {
@@ -51,7 +55,10 @@ export type View = 'city' | 'layers';
 export type Selection =
   | { type: 'building'; id: number }
   | { type: 'vehicle'; id: string }
-  | { type: 'sensor'; id: string };
+  | { type: 'person'; id: string }
+  | { type: 'sensor'; id: string }
+  | { type: 'node'; id: number }
+  | { type: 'edge'; id: number };
 
 /** 选中对象在分层视图中的表示：标签、类，以及提供了记录的数据源。 */
 export interface SelectionInfo {
@@ -78,6 +85,8 @@ export interface CityScene {
   setTime(t: number, playing: boolean, speed: number): void;
   setSources(sources: ReadonlySet<SourceId>): void;
   setDetail(detail: boolean): void;
+  /** 夜景显示：不论模拟时间，场景都按夜间光照呈现（天气照常）。 */
+  setNightView(night: boolean): void;
   /** fresh 为 true 表示切换了查询：新出现的元素播放入场动画，城市视图中镜头移向结果。 */
   showResult(result: CityResult, fresh: boolean): void;
   select(info: SelectionInfo | null): void;
@@ -179,21 +188,6 @@ const sourceDots = (ids: SourceId[]) =>
 const sourcePin = (source: DataSource, on: boolean) =>
   `<b>${escapeHtml(source.catalog)}</b>${on ? '' : '<span>未接入</span>'}`;
 
-function pointAlong(loop: Point[], s: number): Point {
-  let remaining = s;
-  for (let i = 1; i < loop.length; i++) {
-    const a = loop[i - 1];
-    const b = loop[i];
-    const length = Math.hypot(b.x - a.x, b.y - a.y);
-    if (remaining <= length) {
-      const k = length ? remaining / length : 0;
-      return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k };
-    }
-    remaining -= length;
-  }
-  return loop.at(-1)!;
-}
-
 function flatRing(inner: number, outer: number, color: THREE.ColorRepresentation, opacity: number) {
   const mesh = new THREE.Mesh(
     new THREE.RingGeometry(inner, outer, 64),
@@ -220,6 +214,7 @@ export function createCityScene(
     t: number;
     sources: ReadonlySet<SourceId>;
     detail: boolean;
+    nightView: boolean;
   },
 ): CityScene {
   const stage = createStage(container, pinLayer, { reducedMotion: options.reducedMotion });
@@ -236,7 +231,10 @@ export function createCityScene(
   const color = new THREE.Color();
 
   // 两种视图都按模拟时间呈现昼夜；分层视图中线条与节点的配色随场景明暗切换，与页面主题无关
-  let mode: Mode = nightAt(options.t) > 0.5 ? 'night' : 'day';
+  let nightView = options.nightView;
+  /** 夜景显示时固定为接近全黑的夜间光照，留一点余光便于辨认。 */
+  const darkness = (t: number) => (nightView ? 0.92 : nightAt(t));
+  let mode: Mode = darkness(options.t) > 0.5 ? 'night' : 'day';
   let view: View = options.view;
   stage.mix = view === 'layers' ? 1 : 0;
   let simT = options.t;
@@ -370,8 +368,8 @@ export function createCityScene(
       signalLamps.setMatrixAt(i, matrix.makeTranslation(corner.x, BLOCK_HEIGHT + 8.4, corner.z));
       const bar =
         axis === 'ns'
-          ? toWorld({ x: node.x + dx * 6, y: node.y + dy * 12.5 }, 0.15)
-          : toWorld({ x: node.x + dx * 12.5, y: node.y + dy * 6 }, 0.15);
+          ? toWorld({ x: node.x + dx * 6, y: node.y + dy * 21 }, 0.15)
+          : toWorld({ x: node.x + dx * 21, y: node.y + dy * 6 }, 0.15);
       stopBars.setMatrixAt(
         i,
         matrix.makeRotationY(axis === 'ns' ? 0 : Math.PI / 2).setPosition(bar),
@@ -579,22 +577,29 @@ export function createCityScene(
     new THREE.BoxGeometry(13, 3.6, 3.8).translate(0, 2.3, 0),
     new THREE.BoxGeometry(12, 0.5, 3.4).translate(0, 4.35, 0),
   ]);
+  // 配送车：车头在前，后面是厢体
+  const vanGeometry = mergeGeometries([
+    new THREE.BoxGeometry(5.4, 3.4, 3.6).translate(-1, 2.1, 0),
+    new THREE.BoxGeometry(2.4, 2.3, 3.4).translate(2.7, 1.55, 0),
+  ]);
   const vehicleMaterial = new THREE.MeshStandardMaterial({
     roughness: 0.42,
     metalness: 0.3,
     transparent: true,
   });
-  const carList = vehicles.filter((v) => v.kind !== 'bus');
+  const carList = vehicles.filter((v) => v.kind === 'car' || v.kind === 'taxi');
+  const vanList = vehicles.filter((v) => v.kind === 'van');
   const busList = vehicles.filter((v) => v.kind === 'bus');
   const cars = makeInstanced(carGeometry, vehicleMaterial, carList.length);
+  const vans = makeInstanced(vanGeometry, vehicleMaterial, vanList.length);
   const buses = makeInstanced(busGeometry, vehicleMaterial, busList.length);
-  cars.castShadow = buses.castShadow = true;
+  cars.castShadow = vans.castShadow = buses.castShadow = true;
   const lightGeometry = new THREE.BoxGeometry(0.6, 0.8, 3);
   const headMaterial = new THREE.MeshBasicMaterial({ transparent: true });
   const tailMaterial = new THREE.MeshBasicMaterial({ transparent: true });
   const headLights = makeInstanced(lightGeometry, headMaterial, vehicles.length);
   const tailLights = makeInstanced(lightGeometry, tailMaterial, vehicles.length);
-  scene.add(cars, buses, headLights, tailLights);
+  scene.add(cars, vans, buses, headLights, tailLights);
 
   interface VehicleView {
     vehicle: Vehicle;
@@ -610,10 +615,15 @@ export function createCityScene(
   }
   const vehicleViews: VehicleView[] = vehicles.map((vehicle, slot) => ({
     vehicle,
-    mesh: vehicle.kind === 'bus' ? buses : cars,
-    index: vehicle.kind === 'bus' ? busList.indexOf(vehicle) : carList.indexOf(vehicle),
+    mesh: vehicle.kind === 'bus' ? buses : vehicle.kind === 'van' ? vans : cars,
+    index:
+      vehicle.kind === 'bus'
+        ? busList.indexOf(vehicle)
+        : vehicle.kind === 'van'
+          ? vanList.indexOf(vehicle)
+          : carList.indexOf(vehicle),
     slot,
-    half: vehicle.kind === 'bus' ? 6.5 : 3.6,
+    half: vehicle.kind === 'bus' ? 6.5 : vehicle.kind === 'van' ? 3.8 : 3.6,
     base: new THREE.Color(vehicle.color),
     position: new THREE.Vector3(),
     direction: new THREE.Vector3(1, 0, 0),
@@ -624,66 +634,131 @@ export function createCityScene(
   let states = new Map<string, VehicleState>();
   let statesAtT = Number.NaN;
 
-  // ─────────────────────────── 行人（客流传感器） ───────────────────────────
+  // ─────────────────────────── 行人（模拟实况） ───────────────────────────
+  // 街上的每个人都是一个实体：步行、候车、散步。行人不属于任何数据源，始终显示。
 
-  interface Walker {
-    shop: Shop;
-    loop: Point[];
-    perimeter: number;
-    phase: number;
-    pace: number;
-    rank: number;
-    umbrella: number;
-  }
-  const walkers: Walker[] = [];
-  const walkerRandom = seededRandom(23);
-  for (const shop of shops) {
-    const f = buildingOf(shop.buildingId).footprint;
-    const pad = 4.5;
-    const loop = [
-      { x: f.x - pad, y: f.y - pad },
-      { x: f.x + f.w + pad, y: f.y - pad },
-      { x: f.x + f.w + pad, y: f.y + f.h + pad },
-      { x: f.x - pad, y: f.y + f.h + pad },
-      { x: f.x - pad, y: f.y - pad },
-    ];
-    const perimeter = 2 * (f.w + f.h + 4 * pad);
-    const count = shop.category === '商场' ? 28 : 12;
-    for (let r = 0; r < count; r++) {
-      walkers.push({
-        shop,
-        loop,
-        perimeter,
-        phase: walkerRandom() * perimeter,
-        pace: (1.1 + walkerRandom() * 0.7) * (walkerRandom() < 0.5 ? -1 : 1),
-        rank: (r + 0.5) / count,
-        umbrella: walkerRandom(),
-      });
-    }
-  }
-  const walkerMaterial = new THREE.MeshStandardMaterial({ roughness: 0.8, transparent: true });
-  const walkerMesh = makeInstanced(
+  const PEDESTRIANS = 1600;
+  const pedestrianMaterial = new THREE.MeshStandardMaterial({ roughness: 0.8 });
+  const pedestrianMesh = makeInstanced(
     new THREE.CapsuleGeometry(0.85, 1.9, 2, 6).translate(0, 1.8, 0),
-    walkerMaterial,
-    walkers.length,
+    pedestrianMaterial,
+    PEDESTRIANS,
   );
   const umbrellaMaterial = new THREE.MeshStandardMaterial({
     roughness: 0.6,
-    transparent: true,
     side: THREE.DoubleSide,
   });
   const umbrellas = makeInstanced(
     new THREE.ConeGeometry(2.4, 1, 10, 1, true).translate(0, 4.7, 0),
     umbrellaMaterial,
-    walkers.length,
+    PEDESTRIANS,
   );
-  walkers.forEach((_, i) => {
-    walkerMesh.setColorAt(i, color.set(WALKER_COLORS[i % WALKER_COLORS.length]));
-    umbrellas.setColorAt(i, color.set(UMBRELLA_COLORS[(i * 7) % UMBRELLA_COLORS.length]));
+  pedestrianMesh.castShadow = true;
+  scene.add(pedestrianMesh, umbrellas);
+
+  interface Traits {
+    color: THREE.Color;
+    umbrellaColor: THREE.Color;
+    /** 在人行道上相对路线的固定偏移，避免同路的人重叠。 */
+    dx: number;
+    dy: number;
+    umbrella: number;
+  }
+  const traits = new Map<string, Traits>();
+  const traitsOf = (id: string): Traits => {
+    let entry = traits.get(id);
+    if (!entry) {
+      let h = 2166136261;
+      for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+      const random = seededRandom(h >>> 0);
+      const angle = random() * Math.PI * 2;
+      const radius = Math.sqrt(random());
+      entry = {
+        color: new THREE.Color(WALKER_COLORS[Math.floor(random() * WALKER_COLORS.length)]),
+        umbrellaColor: new THREE.Color(
+          UMBRELLA_COLORS[Math.floor(random() * UMBRELLA_COLORS.length)],
+        ),
+        dx: Math.cos(angle) * radius,
+        dy: Math.sin(angle) * radius,
+        umbrella: random(),
+      };
+      traits.set(id, entry);
+    }
+    return entry;
+  };
+  /** 地面高度：街区与公园高出路面，人行横道在路面上。 */
+  const groundAt = (p: Point) => {
+    const lx = p.x - Math.floor(p.x / GRID.width) * GRID.width;
+    const ly = p.y - Math.floor(p.y / GRID.height) * GRID.height;
+    const inset = GRID.street / 2;
+    const onBlock =
+      lx >= inset && lx <= GRID.width - inset && ly >= inset && ly <= GRID.height - inset;
+    return onBlock || pointInPolygon(p, park.area) ? BLOCK_HEIGHT : 0.05;
+  };
+  /** 本帧画出的行人：实例序号对应的人与位置，供拾取使用。 */
+  const shownPeople: { id: string; position: THREE.Vector3 }[] = [];
+  let shownCount = 0;
+  /** 明细视图中另有标识的具名人物，不再画成普通行人。 */
+  const avatarShown = new Set<string>();
+
+  // 人行横道：路面上的斑马线
+  const stripeMatrices: THREE.Matrix4[] = [];
+  for (const { a, b } of crosswalks) {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    if (Math.abs(dx) > 0.5 && Math.abs(dy) > 0.5) continue;
+    const length = Math.hypot(dx, dy);
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const along = Math.abs(dx) > Math.abs(dy);
+    for (let k = -GRID.street / 2 + 1.5; k <= GRID.street / 2 - 1.5; k += 2) {
+      const p = { x: mid.x + (dx / length) * k, y: mid.y + (dy / length) * k };
+      stripeMatrices.push(
+        new THREE.Matrix4().compose(
+          toWorld(p, 0.06),
+          new THREE.Quaternion(),
+          along ? new THREE.Vector3(1, 1, 4) : new THREE.Vector3(4, 1, 1),
+        ),
+      );
+    }
+  }
+  const stripeMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    depthWrite: false,
   });
-  walkerMesh.castShadow = true;
-  scene.add(walkerMesh, umbrellas);
-  const shopIntensity = new Map<number, number>();
+  const stripes = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 0.04, 1),
+    stripeMaterial,
+    stripeMatrices.length,
+  );
+  stripeMatrices.forEach((m, i) => stripes.setMatrixAt(i, m));
+  stripes.renderOrder = 1;
+  scene.add(stripes);
+
+  // 公交站牌：站台上的立杆与站牌
+  const stopSignMaterial = new THREE.MeshStandardMaterial({
+    color: SOURCE_COLOR.mobility,
+    emissive: SOURCE_COLOR.mobility,
+    emissiveIntensity: 0.3,
+    transparent: true,
+  });
+  const stopSigns = new THREE.Group();
+  for (const stop of BUS_LOOP) {
+    const p = platformOf(stop);
+    const base = toWorld(p, BLOCK_HEIGHT);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 5, 6), poleMaterial);
+    pole.position.copy(base).setY(BLOCK_HEIGHT + 2.5);
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.4, 0.3), stopSignMaterial);
+    sign.position.copy(base).setY(BLOCK_HEIGHT + 5.2);
+    const shelter = new THREE.Mesh(new THREE.BoxGeometry(6, 0.3, 2.4), stopSignMaterial);
+    shelter.position.copy(base).setY(BLOCK_HEIGHT + 3.4);
+    // 顺着街道方向
+    const from = nodeById.get(previousStop(stop))!;
+    const to = nodeById.get(stop)!;
+    shelter.rotation.y = sign.rotation.y = Math.atan2(to.y - from.y, to.x - from.x);
+    stopSigns.add(pole, sign, shelter);
+  }
+  scene.add(stopSigns);
 
   // ─────────────────────────── 具名人物（仅明细视图） ───────────────────────────
 
@@ -1633,7 +1708,7 @@ export function createCityScene(
 
   let selection: Selection | null = null;
   let hovered: number | null = null;
-  let follow: { type: 'vehicle' | 'persona'; id: string } | null = null;
+  let follow: { type: 'vehicle' | 'person'; id: string } | null = null;
   const selectedHalo = flatRing(8.5, 10, 0xffffff, 0.95);
   selectedHalo.visible = false;
   scene.add(selectedHalo);
@@ -1693,8 +1768,20 @@ export function createCityScene(
       const v = vehicleViewById.get(follow.id);
       return v?.active ? v.position.clone().setY(0) : null;
     }
-    const state = personAt(follow.id, simT);
-    return state ? toWorld(state) : null;
+    const p = personPoint(follow.id);
+    return p ? p.setY(0) : null;
+  };
+
+  /** 选中的人此刻的位置：乘车时取车辆在场景中的位置，步行时取画出的行人。 */
+  const personPoint = (id: string): THREE.Vector3 | null => {
+    const state = personAt(id, simT);
+    if (!state) return null;
+    if (state.leg.vehicle && isRide(state.leg.mode)) {
+      const v = vehicleViewById.get(state.leg.vehicle);
+      if (v?.active) return v.position.clone();
+    }
+    const shown = shownPeople.find((p) => p.id === id);
+    return shown ? shown.position.clone() : toWorld(state, groundAt(state));
   };
 
   /** 结果中有空间位置的标注：用于切换查询后移动镜头。 */
@@ -1734,18 +1821,47 @@ export function createCityScene(
 
   // ─────────────────────────── 拾取 ───────────────────────────
 
+  /** 行人很小：按屏幕距离拾取，离指针 14 像素以内的最近一人。 */
+  const pickPerson = (event: PointerEvent): { id: string; distance: number } | null => {
+    if (stage.mix >= 0.5) return null;
+    const rect = stage.canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    let best: { id: string; distance: number } | null = null;
+    let bestPixels = 14;
+    for (const person of shownPeople) {
+      scratch.copy(person.position).setY(person.position.y + 2);
+      const distance = scratch.distanceTo(camera.position);
+      scratch.project(camera);
+      if (scratch.z > 1) continue;
+      const px = ((scratch.x + 1) / 2) * rect.width;
+      const py = ((1 - scratch.y) / 2) * rect.height;
+      const pixels = Math.hypot(px - x, py - y);
+      if (pixels < bestPixels) {
+        bestPixels = pixels;
+        best = { id: person.id, distance };
+      }
+    }
+    return best;
+  };
+
   const pickAt = (event: PointerEvent): Selection | null => {
     const targets: THREE.Object3D[] = [...world.buildingGroup.children];
-    if (fade.traffic > 0.5 && stage.mix < 0.5) targets.push(cars, buses);
+    if (fade.traffic > 0.5 && stage.mix < 0.5) targets.push(cars, vans, buses);
     if (fade.iot > 0.5 && stage.mix < 0.5) targets.push(envHeads);
     const hit = stage.pick(event, targets);
+    const person = pickPerson(event);
+    // 行人在前（没有被建筑或车辆挡住）时选中行人
+    if (person && (!hit || person.distance < hit.distance + 4)) {
+      return { type: 'person', id: person.id };
+    }
     if (!hit) return null;
     if (hit.object === envHeads) {
       const sensor = hit.instanceId === undefined ? undefined : ENV_SENSORS[hit.instanceId];
       return sensor ? { type: 'sensor', id: sensor.id } : null;
     }
-    if (hit.object === cars || hit.object === buses) {
-      const list = hit.object === cars ? carList : busList;
+    if (hit.object === cars || hit.object === vans || hit.object === buses) {
+      const list = hit.object === cars ? carList : hit.object === vans ? vanList : busList;
       const vehicle = hit.instanceId === undefined ? undefined : list[hit.instanceId];
       return vehicle ? { type: 'vehicle', id: vehicle.id } : null;
     }
@@ -1775,10 +1891,12 @@ export function createCityScene(
     for (const view of vehicleViews) {
       const state = states.get(view.vehicle.id);
       if (!state) {
-        view.active = false;
-        view.mesh.setMatrixAt(view.index, HIDDEN);
-        headLights.setMatrixAt(view.slot, HIDDEN);
-        tailLights.setMatrixAt(view.slot, HIDDEN);
+        if (view.active) {
+          view.active = false;
+          view.mesh.setMatrixAt(view.index, HIDDEN);
+          headLights.setMatrixAt(view.slot, HIDDEN);
+          tailLights.setMatrixAt(view.slot, HIDDEN);
+        }
         continue;
       }
       const direction = view.direction.set(Math.cos(state.heading), 0, -Math.sin(state.heading));
@@ -1815,7 +1933,7 @@ export function createCityScene(
       if (highlighted) color.lerp(ACCENT, 0.8);
       view.mesh.setColorAt(view.index, color);
     }
-    for (const mesh of [cars, buses, headLights, tailLights]) {
+    for (const mesh of [cars, vans, buses, headLights, tailLights]) {
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
@@ -1849,6 +1967,11 @@ export function createCityScene(
     lampMaterial.color.setRGB(0.72, 0.72, 0.68).lerp(color.setRGB(1.9, 1.4, 0.85), blend);
     lampMaterial.opacity = poleMaterial.opacity = gis;
     lamps.visible = lampPoles.visible = gis > 0.01;
+    stripeMaterial.opacity = (mode === 'night' ? 0.22 : 0.5) * gis;
+    stripes.visible = gis > 0.01 && stage.mix < 0.5;
+    stopSignMaterial.opacity = 0.15 + 0.85 * fade.mobility;
+    stopSignMaterial.emissiveIntensity = 0.3 + 0.9 * blend;
+    stopSigns.visible = stage.mix < 0.5;
     for (const pin of basePins) pin.shown = gis > 0.5;
 
     // 商户招牌随屋顶高度移动
@@ -1940,43 +2063,54 @@ export function createCityScene(
     void now;
   };
 
-  const updateWalkers = () => {
-    const footfall = fade.iot;
+  const updatePedestrians = () => {
     const visible = stage.mix < 0.5;
-    walkerMesh.visible = umbrellas.visible = visible;
+    pedestrianMesh.visible = umbrellas.visible = visible;
     if (!visible) return;
-    for (const shop of shops) {
-      shopIntensity.set(shop.id, clamp01(footfallRate(shop, simT) / (shop.base * 1.4)));
-    }
     const umbrellaShare = rainVisual * 0.9;
-    walkers.forEach((walker, i) => {
-      if (walker.rank > shopIntensity.get(walker.shop.id)!) {
-        walkerMesh.setMatrixAt(i, HIDDEN);
-        umbrellas.setMatrixAt(i, HIDDEN);
-        return;
-      }
-      const s =
-        (((walker.phase + simT * walker.pace) % walker.perimeter) + walker.perimeter) %
-        walker.perimeter;
-      const p = toWorld(pointAlong(walker.loop, s), BLOCK_HEIGHT);
-      matrix.makeTranslation(p.x, p.y, p.z);
-      walkerMesh.setMatrixAt(i, matrix);
-      umbrellas.setMatrixAt(i, walker.umbrella < umbrellaShare ? matrix : HIDDEN);
-    });
-    walkerMesh.instanceMatrix.needsUpdate = true;
-    umbrellas.instanceMatrix.needsUpdate = true;
-    walkerMaterial.opacity = umbrellaMaterial.opacity = 0.08 + 0.92 * footfall;
-    walkerMaterial.depthWrite = umbrellaMaterial.depthWrite = footfall > 0.5;
+    const selectedPerson = selection?.type === 'person' ? selection.id : null;
+    shownPeople.length = 0;
+    let n = 0;
+    for (const p of pedestriansAt(simT)) {
+      if (n >= PEDESTRIANS) break;
+      if (avatarShown.has(p.person)) continue;
+      const trait = traitsOf(p.person);
+      // 候车的人散开一些
+      const spread = p.leg.mode === 'wait' ? 2.6 : 1.2;
+      const at = { x: p.x + trait.dx * spread, y: p.y + trait.dy * spread };
+      const position = toWorld(at, groundAt(at));
+      matrix.makeTranslation(position.x, position.y, position.z);
+      pedestrianMesh.setMatrixAt(n, matrix);
+      pedestrianMesh.setColorAt(n, p.person === selectedPerson ? ACCENT : trait.color);
+      umbrellas.setMatrixAt(n, trait.umbrella < umbrellaShare ? matrix : HIDDEN);
+      umbrellas.setColorAt(n, trait.umbrellaColor);
+      shownPeople.push({ id: p.person, position });
+      n++;
+    }
+    for (let i = n; i < shownCount; i++) {
+      pedestrianMesh.setMatrixAt(i, HIDDEN);
+      umbrellas.setMatrixAt(i, HIDDEN);
+    }
+    shownCount = n;
+    // 夜间路灯下仍能看清行人
+    pedestrianMaterial.emissive.setScalar(0.32 * blend);
+    umbrellaMaterial.emissive.setScalar(0.18 * blend);
+    for (const mesh of [pedestrianMesh, umbrellas]) {
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.instanceColor!.needsUpdate = true;
+    }
   };
 
   const updateAvatars = () => {
     const known = Math.max(fade.hr, fade.community);
     // 同一地点的人物合并为一个标签
     const groups = new Map<string, { members: typeof avatars; building?: Building }>();
+    avatarShown.clear();
     for (const avatar of avatars) {
       avatar.pin.shown = false;
       const state = personAt(avatar.person.id, simT);
       const showing = detail && known > 0.5 && state !== null && state.leg.mode !== 'home';
+      if (showing) avatarShown.add(avatar.person.id);
       // 乘车时人物在车内：只显示车辆周围的光圈
       const riding = showing && isRide(state!.leg.mode);
       avatar.body.visible = showing && state!.leg.mode !== 'metro' && !riding;
@@ -2160,7 +2294,7 @@ export function createCityScene(
       wet = wetness;
       world.setWetness(wet);
     }
-    const nextBlend = clamp01(nightAt(simT) + 0.3 * rainVisual + 0.15 * storm);
+    const nextBlend = clamp01(darkness(simT) + 0.3 * rainVisual + 0.15 * storm);
     if (Math.abs(nextBlend - blend) > 0.003) {
       blend = nextBlend;
       world.applyBlend(blend);
@@ -2226,17 +2360,28 @@ export function createCityScene(
     updateSensors(now, dt);
     updateSignals();
     updateVehicles();
-    updateWalkers();
     updateAvatars();
+    updatePedestrians();
     updateBusPins();
     updateMarks(now);
     if (mix > 0.01) updateGraph(now, dt);
 
-    // 选中的车辆
+    // 选中的车辆或行人
     if (selection?.type === 'vehicle') {
       const v = vehicleViewById.get(selection.id);
       selectedHalo.visible = Boolean(v?.active) && fade.traffic > 0.5;
       if (v?.active) selectedHalo.position.copy(v.position).setY(0.5);
+      selectedHalo.scale.setScalar(1);
+      (selectedHalo.material as THREE.MeshBasicMaterial).color.set(PALETTE[mode].ink);
+    } else if (selection?.type === 'person' && mix < 0.5) {
+      const p = personPoint(selection.id);
+      const state = personAt(selection.id, simT);
+      const riding = Boolean(state?.leg.vehicle && isRide(state.leg.mode));
+      // 在室内时不显示
+      const indoor = state?.leg.building !== undefined && !riding;
+      selectedHalo.visible = Boolean(p) && !indoor;
+      if (p) selectedHalo.position.copy(p).setY(p.y + 0.4);
+      selectedHalo.scale.setScalar(riding ? 1 : 0.45);
       (selectedHalo.material as THREE.MeshBasicMaterial).color.set(PALETTE[mode].ink);
     } else {
       selectedHalo.visible = false;
@@ -2268,7 +2413,12 @@ export function createCityScene(
     selectionEntity = selectionInfo
       ? {
           key: 'sel',
-          kind: selectionInfo.selection.type,
+          kind:
+            selectionInfo.selection.type === 'node'
+              ? 'intersection'
+              : selectionInfo.selection.type === 'edge'
+                ? 'road'
+                : selectionInfo.selection.type,
           ref: selectionInfo.selection.id,
           label: selectionInfo.label,
           cls: selectionInfo.cls,
@@ -2290,6 +2440,9 @@ export function createCityScene(
     },
     setDetail(value) {
       detail = value;
+    },
+    setNightView(value) {
+      nightView = value;
     },
     showResult(result, fresh) {
       const now = performance.now();
@@ -2338,10 +2491,36 @@ export function createCityScene(
           follow = null;
           stage.flyTo(toWorld(sensor.at), near(320));
         }
+      } else if (info?.selection.type === 'node' || info?.selection.type === 'edge') {
+        const p =
+          info.selection.type === 'node'
+            ? nodeById.get(info.selection.id)!
+            : (() => {
+                const edge = edgeById.get(info.selection.id)!;
+                const a = nodeById.get(edge.a)!;
+                const b = nodeById.get(edge.b)!;
+                return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+              })();
+        // 查询结果已标注该路口或路段时不再重复加标签
+        if (!marks.has(`${info.selection.type}:${info.selection.id}`)) {
+          stage.addPin(escapeHtml(info.label), toWorld(p, 16), 'pin-selected', 'city');
+        }
+        if (view === 'city') {
+          follow = null;
+          stage.flyTo(toWorld(p), near(340));
+        }
       } else if (info?.selection.type === 'vehicle' && view === 'city') {
         follow = { type: 'vehicle', id: info.selection.id };
         const v = vehicleViewById.get(info.selection.id);
         if (v?.active) stage.flyTo(v.position.clone().setY(0), near(300));
+      } else if (info?.selection.type === 'person' && view === 'city') {
+        // 跟随选中的人；已经在近处时不再推近镜头
+        const changed = follow?.type !== 'person' || follow.id !== info.selection.id;
+        follow = { type: 'person', id: info.selection.id };
+        const p = followPoint();
+        if (p && changed && camera.position.distanceTo(controls.target) > 420) {
+          stage.flyTo(p, near(260));
+        }
       } else if (!info) {
         follow = null;
       }
@@ -2375,7 +2554,7 @@ export function createCityScene(
           break;
         case 'vehicle':
         case 'persona': {
-          follow = { type: target.type, id: target.id };
+          follow = { type: target.type === 'vehicle' ? 'vehicle' : 'person', id: target.id };
           const p = followPoint();
           if (p) stage.flyTo(p, near(300));
           break;

@@ -101,7 +101,8 @@ export interface Handover {
 }
 
 const LANE_OFFSET = 4;
-const STOP_LINE = 11;
+/** 停车线离路口中心的距离（米）：停在人行横道之后，与公交站台对齐。 */
+const STOP_LINE = 24;
 
 /** 在路段上从 a 驶向 b 时的车道位置（靠右行驶，并留出停车线；出入口一端不留）。 */
 function laneEnds(aId: number, bId: number): [Point, Point] {
@@ -559,19 +560,27 @@ function simulateDay(day: number): DayTraffic {
   });
 
   // ── 公交：从车场驶入，沿环线运行，午后在湖滨站换班 ──
-  // 信号灯会让同一路口等灯的车辆同时放行，若不考虑进站停靠，几圈之后四辆车就会聚到一起；
-  // 每次进站的停靠时长不同，车辆之间保持分散。
+  // 信号灯会让同一路口等灯的车辆同时放行，不加控制时四辆车很快就会聚到一起。
+  // 公交按时刻表运行：四辆车在环线上均匀分布、同时发车，每站按计划时刻离站，早到就多停一会儿。
   const change = nearestNode(city.stations.find((s) => s.name === '湖滨站')!.location).id;
+  const HOP = 75;
   busCrews.forEach((crew, b) => {
     const vehicle = vehicleById.get(crew.bus)!;
     let position = (b * 2) % BUS_LOOP.length;
-    const first = base + (weekend ? hours(7) : hours(6)) + b * hours(0, 4);
-    const depot = nearestGate(BUS_LOOP[position]);
-    const deadhead = route(first - 240, pathBetween(depot, BUS_LOOP[position]));
-    // 首站上客后发车
-    const arrive = deadhead.length ? deadhead.at(-1)!.t1 : first;
-    deadhead.push(stopover(arrive, 30, BUS_LOOP[position], deadhead.at(-1)));
-    const start = arrive + 30;
+    const first = base + (weekend ? hours(7) : hours(6));
+    // 从车场经环线的上一站驶入首站，停在站台一侧
+    const previous = BUS_LOOP[(position + BUS_LOOP.length - 1) % BUS_LOOP.length];
+    const depot = nearestGate(previous);
+    const deadhead = route(
+      first - 300,
+      straighten([...pathBetween(depot, previous), BUS_LOOP[position]]),
+    );
+    // 首站上客，按时发车
+    const arrive = deadhead.length ? deadhead.at(-1)!.t1 : first - 30;
+    deadhead.push(
+      stopover(arrive, Math.max(30, first - arrive), BUS_LOOP[position], deadhead.at(-1)),
+    );
+    const start = Math.max(first, arrive + 30);
     const next: Next = (current) => {
       position = (BUS_LOOP.indexOf(current) + 1) % BUS_LOOP.length;
       return { to: BUS_LOOP[position] };
@@ -579,11 +588,13 @@ function simulateDay(day: number): DayTraffic {
     const dwellRandom = seededRandom(101 + b + day * 13);
     const changeAt = base + hours(14, 30) + b * 360;
     let handover: Handover | null = null;
+    let stop = 0;
     const dwell = (node: number, t: number) => {
-      const seconds = 8 + dwellRandom() * 26;
+      const scheduled = start + ++stop * HOP;
+      const seconds = Math.max(8 + dwellRandom() * 14, scheduled - t);
       if (!handover && node === change && t >= changeAt) {
-        handover = { bus: vehicle.id, node, arrive: t, depart: t + 90 };
-        return 90;
+        handover = { bus: vehicle.id, node, arrive: t, depart: t + Math.max(90, seconds) };
+        return Math.max(90, seconds);
       }
       return seconds;
     };
@@ -597,7 +608,7 @@ function simulateDay(day: number): DayTraffic {
         {
           vehicle: vehicle.id,
           person: crew.early,
-          start: first - 240,
+          start: first - 300,
           end: h.arrive + 20,
           passengers: [],
         },
@@ -607,7 +618,7 @@ function simulateDay(day: number): DayTraffic {
       stints.push({
         vehicle: vehicle.id,
         person: crew.early,
-        start: first - 240,
+        start: first - 300,
         end,
         passengers: [],
       });
