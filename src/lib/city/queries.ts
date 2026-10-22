@@ -5,16 +5,8 @@
  */
 import { city } from '../geo/city';
 import { rectCenter, type Point } from '../geo/spatial';
-import { footfallCount, shops, type Shop } from './commerce';
-import {
-  hasItinerary,
-  isRide,
-  itinerary,
-  placeName,
-  purchasesOf,
-  tapsOf,
-  type Leg,
-} from './mobility';
+import { shops, type Shop } from './commerce';
+import { hasItinerary, isRide, itinerary, placeName, type Leg } from './mobility';
 import {
   carOwners,
   companies,
@@ -22,10 +14,10 @@ import {
   events,
   personById,
   personas,
-  presence,
   type CommunityEvent,
   type Person,
 } from './people';
+import { footfallCount, presence, purchasesOf, tapsOf } from './records';
 import { edgeById, nodeById, roads, signalState } from './roads';
 import {
   ENV_SENSORS,
@@ -39,17 +31,8 @@ import {
 } from './sensors';
 import { sourceById, type SourceId } from './sources';
 import { DAY, DAYS, at, dayOf, formatDayTime, formatTime, hours, startOfDay } from './time';
-import {
-  edgeSpeeds,
-  queuesAt,
-  statesAt,
-  trajectory,
-  tripsOf,
-  vehicleAt,
-  vehicleById,
-  vehicleByOwner,
-  vehicles,
-} from './traffic';
+import { edgeSpeeds, queuesAt, statesAt, trajectory, tripsOf, vehicleAt } from './traffic';
+import { vehicleById, vehicleByOwner, vehicles } from './vehicles';
 import { adverseWindows, badWeatherWindows, observationAt, rainWindows } from './weather';
 
 export type QueryGroup = 'dynamic' | 'fusion' | 'life';
@@ -347,7 +330,7 @@ WHERE  v.type IN ('bus', 'taxi')
       sources: ['gis'],
       hit: true,
     });
-    for (const vehicle of vehicles.filter((v) => v.kind !== 'car')) {
+    for (const vehicle of vehicles.filter((v) => v.kind === 'bus' || v.kind === 'taxi')) {
       const path = trajectory(vehicle, from, ctx.t);
       if (!path.some((p) => Math.hypot(p.x - c.x, p.y - c.y) < 200)) continue;
       const kind = vehicle.kind === 'bus' ? '公交' : '网约车';
@@ -1121,7 +1104,7 @@ ORDER  BY 2`,
       result.entities.push({
         key: 'home',
         kind: 'building',
-        ref: personById.get('P01')!.homeId,
+        ref: personById.get('P01')!.homeId!,
         label: '住址',
         cls: ':Building',
         sources: ['community', 'gis'].filter((id) => ctx.sources.has(id as SourceId)) as SourceId[],

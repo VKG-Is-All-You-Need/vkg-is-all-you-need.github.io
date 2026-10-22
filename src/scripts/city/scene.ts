@@ -14,15 +14,9 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CITY, city, type Building } from '../../lib/geo/city';
 import { pointInPolygon, rectCenter, seededRandom, type Point } from '../../lib/geo/spatial';
 import { footfallRate, shopById, shops, type Shop } from '../../lib/city/commerce';
-import { busLoad, hasItinerary, isRide, personaAt } from '../../lib/city/mobility';
-import {
-  companies,
-  companyById,
-  events,
-  personById,
-  personas,
-  presence,
-} from '../../lib/city/people';
+import { hasItinerary, isRide, personAt } from '../../lib/city/mobility';
+import { companies, companyById, events, personById, personas } from '../../lib/city/people';
+import { busLoad, presence } from '../../lib/city/records';
 import type { CityResult, FusionEntity, FusionRelation, Highlight } from '../../lib/city/queries';
 import {
   edgeById,
@@ -35,14 +29,8 @@ import {
 import { SOURCES, sourceById, type DataSource, type SourceId } from '../../lib/city/sources';
 import { ENV_SENSORS, STATION, readingAt, sensorById } from '../../lib/city/sensors';
 import { at, dayOf, hours, timeOfDay } from '../../lib/city/time';
-import {
-  queuesAt,
-  statesAt,
-  tripsOf,
-  vehicles,
-  type Vehicle,
-  type VehicleState,
-} from '../../lib/city/traffic';
+import { queuesAt, statesAt, tripsOf, type VehicleState } from '../../lib/city/traffic';
+import { vehicles, type Vehicle } from '../../lib/city/vehicles';
 import { cloudAt, fogAt, observationAt, rainAt, stormAt, windAt } from '../../lib/city/weather';
 import { createStage, type Pin } from '../three/stage';
 import {
@@ -1283,10 +1271,10 @@ export function createCityScene(
         return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
       }
       case 'person': {
-        const state = personaAt(entity.ref as string, simT);
+        const state = personAt(entity.ref as string, simT);
         if (state) return state;
         const person = personById.get(entity.ref as string);
-        return person ? centerOf(person.homeId) : null;
+        return person?.homeId ? centerOf(person.homeId) : null;
       }
       case 'company': {
         const company = companyById.get(entity.ref as number)!;
@@ -1705,7 +1693,7 @@ export function createCityScene(
       const v = vehicleViewById.get(follow.id);
       return v?.active ? v.position.clone().setY(0) : null;
     }
-    const state = personaAt(follow.id, simT);
+    const state = personAt(follow.id, simT);
     return state ? toWorld(state) : null;
   };
 
@@ -1987,7 +1975,7 @@ export function createCityScene(
     const groups = new Map<string, { members: typeof avatars; building?: Building }>();
     for (const avatar of avatars) {
       avatar.pin.shown = false;
-      const state = personaAt(avatar.person.id, simT);
+      const state = personAt(avatar.person.id, simT);
       const showing = detail && known > 0.5 && state !== null && state.leg.mode !== 'home';
       // 乘车时人物在车内：只显示车辆周围的光圈
       const riding = showing && isRide(state!.leg.mode);
@@ -2029,7 +2017,7 @@ export function createCityScene(
         'is-hit',
         members.some((member) => markedPersonas.has(member.person.id)),
       );
-      const leg = personaAt(lead.person.id, simT)!.leg;
+      const leg = personAt(lead.person.id, simT)!.leg;
       const plate =
         leg.vehicle && isRide(leg.mode) && fade.traffic > 0.5
           ? `（${vehicleViewById.get(leg.vehicle)!.vehicle.plate}）`

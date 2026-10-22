@@ -3,7 +3,8 @@
  * - 物联网平台中的客流计数器只知道设备编号与所在建筑；
  * - 商户系统知道店名、类别与营业时间。
  * 两者通过 building_id 关联，这正是融合的意义所在。
- * 客流随工作日与周末、降雨、高温与大风变化。
+ * 客流随工作日与周末、降雨、高温与大风变化。这里给出的是客流强度；实际进店的是一个个人，
+ * 由 plans.ts 按强度抽样安排，客流计数（records.ts）即进店人数。
  */
 import { city, type Building } from '../geo/city';
 import { seededRandom } from '../geo/spatial';
@@ -177,11 +178,4 @@ export function footfallRate(shop: Shop, t: number): number {
     weather *
     noise(shop, Math.floor(t / 300))
   );
-}
-
-/** 区间内的客流计数（按 5 分钟计数记录累加）。 */
-export function footfallCount(shop: Shop, from: number, to: number): number {
-  let total = 0;
-  for (let t = from; t < to; t += 300) total += footfallRate(shop, t + 150) / 12;
-  return Math.round(total);
 }

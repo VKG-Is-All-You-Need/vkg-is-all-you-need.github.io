@@ -3,8 +3,7 @@
  * 结果列表、对象详情卡片，以及三维场景的按需加载与全屏。
  */
 import { city } from '../../lib/geo/city';
-import { footfallCount, footfallRate, shopById, shopByBuilding } from '../../lib/city/commerce';
-import { busLoad, tapsOf } from '../../lib/city/mobility';
+import { footfallRate, shopById, shopByBuilding } from '../../lib/city/commerce';
 import {
   carOwners,
   companies,
@@ -12,7 +11,6 @@ import {
   events,
   people,
   personById,
-  presence,
 } from '../../lib/city/people';
 import {
   cityQueries,
@@ -22,6 +20,7 @@ import {
   type ResultRow,
 } from '../../lib/city/queries';
 import { dayMarkers } from '../../lib/city/calendar';
+import { busLoad, footfallCount, presence, tapsOf } from '../../lib/city/records';
 import { edgeById, nodeById } from '../../lib/city/roads';
 import { ENV_SENSORS, placeOf, readingAt, sensorById } from '../../lib/city/sensors';
 import { ALL_SOURCES, SOURCES, sourceById, type SourceId } from '../../lib/city/sources';
@@ -36,7 +35,8 @@ import {
   startOfDay,
   timeOfDay,
 } from '../../lib/city/time';
-import { tripsOf, vehicleAt, vehicleById, vehicleByOwner } from '../../lib/city/traffic';
+import { tripsOf, vehicleAt } from '../../lib/city/traffic';
+import { vehicleById, vehicleByOwner } from '../../lib/city/vehicles';
 import { observationAt } from '../../lib/city/weather';
 import { prefersReducedMotion } from '../lifecycle';
 import type { CityScene, FocusTarget, Insets, Selection, SelectionInfo, View } from './scene';
@@ -135,7 +135,14 @@ function buildingCard(id: number, t: number, on: ReadonlySet<SourceId>): Card {
 function vehicleCard(id: string, t: number, detail: boolean): Card {
   const vehicle = vehicleById.get(id)!;
   const state = vehicleAt(vehicle, t);
-  const kind = vehicle.kind === 'bus' ? '公交' : vehicle.kind === 'taxi' ? '网约车' : '小汽车';
+  const kind =
+    vehicle.kind === 'bus'
+      ? '公交'
+      : vehicle.kind === 'taxi'
+        ? '网约车'
+        : vehicle.kind === 'van'
+          ? '配送车'
+          : '小汽车';
   const rows: CardRow[] = [
     {
       source: 'traffic',
@@ -152,11 +159,11 @@ function vehicleCard(id: string, t: number, detail: boolean): Card {
         : `行驶在 ${edgeById.get(state.edge)!.name}`,
     });
   }
-  if (vehicle.driver) {
+  if (vehicle.kind === 'taxi' && vehicle.driver === 'P05') {
     rows.push({
       source: 'hr',
       text: detail
-        ? `司机 ${vehicle.driver} · 畅行出行（虚构）`
+        ? `司机 ${personById.get(vehicle.driver)!.name} · 畅行出行（虚构）`
         : '司机为畅行出行员工（聚合视图不显示姓名）',
     });
   }

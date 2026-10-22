@@ -1,28 +1,36 @@
 /**
- * 车辆轨迹：信号灯控制下的道路交通，按天推演为分段，任意时刻的位置可直接求得。
- * - 过境与配送车辆在路网中随机行驶，工作日高峰时段更多；
- * - 有停车许可的员工按上下班时间开车往返家与公司车库，车入库后不再出现在道路上；
- * - 网约车在接单之间巡游，接单后经最短路径去接乘客，再送到目的地；
- * - 公交车沿环线运行，每个路口设站，停靠时长各不相同。
+ * 车辆轨迹：信号灯控制下的道路交通，按天推演为分段，任意时刻的位置可直接求得。车辆之间互不影响，
+ * 车速只取决于路段、时段与天气。
+ * - 过境车辆从街区边缘的出入口驶入，穿过街区后驶出；工作日早晚高峰更多；
+ * - 员工与外来访客按 plans.ts 中的请求开车往返，车停进车库后不再出现在道路上；
+ * - 配送车上午与午后各跑一轮，在商店门口停靠卸货；
+ * - 网约车在接单之间巡游，接单后经最短路径去接乘客，再送到目的地或驶出街区；
+ * - 公交车从车场驶入后沿环线运行，每个路口设站，午后在湖滨站换班。
  * 某一天的轨迹在首次用到时计算并缓存。
  */
 import { city } from '../geo/city';
-import { rectCenter, seededRandom, type Point } from '../geo/spatial';
-import { carOwners, companyById, homeOf, people, personaTrips, sessionsOf } from './people';
+import { seededRandom, type Point } from '../geo/spatial';
+import { shops } from './commerce';
+import { homeOf } from './people';
+import { dayPlan, type OrderRequest } from './plans';
 import {
+  BUS_LOOP,
+  edgeBetween,
   edgeById,
+  gateById,
+  gates,
+  isGate,
   nearestNode,
   nextGreen,
   nodeById,
   roads,
   shortestPath,
+  speedAt,
   type Axis,
-  type RoadEdge,
 } from './roads';
-import { DAY, DAYS, bell, dayOf, hours, isWeekend, timeOfDay } from './time';
-import { fogAt, rainAt, windAt } from './weather';
-
-export type VehicleKind = 'car' | 'bus' | 'taxi';
+import { DAY, DAYS, dayOf, hours } from './time';
+import { busCrews, vehicleById, vehicles, vehiclesOf, type Vehicle } from './vehicles';
+import { curbAt, doorOf, walkRoute, walkSeconds } from './walk';
 
 export interface Segment {
   t0: number;
@@ -37,32 +45,24 @@ export interface Segment {
   waiting: boolean;
 }
 
-export interface Vehicle {
-  id: string;
-  kind: VehicleKind;
-  plate: string;
-  color: string;
-  driver?: string;
-  /** 有停车许可的车主（居民编号）。 */
-  owner?: string;
-}
-
-type Role = 'cruise' | 'rush' | 'commuter' | 'taxi' | 'bus';
-
 /** 一次用车：自驾或网约车订单。 */
 export interface Trip {
   id: string;
   vehicle: string;
   kind: 'drive' | 'taxi';
   person: string;
+  /** 同车的其他人。 */
+  riders: string[];
   /** 自驾为出发时刻，打车为下单时刻。 */
   request: number;
   /** 乘客上车的时刻（自驾等于出发时刻）。 */
   pickup: number;
-  /** 到达目的地的时刻。 */
+  /** 到达目的地的时刻；驶出街区时为驶出的时刻。 */
   arrive: number;
   from: Point;
   to: Point;
+  /** 驶出街区的出入口。 */
+  exit?: number;
 }
 
 /** 公交进站：到站与离站时刻。 */
@@ -73,22 +73,37 @@ export interface StopVisit {
   depart: number;
 }
 
+/** 驾驶人在车上的时段；passengers 为同乘者（过境车辆）。 */
+export interface Stint {
+  vehicle: string;
+  person: string;
+  start: number;
+  end: number;
+  passengers: string[];
+}
+
+/** 配送车停在商店附近卸货：司机下车把货送进店里。 */
+export interface Delivery {
+  vehicle: string;
+  shop: number;
+  start: number;
+  end: number;
+  /** 停车位置。 */
+  at: Point;
+}
+
+/** 公交换班：早班司机在 node 站下车，晚班司机上车。 */
+export interface Handover {
+  bus: string;
+  node: number;
+  arrive: number;
+  depart: number;
+}
+
 const LANE_OFFSET = 4;
 const STOP_LINE = 11;
-const COLORS = ['#e8e4dc', '#3a3f46', '#b8c2cc', '#8e2f2f', '#2f5d8e', '#c9b27a', '#556b4f'];
 
-/** 时段拥堵程度 0–1：工作日早晚高峰最高，周末午后略有拥堵。 */
-export const rushAt = (t: number) => {
-  const s = timeOfDay(t);
-  if (isWeekend(t)) return 0.25 * bell(s, hours(15), hours(2));
-  return Math.min(1, bell(s, hours(8, 30), hours(0, 45)) + bell(s, hours(18, 15), hours(0, 50)));
-};
-
-/** 路段在时刻 t 的通行速度（米/秒）：高峰、降雨与大雾都会降低车速。 */
-export const speedAt = (edge: RoadEdge, t: number) =>
-  11.5 * edge.factor * (1 - 0.45 * rushAt(t)) * (1 - 0.32 * rainAt(t)) * (1 - 0.22 * fogAt(t));
-
-/** 在路段上从 a 驶向 b 时的车道位置（靠右行驶，并留出停车线）。 */
+/** 在路段上从 a 驶向 b 时的车道位置（靠右行驶，并留出停车线；出入口一端不留）。 */
 function laneEnds(aId: number, bId: number): [Point, Point] {
   const a = nodeById.get(aId)!;
   const b = nodeById.get(bId)!;
@@ -98,13 +113,15 @@ function laneEnds(aId: number, bId: number): [Point, Point] {
   // 平面坐标 y 轴朝北，行驶方向右侧的法向为 (dy, -dx)
   const ox = dy * LANE_OFFSET;
   const oy = -dx * LANE_OFFSET;
+  const head = isGate(aId) ? 0 : STOP_LINE;
+  const tail = isGate(bId) ? 0 : STOP_LINE;
   return [
-    { x: a.x + dx * STOP_LINE + ox, y: a.y + dy * STOP_LINE + oy },
-    { x: b.x - dx * STOP_LINE + ox, y: b.y - dy * STOP_LINE + oy },
+    { x: a.x + dx * head + ox, y: a.y + dy * head + oy },
+    { x: b.x - dx * tail + ox, y: b.y - dy * tail + oy },
   ];
 }
 
-type Next = (current: number, previous: number | null) => { edge: RoadEdge; to: number };
+type Next = (current: number, previous: number | null) => { to: number };
 
 /** 逐段推演：直到时刻 end 或驶过 maxEdges 个路段为止。 */
 function simulate(
@@ -113,7 +130,7 @@ function simulate(
   startNode: number,
   next: Next,
   /** 到达路口后的停靠时长（秒），如公交进站。 */
-  dwell?: (node: number) => number,
+  dwell?: (node: number, t: number) => number,
   maxEdges = Infinity,
 ): Segment[] {
   const segments: Segment[] = [];
@@ -121,9 +138,10 @@ function simulate(
   let node = startNode;
   let previous: number | null = null;
   for (let count = 0; t < end && count < maxEdges; count++) {
-    const { edge, to } = next(node, previous);
+    const { to } = next(node, previous);
+    const edge = edgeBetween(node, to);
     const [from, stop] = laneEnds(node, to);
-    const duration = (edge.length - STOP_LINE * 2) / speedAt(edge, t);
+    const duration = Math.hypot(stop.x - from.x, stop.y - from.y) / speedAt(edge, t);
     segments.push({
       t0: t,
       t1: t + duration,
@@ -135,7 +153,7 @@ function simulate(
       waiting: false,
     });
     t += duration;
-    const stay = dwell?.(to) ?? 0;
+    const stay = dwell?.(to, t) ?? 0;
     if (stay > 0) {
       segments.push({
         t0: t,
@@ -149,7 +167,8 @@ function simulate(
       });
       t += stay;
     }
-    const green = nextGreen(to, edge.axis, t);
+    // 驶出街区的一段终点没有信号灯；路径的最后一个路口也不必等灯
+    const green = isGate(to) || count === maxEdges - 1 ? t : nextGreen(to, edge.axis, t);
     if (green > t) {
       segments.push({
         t0: t,
@@ -169,19 +188,22 @@ function simulate(
   return segments;
 }
 
-/** 沿给定路口序列行驶。 */
+/** 沿给定路口序列行驶（可以以出入口开头或结尾）。 */
 function route(start: number, path: number[]): Segment[] {
   if (path.length < 2) return [];
   let i = 0;
-  const next: Next = (current) => {
-    const to = path[++i];
-    const edge = roads.adjacency.get(current)!.find((option) => option.to === to)!.edge;
-    return { edge, to };
-  };
-  return simulate(start, Infinity, path[0], next, undefined, path.length - 1);
+  return simulate(start, Infinity, path[0], () => ({ to: path[++i] }), undefined, path.length - 1);
 }
 
-/** 原地停靠（上下客）。 */
+/** 从路口（或出入口）到路口（或出入口）的路径。 */
+function pathBetween(from: number, to: number): number[] {
+  const a = gateById.get(from);
+  const b = gateById.get(to);
+  const path = shortestPath(a?.junction ?? from, b?.junction ?? to);
+  return [...(a ? [from] : []), ...path, ...(b ? [to] : [])];
+}
+
+/** 原地停靠（上下客、卸货）。 */
 function stopover(t: number, seconds: number, node: number, last?: Segment): Segment {
   if (last) {
     return { ...last, t0: t, t1: t + seconds, from: last.to, waiting: false };
@@ -200,144 +222,64 @@ function stopover(t: number, seconds: number, node: number, last?: Segment): Seg
   };
 }
 
-/** 粗略估计两点之间的行车时间（秒）。 */
-const estimate = (path: number[]) =>
-  path.slice(1).reduce((sum, to, i) => {
-    const edge = roads.adjacency.get(path[i])!.find((option) => option.to === to)!.edge;
-    return sum + edge.length / (11.5 * edge.factor * 0.7) + 15;
-  }, 0);
-
-// ── 车辆登记信息：一周内不变 ──
-function buildVehicles(): { vehicle: Vehicle; role: Role }[] {
-  const random = seededRandom(31);
-  const list: { vehicle: Vehicle; role: Role }[] = [];
-  let index = 1;
-  const add = (role: Role, kind: VehicleKind, extra: Partial<Vehicle> = {}) =>
-    list.push({
-      role,
-      vehicle: {
-        id: `V${String(index++).padStart(3, '0')}`,
-        kind,
-        plate: `沪A·${String(10000 + Math.floor(random() * 89999))}`,
-        color: kind === 'taxi' ? '#e6c07b' : COLORS[Math.floor(random() * COLORS.length)],
-        ...extra,
-      },
-    });
-  for (let i = 0; i < 16; i++) add('cruise', 'car');
-  for (let i = 0; i < 64; i++) add('rush', 'car');
-  // 网约车：三辆，其中一辆的司机为虚构人物王磊
-  add('taxi', 'taxi', { driver: '王磊' });
-  add('taxi', 'taxi');
-  add('taxi', 'taxi');
-  for (const owner of carOwners) add('commuter', 'car', { owner: owner.person });
-  for (let b = 0; b < 4; b++) {
-    list.push({
-      role: 'bus',
-      vehicle: { id: `B${b + 1}`, kind: 'bus', plate: `公交 ${b + 1}`, color: '#3f8f6a' },
-    });
-  }
-  return list;
-}
-
-const registry = buildVehicles();
-export const vehicles = registry.map((entry) => entry.vehicle);
-export const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
-/** 车主（居民编号）到车辆。 */
-export const vehicleByOwner = new Map(
-  vehicles.filter((v) => v.owner).map((vehicle) => [vehicle.owner!, vehicle]),
-);
-
-// 公交：环线（文华街—星河路—北园街—梧桐路），四辆车错峰发车，每个路口设站。
-// 信号灯会让同一路口等灯的车辆同时放行，若不考虑进站停靠，几圈之后四辆车就会聚到一起；
-// 每次进站的停靠时长不同，车辆之间保持分散。
-export const BUS_LOOP = [
-  [320, 180],
-  [480, 180],
-  [640, 180],
-  [640, 360],
-  [640, 540],
-  [480, 540],
-  [320, 540],
-  [320, 360],
-].map(([x, y]) => roads.nodes.find((n) => n.x === x && n.y === y)!.id);
-
-interface Order {
-  id: string;
-  person: string;
-  request: number;
-  from: Point;
-  to: Point;
-  taxi?: string;
-}
-
-const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
-
-/** 网约车订单：平时较少，下雨、大风与晚间增多。 */
-function taxiOrders(day: number, random: () => number): Order[] {
-  const residents = people.filter((p) => !p.persona);
-  const places = city.buildings.filter((b) =>
-    ['住宅', '办公', '医院', '商场', '学校', '咖啡馆'].includes(b.kind),
-  );
-  const pickPlace = () => rectCenter(places[Math.floor(random() * places.length)].footprint);
-  const orders: Order[] = [];
-  for (let s = hours(7); s < hours(22, 30); s += 900) {
-    const t = day * DAY + s;
-    const rate =
-      1 +
-      7 * rainAt(t) +
-      2.5 * clamp01((windAt(t) - 6) / 5) +
-      1.5 * bell(s, hours(18, 30), hours(1, 30)) +
-      (DAYS[day].weekend ? bell(s, hours(21), hours(1)) : 0);
-    for (let expected = rate / 4; random() < expected; expected -= 1) {
-      const from = pickPlace();
-      let to = pickPlace();
-      while (Math.hypot(to.x - from.x, to.y - from.y) < 250) to = pickPlace();
-      orders.push({
-        id: `R${day}${String(orders.length + 1).padStart(3, '0')}`,
-        person: residents[Math.floor(random() * residents.length)].id,
-        request: t + random() * 900,
-        from,
-        to,
-      });
+/** 去掉路径中的原路折返（a → b → a）。 */
+function straighten(path: number[]): number[] {
+  const out: number[] = [];
+  for (const node of path) {
+    if (out.at(-1) === node) continue;
+    if (out.length >= 2 && out.at(-2) === node) {
+      out.pop();
+      continue;
     }
+    out.push(node);
   }
-  for (const trip of personaTrips(day).filter((trip) => trip.mode === 'taxi')) {
-    orders.push({
-      id: trip.id,
-      person: trip.person,
-      request: trip.depart,
-      from: trip.from,
-      to: trip.to,
-      taxi: 'V081',
-    });
-  }
-  return orders.sort((a, b) => a.request - b.request);
+  return out;
 }
+
+const gateSide = (id: number) => {
+  const { x, y } = gateById.get(id)!.node;
+  return x === 0 ? 'w' : y === 0 ? 's' : x > 900 ? 'e' : 'n';
+};
 
 interface DayTraffic {
   segments: Map<string, Segment[]>;
   trips: Trip[];
   visits: StopVisit[];
+  stints: Stint[];
+  deliveries: Delivery[];
+  handovers: Handover[];
 }
 
 /** 推演某一天所有车辆的轨迹。 */
 function simulateDay(day: number): DayTraffic {
   const random = seededRandom(1000 + day * 7919);
+  const between = (a: number, b: number) => a + random() * (b - a);
+  const gauss = () => Math.sqrt(-2 * Math.log(1 - random())) * Math.cos(2 * Math.PI * random());
   const weekend = DAYS[day].weekend;
   const base = day * DAY;
-  const nodeIds = roads.nodes.map((n) => n.id);
+  const plan = dayPlan(day);
   const segments = new Map<string, Segment[]>();
   const trips: Trip[] = [];
+  const stints: Stint[] = [];
+  const deliveries: Delivery[] = [];
+  const handovers: Handover[] = [];
+  const nodeIds = roads.nodes.map((n) => n.id);
+  const append = (vehicle: Vehicle, more: Segment[]) => {
+    const list = segments.get(vehicle.id) ?? [];
+    list.push(...more);
+    segments.set(vehicle.id, list);
+  };
 
   // 随机游走，略偏向中心区域（车流更集中在中心站一带）
+  const centerWeight = (id: number) => {
+    const node = nodeById.get(id)!;
+    return 1 + 2.2 * Math.exp(-Math.hypot(node.x - 480, node.y - 360) / 180);
+  };
   const randomWalk: Next = (current, previous) => {
     const options = roads.adjacency.get(current)!;
     const forward = options.filter((option) => option.to !== previous);
     const pool = forward.length ? forward : options;
-    const weights = pool.map(({ to }) => {
-      const node = nodeById.get(to)!;
-      return 1 + 2.2 * Math.exp(-Math.hypot(node.x - 480, node.y - 360) / 180);
-    });
+    const weights = pool.map(({ to }) => centerWeight(to));
     let pick = random() * weights.reduce((a, b) => a + b, 0);
     for (let i = 0; i < pool.length; i++) {
       pick -= weights[i];
@@ -345,30 +287,188 @@ function simulateDay(day: number): DayTraffic {
     }
     return pool.at(-1)!;
   };
-  const cruise = (windows: [number, number][]) =>
-    windows.flatMap(([start, end]) =>
-      simulate(
-        base + start,
-        base + end,
-        nodeIds[Math.floor(random() * nodeIds.length)],
-        randomWalk,
-      ),
-    );
+  const centerNode = () => {
+    let pick = random() * nodeIds.reduce((sum, id) => sum + centerWeight(id), 0);
+    for (const id of nodeIds) {
+      pick -= centerWeight(id);
+      if (pick <= 0) return id;
+    }
+    return nodeIds.at(-1)!;
+  };
+  // 过境车流多走中央大道与人民路两条主干道
+  const gateWeight = (id: number) =>
+    /^(中央大道|人民路)/.test(gateById.get(id)!.node.name) ? 4 : 1;
+  const weighted = (pool: typeof gates) => {
+    let pick = random() * pool.reduce((sum, g) => sum + gateWeight(g.id), 0);
+    for (const g of pool) {
+      pick -= gateWeight(g.id);
+      if (pick <= 0) return g.id;
+    }
+    return pool.at(-1)!.id;
+  };
+  const otherGate = (from: number) => {
+    const options = gates.filter((g) => g.id !== from);
+    const across = options.filter((g) => gateSide(g.id) !== gateSide(from));
+    return weighted(random() < 0.8 ? across : options);
+  };
+  const anyGate = () => weighted(gates);
+  const nearestGate = (node: number) => {
+    const p = nodeById.get(node)!;
+    return gates.reduce((best, g) =>
+      Math.hypot(g.node.x - p.x, g.node.y - p.y) < Math.hypot(best.node.x - p.x, best.node.y - p.y)
+        ? g
+        : best,
+    ).id;
+  };
 
-  // 网约车：订单分给预计最早空闲的车（具名人物的订单由王磊接）
-  const orders = taxiOrders(day, random);
-  const taxis = registry.filter((entry) => entry.role === 'taxi').map((entry) => entry.vehicle);
+  // ── 过境车辆：工作日约一半的车早晚各穿过一次，其余随机穿过一到三次 ──
+  for (const [index, vehicle] of vehiclesOf('through').entries()) {
+    const departs: number[] = [];
+    const commuter = !weekend && index % 20 < 9;
+    if (commuter) {
+      if (random() < 0.92) {
+        departs.push(base + hours(8, 25) + gauss() * 1200, base + hours(18, 10) + gauss() * 1500);
+      }
+    } else if (random() < (weekend ? 0.7 : 0.8)) {
+      const n = 1 + Math.floor(random() * 3.5);
+      for (let i = 0; i < n; i++) {
+        departs.push(
+          base + (weekend ? between(hours(8), hours(22)) : between(hours(6, 30), hours(23))),
+        );
+      }
+      departs.sort((a, b) => a - b);
+    }
+    // 通勤车早上从 home 一侧驶入、从 work 一侧驶出，晚上反过来
+    const home = anyGate();
+    const work = otherGate(home);
+    let free = 0;
+    departs.forEach((depart, i) => {
+      const start = Math.max(depart, free);
+      if (start > base + hours(23, 40)) return;
+      const entry = commuter ? (i === 0 ? home : work) : anyGate();
+      const exit = commuter ? (i === 0 ? work : home) : otherGate(entry);
+      const via = random() < 0.8 ? centerNode() : null;
+      const a = gateById.get(entry)!.junction;
+      const b = gateById.get(exit)!.junction;
+      const middle = via
+        ? [...shortestPath(a, via), ...shortestPath(via, b).slice(1)]
+        : shortestPath(a, b);
+      const list = route(start, [entry, ...straighten(middle), exit]);
+      append(vehicle, list);
+      const end = list.at(-1)!.t1;
+      stints.push({
+        vehicle: vehicle.id,
+        person: vehicle.driver!,
+        start,
+        end,
+        passengers: vehicle.companion && random() < 0.6 ? [vehicle.companion] : [],
+      });
+      free = end + 2400;
+    });
+  }
+
+  // ── 配送车：上午一轮，工作日午后部分车辆再跑一轮 ──
+  vehiclesOf('van').forEach((vehicle, v) => {
+    const rounds: number[] = [];
+    if (!weekend || v % 2 === 0) rounds.push(base + hours(7) + between(0, hours(2, 30)));
+    if (!weekend && random() < 0.6) rounds.push(base + hours(13, 30) + between(0, hours(2)));
+    for (const start of rounds) {
+      const entry = anyGate();
+      let t = start;
+      let node = entry;
+      const list: Segment[] = [];
+      const stops = shops
+        .slice()
+        .sort(() => random() - 0.5)
+        .slice(0, 3 + Math.floor(random() * 3));
+      for (const shop of stops) {
+        const target = nearestNode(doorOf(city.buildings.find((b) => b.id === shop.buildingId)!));
+        const leg = route(t, pathBetween(node, target.id));
+        list.push(...leg);
+        if (leg.length) {
+          t = leg.at(-1)!.t1;
+          node = target.id;
+        }
+        const last = list.at(-1);
+        const at = last ? last.to : nodeById.get(node)!;
+        const curb = curbAt(at);
+        const door = doorOf(city.buildings.find((b) => b.id === shop.buildingId)!);
+        const walk =
+          walkSeconds(walkRoute(curb, door), 1.3) + walkSeconds(walkRoute(door, curb), 1.3);
+        const stay = walk + between(120, 240);
+        list.push(stopover(t, stay, node, last));
+        deliveries.push({
+          vehicle: vehicle.id,
+          shop: shop.id,
+          start: t,
+          end: t + stay,
+          at: { ...at },
+        });
+        t += stay;
+      }
+      const exit = nearestGate(node);
+      list.push(...route(t, pathBetween(node, exit)));
+      append(vehicle, list);
+      stints.push({
+        vehicle: vehicle.id,
+        person: vehicle.driver!,
+        start,
+        end: list.at(-1)!.t1,
+        passengers: [],
+      });
+    }
+  });
+
+  // ── 自驾：员工上下班、外来车辆进出（按 plans.ts 的请求） ──
+  const freeAt = new Map<string, number>();
+  for (const drive of plan.drives.slice().sort((a, b) => a.depart - b.depart)) {
+    const vehicle = vehicleById.get(drive.vehicle)!;
+    // 同一辆车的上一段还没开完时顺延
+    const start = Math.max(drive.depart, freeAt.get(vehicle.id) ?? -Infinity);
+    const list = route(start, pathBetween(drive.from, drive.to));
+    if (!list.length) continue;
+    append(vehicle, list);
+    const end = list.at(-1)!.t1;
+    freeAt.set(vehicle.id, end + 60);
+    trips.push({
+      id: drive.id,
+      vehicle: vehicle.id,
+      kind: 'drive',
+      person: drive.person,
+      riders: drive.riders,
+      request: drive.depart,
+      pickup: start,
+      arrive: end,
+      from: drive.origin,
+      to: drive.destination,
+    });
+  }
+
+  // ── 网约车：订单分给预计最早空闲的车（具名人物的订单由王磊接；王磊不接出街区的单） ──
+  const taxis = vehiclesOf('taxi');
+  const orders = plan.orders.slice().sort((a, b) => a.request - b.request);
   const free = new Map(taxis.map((taxi) => [taxi.id, base + hours(7)]));
-  const assigned = new Map<string, Order[]>(taxis.map((taxi) => [taxi.id, []]));
+  const assigned = new Map<string, OrderRequest[]>(taxis.map((taxi) => [taxi.id, []]));
   for (const order of orders) {
-    const taxi = order.taxi ?? [...free.entries()].sort((a, b) => a[1] - b[1])[0][0];
-    free.set(taxi, Math.max(free.get(taxi)!, order.request) + 600);
+    if (order.request < base + hours(7) || order.request > base + hours(22, 30)) continue;
+    const pool = [...free.entries()].filter(
+      ([id]) => !order.exit || vehicleById.get(id)!.driver !== 'P05',
+    );
+    const taxi = order.taxi ?? pool.sort((a, b) => a[1] - b[1])[0][0];
+    // 预计要等 15 分钟以上的订单没有车接（具名人物的订单除外）
+    if (!order.taxi && free.get(taxi)! > order.request + 900) continue;
+    free.set(taxi, Math.max(free.get(taxi)!, order.request) + (order.exit ? 2400 : 720));
     assigned.get(taxi)!.push(order);
   }
+  const homeNode = nearestNode(homeOf('P05')).id;
   taxis.forEach((taxi, i) => {
     const list: Segment[] = [];
-    let t = base + hours(7) + i * 240;
-    let node = nodeIds[Math.floor(random() * nodeIds.length)];
+    const ownCar = taxi.driver === 'P05';
+    const shiftStart = base + hours(7) + i * 240;
+    let t = shiftStart;
+    let node: number;
+    let stintStart = t;
+    let inside = true;
     const push = (more: Segment[]) => {
       list.push(...more);
       if (more.length) {
@@ -376,18 +476,62 @@ function simulateDay(day: number): DayTraffic {
         node = more.at(-1)!.node;
       }
     };
+    if (ownCar) {
+      // 王磊的车停在家附近，上车后出发
+      node = homeNode;
+      push([stopover(t, 60, node)]);
+    } else {
+      node = anyGate();
+      push(route(t, pathBetween(node, gateById.get(node)!.junction)));
+    }
     for (const order of assigned.get(taxi.id)!) {
-      if (t < order.request) push(simulate(t, order.request, node, randomWalk));
-      push(route(t, shortestPath(node, nearestNode(order.from).id)));
-      push([stopover(t, 40, node, list.at(-1))]);
+      if (t < order.request) push(simulate(t, order.request, node!, randomWalk));
+      push(route(t, shortestPath(node!, nearestNode(order.from).id)));
+      // 停在路边等乘客：乘客按下单时估计的时间走到路边，最多再等两分半
+      push([stopover(t, Math.max(40, order.request + 150 - t), node!, list.at(-1))]);
       const pickup = t;
-      push(route(t, shortestPath(node, nearestNode(order.to).id)));
-      push([stopover(t, 30, node, list.at(-1))]);
+      if (order.exit) {
+        push(route(t, pathBetween(node!, order.exit)));
+        trips.push({
+          id: order.id,
+          vehicle: taxi.id,
+          kind: 'taxi',
+          person: order.person,
+          riders: [],
+          request: order.request,
+          pickup,
+          arrive: t,
+          from: order.from,
+          to: order.to,
+          exit: order.exit,
+        });
+        stints.push({
+          vehicle: taxi.id,
+          person: taxi.driver!,
+          start: stintStart,
+          end: t,
+          passengers: [],
+        });
+        // 在街区外送完乘客后再驶回；临近收车时不再回来
+        t += between(900, 1800);
+        if (t > base + hours(22, 40)) {
+          inside = false;
+          break;
+        }
+        const back = anyGate();
+        stintStart = t;
+        node = back;
+        push(route(t, [back, gateById.get(back)!.junction]));
+        continue;
+      }
+      push(route(t, shortestPath(node!, nearestNode(order.to).id)));
+      push([stopover(t, 30, node!, list.at(-1))]);
       trips.push({
         id: order.id,
         vehicle: taxi.id,
         kind: 'taxi',
         person: order.person,
+        riders: [],
         request: order.request,
         pickup,
         arrive: t,
@@ -395,114 +539,93 @@ function simulateDay(day: number): DayTraffic {
         to: order.to,
       });
     }
-    if (t < base + hours(23)) push(simulate(t, base + hours(23), node, randomWalk));
+    if (inside) {
+      if (t < base + hours(23)) push(simulate(t, base + hours(23), node!, randomWalk));
+      if (ownCar) {
+        push(route(t, shortestPath(node!, homeNode)));
+        push([stopover(t, 60, node!, list.at(-1))]);
+      } else {
+        push(route(t, pathBetween(node!, nearestGate(node!))));
+      }
+      stints.push({
+        vehicle: taxi.id,
+        person: taxi.driver!,
+        start: stintStart,
+        end: t,
+        passengers: [],
+      });
+    }
     segments.set(taxi.id, list);
   });
 
-  // 员工开车上下班：家附近的路口 ↔ 公司车库所在的路口
-  const sessions = new Map(sessionsOf(day).map((s) => [s.personId, s]));
-  const drive = (
-    vehicle: Vehicle,
-    id: string,
-    person: string,
-    depart: number,
-    from: Point,
-    to: Point,
-  ) => {
-    const path = shortestPath(nearestNode(from).id, nearestNode(to).id);
-    const list = route(depart, path);
-    if (!list.length) return [];
-    trips.push({
-      id,
-      vehicle: vehicle.id,
-      kind: 'drive',
-      person,
-      request: depart,
-      pickup: depart,
-      arrive: list.at(-1)!.t1,
-      from,
-      to,
-    });
-    return list;
-  };
-
-  let busIndex = 0;
-  for (const { vehicle, role } of registry) {
-    let list: Segment[] = [];
-    if (role === 'cruise') {
-      list = cruise([[hours(6) + random() * hours(1), hours(24)]]);
-    } else if (role === 'rush') {
-      if (!weekend) {
-        const morning = hours(7) + random() * hours(1, 30);
-        const evening = hours(17) + random() * hours(1, 45);
-        list = cruise([
-          [morning, morning + hours(0, 50) + random() * hours(0, 40)],
-          [evening, evening + hours(0, 50) + random() * hours(0, 50)],
-        ]);
-      } else if (random() < 0.35) {
-        // 周末：约三分之一的车辆有一次外出
-        const start = hours(9, 30) + random() * hours(9);
-        list = cruise([[start, start + hours(0, 50) + random() * hours(1, 10)]]);
+  // ── 公交：从车场驶入，沿环线运行，午后在湖滨站换班 ──
+  // 信号灯会让同一路口等灯的车辆同时放行，若不考虑进站停靠，几圈之后四辆车就会聚到一起；
+  // 每次进站的停靠时长不同，车辆之间保持分散。
+  const change = nearestNode(city.stations.find((s) => s.name === '湖滨站')!.location).id;
+  busCrews.forEach((crew, b) => {
+    const vehicle = vehicleById.get(crew.bus)!;
+    let position = (b * 2) % BUS_LOOP.length;
+    const first = base + (weekend ? hours(7) : hours(6)) + b * hours(0, 4);
+    const depot = nearestGate(BUS_LOOP[position]);
+    const deadhead = route(first - 240, pathBetween(depot, BUS_LOOP[position]));
+    // 首站上客后发车
+    const arrive = deadhead.length ? deadhead.at(-1)!.t1 : first;
+    deadhead.push(stopover(arrive, 30, BUS_LOOP[position], deadhead.at(-1)));
+    const start = arrive + 30;
+    const next: Next = (current) => {
+      position = (BUS_LOOP.indexOf(current) + 1) % BUS_LOOP.length;
+      return { to: BUS_LOOP[position] };
+    };
+    const dwellRandom = seededRandom(101 + b + day * 13);
+    const changeAt = base + hours(14, 30) + b * 360;
+    let handover: Handover | null = null;
+    const dwell = (node: number, t: number) => {
+      const seconds = 8 + dwellRandom() * 26;
+      if (!handover && node === change && t >= changeAt) {
+        handover = { bus: vehicle.id, node, arrive: t, depart: t + 90 };
+        return 90;
       }
-    } else if (role === 'commuter') {
-      const owner = vehicle.owner!;
-      const planned = personaTrips(day).filter(
-        (trip) => trip.person === owner && trip.mode === 'drive',
+      return seconds;
+    };
+    const service = simulate(start, base + hours(24), BUS_LOOP[position], next, dwell);
+    segments.set(vehicle.id, [...deadhead, ...service]);
+    const end = service.at(-1)!.t1;
+    const h = handover as Handover | null;
+    if (h) {
+      handovers.push(h);
+      stints.push(
+        {
+          vehicle: vehicle.id,
+          person: crew.early,
+          start: first - 240,
+          end: h.arrive + 20,
+          passengers: [],
+        },
+        { vehicle: vehicle.id, person: crew.late, start: h.depart - 30, end, passengers: [] },
       );
-      if (planned.length) {
-        list = planned.flatMap((trip) =>
-          drive(vehicle, trip.id, owner, trip.depart, trip.from, trip.to),
-        );
-      } else {
-        const session = sessions.get(owner);
-        const company = companyById.get(carOwners.find((c) => c.person === owner)!.companyId)!;
-        const work = rectCenter(city.buildings.find((b) => b.id === company.buildingId)!.footprint);
-        const home = homeOf(owner);
-        if (session) {
-          const there = estimate(shortestPath(nearestNode(home).id, nearestNode(work).id));
-          list = drive(
-            vehicle,
-            `${vehicle.id}-${day}-am`,
-            owner,
-            session.start - there - 120,
-            home,
-            work,
-          );
-          if (session.end < base + hours(23, 45)) {
-            list = list.concat(
-              drive(vehicle, `${vehicle.id}-${day}-pm`, owner, session.end + 180, work, home),
-            );
-          }
-        }
-      }
-    } else if (role === 'bus') {
-      const b = busIndex++;
-      let position = (b * 2) % BUS_LOOP.length;
-      const next: Next = (current) => {
-        position = (BUS_LOOP.indexOf(current) + 1) % BUS_LOOP.length;
-        const to = BUS_LOOP[position];
-        const edge = roads.adjacency.get(current)!.find((option) => option.to === to)!.edge;
-        return { edge, to };
-      };
-      const dwellRandom = seededRandom(101 + b + day * 13);
-      const dwell = () => 8 + dwellRandom() * 26;
-      const first = base + (weekend ? hours(7) : hours(6)) + b * hours(0, 4);
-      list = simulate(first, base + hours(24), BUS_LOOP[position], next, dwell);
+    } else {
+      stints.push({
+        vehicle: vehicle.id,
+        person: crew.early,
+        start: first - 240,
+        end,
+        passengers: [],
+      });
     }
-    if (role !== 'taxi') segments.set(vehicle.id, list);
-  }
+  });
 
   const visits: StopVisit[] = [];
-  for (const vehicle of vehicles.filter((v) => v.kind === 'bus')) {
+  for (const vehicle of vehiclesOf('bus')) {
     for (const s of segments.get(vehicle.id)!) {
       if (!s.waiting && s.from.x === s.to.x && s.from.y === s.to.y) {
         visits.push({ bus: vehicle.id, node: s.node, arrive: s.t0, depart: s.t1 });
       }
     }
   }
+  for (const list of segments.values()) list.sort((a, b) => a.t0 - b.t0);
   visits.sort((a, b) => a.arrive - b.arrive);
   trips.sort((a, b) => a.request - b.request);
-  return { segments, trips, visits };
+  return { segments, trips, visits, stints, deliveries, handovers };
 }
 
 /** 最近用到的几天的轨迹。 */
@@ -518,13 +641,24 @@ function trafficOf(day: number): DayTraffic {
   return traffic;
 }
 
-const segmentsOf = (vehicle: Vehicle, day: number) => trafficOf(day).segments.get(vehicle.id)!;
+const NONE: Segment[] = [];
+const segmentsOf = (vehicle: Vehicle, day: number) =>
+  trafficOf(day).segments.get(vehicle.id) ?? NONE;
 
 /** 某一天的用车记录（自驾与网约车）。 */
 export const tripsOf = (day: number) => trafficOf(day).trips;
 
 /** 某一天的公交进站记录。 */
 export const stopVisits = (day: number) => trafficOf(day).visits;
+
+/** 某一天驾驶人在车上的时段。 */
+export const stintsOf = (day: number) => trafficOf(day).stints;
+
+/** 某一天配送车的卸货停靠。 */
+export const deliveriesOf = (day: number) => trafficOf(day).deliveries;
+
+/** 某一天的公交换班。 */
+export const handoversOf = (day: number) => trafficOf(day).handovers;
 
 function segmentAt(vehicle: Vehicle, t: number): Segment | null {
   const segments = segmentsOf(vehicle, dayOf(t));
@@ -639,8 +773,10 @@ function computeEdgeSpeeds(windows: [number, number][]): Map<number, number> {
   const day = dayOf(windows[0][0]);
   for (const vehicle of vehicles) {
     for (const s of segmentsOf(vehicle, day)) {
-      // 等灯、进站与上下客停靠都不计入行驶速度
-      if (s.waiting || (s.from.x === s.to.x && s.from.y === s.to.y)) continue;
+      // 等灯、进站与上下客停靠都不计入行驶速度；街区边缘的进出路段不在路网中
+      if (s.waiting || (s.from.x === s.to.x && s.from.y === s.to.y) || gateById.has(s.edge)) {
+        continue;
+      }
       for (const [w0, w1] of windows) {
         const overlap = Math.min(s.t1, w1) - Math.max(s.t0, w0);
         if (overlap <= 0) continue;

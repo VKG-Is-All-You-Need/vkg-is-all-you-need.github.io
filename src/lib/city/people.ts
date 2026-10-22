@@ -1,8 +1,10 @@
 /**
- * 企业、居民与社区活动（全部为虚构数据），时间跨度为一周。
- * - 企业与门禁（hr）：企业、雇佣关系、上下班记录、楼宇门禁小时汇总；
- * - 社区应用（community）：居民住址、活动与报名记录。
- * 六位具名人物用于“明细”演示，其余居民与员工只以编号出现，用于聚合统计。
+ * 街区中的人（全部为虚构数据），时间跨度为一周。
+ * - 登记居民：社区应用中有住址，其中一部分是企业员工（企业与门禁）；六位具名人物用于“明细”演示，
+ *   其余居民只以编号出现。居民的公交卡号与会员号就是居民编号。
+ * - 外来人员：在街区上班、购物、看病、开车路过的人，以及公交司机、网约车司机与配送员。
+ *   他们不是社区应用的登记居民，大多只在公交刷卡（匿名卡号）或会员消费（会员号）中留下记录。
+ * 每个人每天做什么由 plans.ts 安排，实际行程由 mobility.ts 按交通模拟落实。
  */
 import { city, type Building } from '../geo/city';
 import { rectCenter, seededRandom, type Point } from '../geo/spatial';
@@ -52,12 +54,35 @@ export interface Person {
   id: string;
   name?: string;
   role?: string;
-  homeId: number;
+  /** 登记居民（社区应用）或外来人员。 */
+  kind: 'resident' | 'outsider';
+  /** 居民的住址。 */
+  homeId?: number;
   companyId?: number;
+  /** 外来上班族的工作地点（建筑编号）。 */
+  workplace?: number;
   /** 具名人物，用于明细演示。 */
   persona: boolean;
   color?: string;
+  /** 公交卡号：居民以居民编号登记，外来人员为匿名卡号。 */
+  card: string;
+  /** 商户会员号：居民以居民编号登记。 */
+  member?: string;
+  /** 开车进出街区（外来上班族与访客）。 */
+  drives?: boolean;
+  /** 步行速度（米/秒）。 */
+  pace: number;
 }
+
+type PersonaInput = Omit<Person, 'kind' | 'card' | 'member' | 'pace' | 'persona'>;
+const persona = (input: PersonaInput): Person => ({
+  ...input,
+  kind: 'resident',
+  persona: true,
+  card: input.id,
+  member: input.id,
+  pace: 1.35,
+});
 
 const linHome = nearestResidential(station('北站'));
 const zhouHome = byName('湖畔公寓');
@@ -72,72 +97,73 @@ const zhaoHome = nearestResidential({ x: 560, y: 600 }, [
 ]);
 
 export const personas: Person[] = [
-  {
+  persona({
     id: 'P01',
     name: '林晓',
     role: '软件工程师',
     homeId: linHome.id,
     companyId: 1,
-    persona: true,
     color: '#49bbdd',
-  },
-  {
+  }),
+  persona({
     id: 'P02',
     name: '周宁',
     role: '产品经理',
     homeId: zhouHome.id,
     companyId: 1,
-    persona: true,
     color: '#f29fb8',
-  },
-  {
+  }),
+  persona({
     id: 'P03',
     name: '孙浩',
     role: '后端工程师',
     homeId: sunHome.id,
     companyId: 1,
-    persona: true,
     color: '#7fd38a',
-  },
-  {
+  }),
+  persona({
     id: 'P04',
     name: '陈雨',
     role: '护士',
     homeId: chenHome.id,
     companyId: 3,
-    persona: true,
     color: '#c9a0f0',
-  },
-  {
+  }),
+  persona({
     id: 'P05',
     name: '王磊',
     role: '网约车司机',
     homeId: wangHome.id,
     companyId: 4,
-    persona: true,
     color: '#e6c07b',
-  },
-  {
+  }),
+  persona({
     id: 'P06',
     name: '赵敏',
     role: '街角咖啡店主',
     homeId: zhaoHome.id,
-    persona: true,
     color: '#ff9f6b',
-  },
+  }),
 ];
 
 function buildResidents(): Person[] {
   const random = seededRandom(73);
+  const traits = seededRandom(74);
   const homes = city.buildings.filter((b) => b.kind === '住宅');
   const residents: Person[] = [...personas];
-  const add = (companyId?: number) =>
+  const add = (companyId?: number) => {
+    const id = `R${String(residents.length - personas.length + 1).padStart(3, '0')}`;
     residents.push({
-      id: `R${String(residents.length - personas.length + 1).padStart(3, '0')}`,
+      id,
+      kind: 'resident',
       homeId: homes[Math.floor(random() * homes.length)].id,
       companyId,
       persona: false,
+      card: id,
+      member: traits() < 0.55 ? id : undefined,
+      pace: 1.1 + traits() * 0.45,
     });
+  };
   for (let i = 0; i < 36; i++) add(1);
   for (let i = 0; i < 18; i++) add(2);
   for (let i = 0; i < 50; i++) add(3);
@@ -145,11 +171,89 @@ function buildResidents(): Person[] {
   return residents;
 }
 
+/** 登记居民（社区应用 residents 表），含具名人物。 */
 export const people = buildResidents();
-export const personById = new Map(people.map((p) => [p.id, p]));
 
-// ── 上下班记录（门禁） ──
-export interface WorkSession {
+// ── 外来人员 ──
+/** 过境车辆数：每辆车有一名固定的驾驶人，约三成常有同乘者。 */
+export const THROUGH_CARS = 2600;
+/** 开车来商场的访客车辆数。 */
+export const GUEST_CARS = 220;
+
+export interface Staff {
+  bus: string[];
+  taxi: string[];
+  courier: string[];
+  /** 过境车辆的驾驶人与同乘者（与车辆一一对应）。 */
+  through: { driver: string; companion?: string }[];
+  office: string[];
+  visitors: string[];
+}
+
+function buildOutsiders(): { outsiders: Person[]; staff: Staff } {
+  const random = seededRandom(211);
+  const outsiders: Person[] = [];
+  const cards = new Set<string>();
+  const unique = (prefix: string) => {
+    let code: string;
+    do code = `${prefix}${10000 + Math.floor(random() * 90000)}`;
+    while (cards.has(code));
+    cards.add(code);
+    return code;
+  };
+  const add = (extra: Partial<Person> = {}) => {
+    const id = `N${String(outsiders.length + 1).padStart(5, '0')}`;
+    outsiders.push({
+      id,
+      kind: 'outsider',
+      persona: false,
+      card: unique('C'),
+      pace: 1.1 + random() * 0.45,
+      ...extra,
+    });
+    return id;
+  };
+  const staff: Staff = { bus: [], taxi: [], courier: [], through: [], office: [], visitors: [] };
+  // 在街区写字楼上班的人：所在企业没有接入企业与门禁
+  const offices = city.buildings.filter(
+    (b) => b.kind === '办公' && b.id !== central.id && b.id !== designOffice.id,
+  );
+  for (const office of offices) {
+    const n = 14 + Math.floor(random() * 13);
+    for (let i = 0; i < n; i++) {
+      staff.office.push(
+        add({ role: '上班族', workplace: office.id, drives: random() < 0.22 || undefined }),
+      );
+    }
+  }
+  for (let i = 0; i < 8; i++) staff.bus.push(add({ role: '公交司机' }));
+  for (let i = 0; i < 2; i++) staff.taxi.push(add({ role: '网约车司机' }));
+  for (let i = 0; i < 10; i++) staff.courier.push(add({ role: '配送员' }));
+  for (let i = 0; i < THROUGH_CARS; i++) {
+    const driver = add({ role: '驾车路过' });
+    staff.through.push({ driver, companion: random() < 0.3 ? add() : undefined });
+  }
+  for (let i = 0; i < 12000; i++) {
+    staff.visitors.push(
+      add({
+        member: random() < 0.15 ? unique('M') : undefined,
+        drives: i < GUEST_CARS || undefined,
+      }),
+    );
+  }
+  return { outsiders, staff };
+}
+
+const outside = buildOutsiders();
+/** 外来人员：不在社区应用中登记。 */
+export const outsiders = outside.outsiders;
+export const staff = outside.staff;
+
+export const personById = new Map([...people, ...outsiders].map((p) => [p.id, p]));
+export const isPersona = (id: string) => personById.get(id)?.persona === true;
+
+// ── 排班：员工计划几点进门、几点离开（实际的门禁记录见 records.ts） ──
+export interface WorkShift {
   personId: string;
   companyId: number;
   start: number;
@@ -179,15 +283,15 @@ const PERSONA_SHIFTS: Record<
   P04: { companyId: 3, days: [0, 1, 2, 3, 4, 6], shift: () => [7, 25, 18, 5] },
 };
 
-function buildSessions(day: number): WorkSession[] {
+function buildShifts(day: number): WorkShift[] {
   const random = seededRandom(97 + day * 131);
   const between = (a: number, b: number) => a + random() * (b - a);
   const weekend = DAYS[day].weekend;
-  const sessions: WorkSession[] = [];
+  const shifts: WorkShift[] = [];
   for (const [personId, plan] of Object.entries(PERSONA_SHIFTS)) {
     if (!plan.days.includes(day)) continue;
     const [h0, m0, h1, m1] = plan.shift(day);
-    sessions.push({
+    shifts.push({
       personId,
       companyId: plan.companyId,
       start: at(day, h0, m0),
@@ -202,7 +306,7 @@ function buildSessions(day: number): WorkSession[] {
         person.companyId === 1
           ? [hours(8, 30), hours(9, 45), hours(18), hours(20, 30)]
           : [hours(9), hours(10), hours(17, 30), hours(19)];
-      sessions.push({
+      shifts.push({
         personId: person.id,
         companyId: person.companyId,
         start: day * DAY + between(a, b),
@@ -218,7 +322,7 @@ function buildSessions(day: number): WorkSession[] {
           : shift < 0.8
             ? [hours(7, 30), hours(18)]
             : [hours(18), hours(24)];
-      sessions.push({
+      shifts.push({
         personId: person.id,
         companyId: 3,
         start: day * DAY + start + between(-600, 600),
@@ -226,7 +330,7 @@ function buildSessions(day: number): WorkSession[] {
       });
     }
   }
-  return sessions;
+  return shifts;
 }
 
 /** 具名人物某天的上下班时刻；不上班时为 null。 */
@@ -237,22 +341,16 @@ export function personaShift(person: string, day: number): [number, number] | nu
   return [at(day, h0, m0), at(day, h1, m1)];
 }
 
-const sessionCache = new Map<number, WorkSession[]>();
+const shiftCache = new Map<number, WorkShift[]>();
 
-/** 某一天的上下班记录。 */
-export function sessionsOf(day: number): WorkSession[] {
-  let sessions = sessionCache.get(day);
-  if (!sessions) {
-    sessions = buildSessions(day);
-    sessionCache.set(day, sessions);
+/** 某一天的排班。 */
+export function shiftsOf(day: number): WorkShift[] {
+  let shifts = shiftCache.get(day);
+  if (!shifts) {
+    shifts = buildShifts(day);
+    shiftCache.set(day, shifts);
   }
-  return sessions;
-}
-
-/** 门禁汇总：某企业在时刻 t 的在岗人数。 */
-export function presence(companyId: number, t: number): number {
-  return sessionsOf(dayOf(t)).filter((s) => s.companyId === companyId && s.start <= t && s.end > t)
-    .length;
+  return shifts;
 }
 
 // ── 社区活动 ──
@@ -329,7 +427,7 @@ export const events: CommunityEvent[] = [
 
 // ── 常用地点 ──
 export const homeOf = (id: string) =>
-  center(city.buildings.find((b) => b.id === personById.get(id)!.homeId)!);
+  center(city.buildings.find((b) => b.id === personById.get(id)!.homeId!)!);
 
 export const PLACES = {
   office: center(central),
