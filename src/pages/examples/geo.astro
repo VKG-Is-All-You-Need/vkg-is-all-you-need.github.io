@@ -70,36 +70,34 @@ const reading = [
         title="查询如何改写"
         description="左侧为面向本体的 GeoSPARQL 查询，右侧为改写后发往 PostGIS 的 SQL。GeoSPARQL 函数被转换为对应的空间函数，在数据库中执行。代码省略了前缀声明。"
       />
-      {
-        runs.map(({ query, result }, i) => (
-          <article class="rewrite" data-query-panel={query.id} data-reveal>
-            <header class="rewrite-head">
-              <span class="rewrite-index">{String(i + 1).padStart(2, '0')}</span>
-              <div>
-                <h3>{query.title}</h3>
-                <p>{query.description}</p>
-              </div>
-            </header>
-            <div class="rewrite-grid">
-              <div class="codebox">
-                <p class="codebox-label">GeoSPARQL</p>
-                <pre set:html={`<code>${highlight(query.sparql)}</code>`} />
-              </div>
-              <span class="rewrite-arrow" aria-hidden="true">
-                <Icon name="arrow-right" size={18} />
-              </span>
-              <div class="codebox">
-                <p class="codebox-label">PostGIS SQL（简化）</p>
-                <pre set:html={`<code>${highlight(query.sql)}</code>`} />
-              </div>
+      {runs.map(({ query, result }, i) => (
+        <article class="rewrite" data-query-panel={query.id} data-reveal>
+          <header class="rewrite-head">
+            <span class="rewrite-index">{String(i + 1).padStart(2, '0')}</span>
+            <div>
+              <h3>{query.title}</h3>
+              <p>{query.description}</p>
             </div>
-            <p class="rewrite-result">
-              结果：
-              {result.hits.map((hit) => `${nameOf(hit.id)}（${hit.detail}）`).join('、')}
-            </p>
-          </article>
-        ))
-      }
+          </header>
+          <div class="rewrite-grid">
+            <div class="codebox">
+              <p class="codebox-label">GeoSPARQL</p>
+              <pre set:html={`<code>${highlight(query.sparql)}</code>`} />
+            </div>
+            <span class="rewrite-arrow" aria-hidden="true">
+              <Icon name="arrow-right" size={18} />
+            </span>
+            <div class="codebox">
+              <p class="codebox-label">PostGIS SQL（简化）</p>
+              <pre set:html={`<code>${highlight(query.sql)}</code>`} />
+            </div>
+          </div>
+          <p class="rewrite-result">
+            结果：
+            {result.hits.map((hit) => `${nameOf(hit.id)}（${hit.detail}）`).join('、')}
+          </p>
+        </article>
+      ))}
     </div>
   </section>
 
@@ -135,65 +133,84 @@ const reading = [
       />
       <div class="tables" data-reveal>
         <figure class="table-card">
-          <figcaption>stations <span>{city.stations.length} 行</span></figcaption>
+          <figcaption>
+            stations <span>{city.stations.length} 行</span>
+          </figcaption>
           <table>
-            <thead><tr><th>id</th><th>name</th><th>line</th><th>location</th></tr></thead>
+            <thead>
+              <tr>
+                <th>id</th>
+                <th>name</th>
+                <th>line</th>
+                <th>location</th>
+              </tr>
+            </thead>
             <tbody>
-              {
-                city.stations.map((s) => (
-                  <tr>
-                    <td>{s.id}</td>
-                    <td>{s.name}</td>
-                    <td>{s.line}</td>
-                    <td class="wkt">{pointToWkt(s.location)}</td>
-                  </tr>
-                ))
-              }
+              {city.stations.map((s) => (
+                <tr>
+                  <td>{s.id}</td>
+                  <td>{s.name}</td>
+                  <td>{s.line}</td>
+                  <td class="wkt">{pointToWkt(s.location)}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </figure>
         <figure class="table-card">
-          <figcaption>parks <span>{city.parks.length} 行</span></figcaption>
+          <figcaption>
+            parks <span>{city.parks.length} 行</span>
+          </figcaption>
           <table>
-            <thead><tr><th>id</th><th>name</th><th>area</th></tr></thead>
+            <thead>
+              <tr>
+                <th>id</th>
+                <th>name</th>
+                <th>area</th>
+              </tr>
+            </thead>
             <tbody>
-              {
-                city.parks.map((p) => (
-                  <tr>
-                    <td>{p.id}</td>
-                    <td>{p.name}</td>
-                    <td class="wkt" title={polygonToWkt(p.area)}>
-                      {shorten(polygonToWkt(p.area))}
-                    </td>
-                  </tr>
-                ))
-              }
+              {city.parks.map((p) => (
+                <tr>
+                  <td>{p.id}</td>
+                  <td>{p.name}</td>
+                  <td class="wkt" title={polygonToWkt(p.area)}>
+                    {shorten(polygonToWkt(p.area))}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </figure>
         <figure class="table-card table-wide">
           <figcaption>
-            buildings <span>共 {city.buildings.length} 行，列出前 {sampleBuildings.length} 行</span>
+            buildings{' '}
+            <span>
+              共 {city.buildings.length} 行，列出前 {sampleBuildings.length} 行
+            </span>
           </figcaption>
           <table>
-            <thead
-              ><tr><th>id</th><th>name</th><th>kind</th><th>floors</th><th>footprint</th></tr
-              ></thead
-            >
+            <thead>
+              <tr>
+                <th>id</th>
+                <th>name</th>
+                <th>kind</th>
+                <th>floors</th>
+                <th>footprint</th>
+              </tr>
+            </thead>
             <tbody>
-              {
-                sampleBuildings.map((b) => (
-                  <tr>
-                    <td>{b.id}</td>
-                    <td>{b.name}</td>
-                    <td>{b.kind}</td>
-                    <td>{b.floors}</td>
-                    <td class="wkt" title={rectToWkt(b.footprint)}>
-                      {shorten(rectToWkt(b.footprint), 52)}
-                    </td>
-                  </tr>
-                ))
-              }
+              {sampleBuildings.map((b) => (
+                <tr>
+                  <td>{b.id}</td>
+                  <td>{b.name}</td>
+                  <td>{b.kind}</td>
+                  <td>{b.floors}</td>
+                  <td class="wkt" title={rectToWkt(b.footprint)}>
+                    {shorten(rectToWkt(b.footprint), 52)}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </figure>
@@ -206,14 +223,18 @@ const reading = [
       <SectionHeading id="points-title" title="要点" />
       <ul class="points" role="list">
         <li class="point spotlight" data-reveal>
-          <span class="point-icon"><Icon name="database" size={20} /></span>
+          <span class="point-icon">
+            <Icon name="database" size={20} />
+          </span>
           <h3>几何保留在数据库中</h3>
           <p>
             几何以 PostGIS 类型存储在源表中；映射将其呈现为 geo:wktLiteral，不复制、不转换源数据。
           </p>
         </li>
         <li class="point spotlight" data-reveal style="--reveal-delay:90ms">
-          <span class="point-icon"><Icon name="map" size={20} /></span>
+          <span class="point-icon">
+            <Icon name="map" size={20} />
+          </span>
           <h3>空间函数下推到数据库</h3>
           <p>
             geof:distance、geof:sfWithin 等函数在改写时转换为 ST_Distance、ST_Within 等 PostGIS
@@ -221,7 +242,9 @@ const reading = [
           </p>
         </li>
         <li class="point spotlight" data-reveal style="--reveal-delay:180ms">
-          <span class="point-icon"><Icon name="hierarchy" size={20} /></span>
+          <span class="point-icon">
+            <Icon name="hierarchy" size={20} />
+          </span>
           <h3>本体与空间条件组合</h3>
           <p>
             数据库中没有“公共设施”类别。本体将学校、医院、图书馆与博物馆归入
@@ -233,21 +256,25 @@ const reading = [
       <figure class="functions" data-reveal>
         <figcaption>GeoSPARQL 函数与 PostGIS 函数的常见对应</figcaption>
         <table>
-          <thead><tr><th>GeoSPARQL</th><th>PostGIS</th><th>含义</th></tr></thead>
+          <thead>
+            <tr>
+              <th>GeoSPARQL</th>
+              <th>PostGIS</th>
+              <th>含义</th>
+            </tr>
+          </thead>
           <tbody>
-            {
-              functions.map(([geof, st, meaning]) => (
-                <tr>
-                  <td>
-                    <code>{geof}</code>
-                  </td>
-                  <td>
-                    <code>{st}</code>
-                  </td>
-                  <td>{meaning}</td>
-                </tr>
-              ))
-            }
+            {functions.map(([geof, st, meaning]) => (
+              <tr>
+                <td>
+                  <code>{geof}</code>
+                </td>
+                <td>
+                  <code>{st}</code>
+                </td>
+                <td>{meaning}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </figure>
@@ -258,21 +285,19 @@ const reading = [
     <div class="container">
       <SectionHeading id="reading-title" title="延伸阅读" />
       <ul class="reading" role="list" data-reveal>
-        {
-          reading.map((item) => (
-            <li>
-              <a
-                href={item.href}
-                target={item.external ? '_blank' : undefined}
-                rel={item.external ? 'noopener' : undefined}
-              >
-                <span class="reading-title">{item.title}</span>
-                <span class="reading-meta">{item.meta}</span>
-                <Icon name={item.external ? 'arrow-up-right' : 'arrow-right'} size={16} />
-              </a>
-            </li>
-          ))
-        }
+        {reading.map((item) => (
+          <li>
+            <a
+              href={item.href}
+              target={item.external ? '_blank' : undefined}
+              rel={item.external ? 'noopener' : undefined}
+            >
+              <span class="reading-title">{item.title}</span>
+              <span class="reading-meta">{item.meta}</span>
+              <Icon name={item.external ? 'arrow-up-right' : 'arrow-right'} size={16} />
+            </a>
+          </li>
+        ))}
       </ul>
     </div>
   </section>

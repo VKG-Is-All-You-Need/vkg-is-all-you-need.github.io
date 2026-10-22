@@ -17,7 +17,9 @@ const total = (await getResources()).length;
     title="标准、工具、教程与研究"
     description={`收录 ${total} 项资源，按用途分为六类，并注明每项资源的适用范围与使用限制。核对范围限于项目页面与文档，未经安装或运行验证；使用前请确认版本、数据与许可证。`}
   >
-    <p class="verified">最近核对 <time datetime={site.verifiedAt}>{site.verifiedAt}</time></p>
+    <p class="verified">
+      最近核对 <time datetime={site.verifiedAt}>{site.verifiedAt}</time>
+    </p>
   </PageHeader>
   <div class="container page-body">
     <ResourceExplorer />

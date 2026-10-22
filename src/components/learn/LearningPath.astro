@@ -63,34 +63,32 @@ const stages: { title: string; goal: string; materials: Material[] }[] = [
 ---
 
 <ol class="timeline" data-timeline role="list">
-  {
-    stages.map((stage, i) => (
-      <li class="stage" data-stage>
-        <span class="stage-node" aria-hidden="true">
-          {String(i + 1).padStart(2, '0')}
-        </span>
-        <div class="stage-card spotlight" data-reveal>
-          <h3>{stage.title}</h3>
-          <p class="stage-goal">{stage.goal}</p>
-          <ul class="materials" role="list">
-            {stage.materials.map((material) => (
-              <li>
-                <a
-                  href={material.href}
-                  target={material.external ? '_blank' : undefined}
-                  rel={material.external ? 'noopener' : undefined}
-                >
-                  <span class="material-title">{material.title}</span>
-                  <span class="material-meta">{material.meta}</span>
-                  <Icon name={material.external ? 'arrow-up-right' : 'arrow-right'} size={16} />
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </li>
-    ))
-  }
+  {stages.map((stage, i) => (
+    <li class="stage" data-stage>
+      <span class="stage-node" aria-hidden="true">
+        {String(i + 1).padStart(2, '0')}
+      </span>
+      <div class="stage-card spotlight" data-reveal>
+        <h3>{stage.title}</h3>
+        <p class="stage-goal">{stage.goal}</p>
+        <ul class="materials" role="list">
+          {stage.materials.map((material) => (
+            <li>
+              <a
+                href={material.href}
+                target={material.external ? '_blank' : undefined}
+                rel={material.external ? 'noopener' : undefined}
+              >
+                <span class="material-title">{material.title}</span>
+                <span class="material-meta">{material.meta}</span>
+                <Icon name={material.external ? 'arrow-up-right' : 'arrow-right'} size={16} />
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </li>
+  ))}
 </ol>
 
 <style>

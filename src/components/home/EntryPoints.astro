@@ -45,23 +45,21 @@ const entries: { icon: IconName; title: string; text: string; href: string; cta:
       description="根据当前阶段选择入口：系统学习、按需查找、动手示例，或直接阅读文献。"
     />
     <ul class="entries" role="list">
-      {
-        entries.map((entry, i) => (
-          <li data-reveal style={`--reveal-delay:${i * 90}ms`}>
-            <a class="entry spotlight" href={entry.href}>
-              <span class="entry-icon">
-                <Icon name={entry.icon} size={22} />
-              </span>
-              <h3>{entry.title}</h3>
-              <p>{entry.text}</p>
-              <span class="entry-cta">
-                {entry.cta}
-                <Icon name="arrow-right" size={16} />
-              </span>
-            </a>
-          </li>
-        ))
-      }
+      {entries.map((entry, i) => (
+        <li data-reveal style={`--reveal-delay:${i * 90}ms`}>
+          <a class="entry spotlight" href={entry.href}>
+            <span class="entry-icon">
+              <Icon name={entry.icon} size={22} />
+            </span>
+            <h3>{entry.title}</h3>
+            <p>{entry.text}</p>
+            <span class="entry-cta">
+              {entry.cta}
+              <Icon name="arrow-right" size={16} />
+            </span>
+          </a>
+        </li>
+      ))}
     </ul>
   </div>
 </section>

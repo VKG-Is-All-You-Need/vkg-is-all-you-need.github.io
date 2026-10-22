@@ -8,15 +8,19 @@ import { site } from '../../data/site';
     <div class="banner" data-reveal>
       <div class="banner-glow" aria-hidden="true"></div>
       <div class="banner-copy">
-        <span class="banner-icon"><Icon name="git-pull" size={22} /></span>
+        <span class="banner-icon">
+          <Icon name="git-pull" size={22} />
+        </span>
         <h2 id="contribute-title">参与贡献</h2>
         <p>补充资源、修正描述或报告失效链接，均可通过 issue 或 pull request 提交。</p>
       </div>
       <div class="banner-actions">
-        <a class="btn btn-primary" href={site.links.issues}
-          >提交 issue <Icon name="arrow-right" /></a
-        >
-        <a class="btn" href="/about/#contribute">贡献说明</a>
+        <a class="btn btn-primary" href={site.links.issues}>
+          提交 issue <Icon name="arrow-right" />
+        </a>
+        <a class="btn" href="/about/#contribute">
+          贡献说明
+        </a>
       </div>
     </div>
   </div>

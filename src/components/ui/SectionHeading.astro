@@ -16,14 +16,12 @@ const { title, description, id, link } = Astro.props;
     <h2 id={id}>{title}</h2>
     {description && <p>{description}</p>}
   </div>
-  {
-    link && (
-      <a class="heading-link" href={link.href}>
-        {link.label}
-        <Icon name="arrow-right" size={16} />
-      </a>
-    )
-  }
+  {link && (
+    <a class="heading-link" href={link.href}>
+      {link.label}
+      <Icon name="arrow-right" size={16} />
+    </a>
+  )}
 </header>
 
 <style>

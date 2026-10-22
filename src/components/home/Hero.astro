@@ -17,7 +17,9 @@ const total = (await getResources()).length;
 
   <div class="container hero-inner">
     <div class="hero-copy">
-      <p class="hero-label"><span class="live-dot"></span>虚拟知识图谱 · OBDA · 资源索引</p>
+      <p class="hero-label">
+        <span class="live-dot"></span>虚拟知识图谱 · OBDA · 资源索引
+      </p>
       <h1>
         <span class="h1-mark">VKG</span>
         <span class="h1-serif">is all you need</span>
@@ -28,14 +30,27 @@ const total = (await getResources()).length;
         查询在执行时被改写为 SQL。
       </p>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="/resources/">浏览资源 <Icon name="arrow-right" /></a>
-        <a class="btn" href="#how">了解工作原理</a>
+        <a class="btn btn-primary" href="/resources/">
+          浏览资源 <Icon name="arrow-right" />
+        </a>
+        <a class="btn" href="#how">
+          了解工作原理
+        </a>
       </div>
       <dl class="hero-facts">
-        <div><dt>收录资源</dt><dd>{total} 项</dd></div>
-        <div><dt>资源分类</dt><dd>{categories.length} 类</dd></div>
         <div>
-          <dt>最近核对</dt><dd><time datetime={site.verifiedAt}>{site.verifiedAt}</time></dd>
+          <dt>收录资源</dt>
+          <dd>{total} 项</dd>
+        </div>
+        <div>
+          <dt>资源分类</dt>
+          <dd>{categories.length} 类</dd>
+        </div>
+        <div>
+          <dt>最近核对</dt>
+          <dd>
+            <time datetime={site.verifiedAt}>{site.verifiedAt}</time>
+          </dd>
         </div>
       </dl>
     </div>

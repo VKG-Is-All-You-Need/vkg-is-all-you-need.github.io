@@ -11,24 +11,27 @@ const isActive = (match: string | null) => match !== null && path.startsWith(mat
   <div class="container header-inner">
     <a class="brand" href="/" aria-label={`${site.name} 首页`}>
       <Logo size={30} />
-      <span>VKG <em>is all you need</em></span>
+      <span>
+        VKG <em>is all you need</em>
+      </span>
     </a>
 
     <nav class="nav" aria-label="主导航">
-      {
-        nav.map((item) => (
-          <a href={item.href} aria-current={isActive(item.match) ? 'page' : undefined}>
-            {item.label}
-          </a>
-        ))
-      }
+      {nav.map((item) => (
+        <a href={item.href} aria-current={isActive(item.match) ? 'page' : undefined}>
+          {item.label}
+        </a>
+      ))}
     </nav>
 
     <div class="actions">
       <button class="search-trigger" type="button" data-palette-open aria-label="搜索资源与页面">
         <Icon name="search" size={16} />
         <span class="search-label">搜索</span>
-        <span class="search-keys" aria-hidden="true"><kbd data-mod-key>⌘</kbd><kbd>K</kbd></span>
+        <span class="search-keys" aria-hidden="true">
+          <kbd data-mod-key>⌘</kbd>
+          <kbd>K</kbd>
+        </span>
       </button>
       <button class="icon-button" type="button" data-theme-toggle aria-label="切换深色或浅色主题">
         <Icon name="sun" class="icon-sun" />
@@ -53,14 +56,12 @@ const isActive = (match: string | null) => match !== null && path.startsWith(mat
 
   <nav id="mobile-nav" class="mobile-nav" aria-label="移动端导航" hidden>
     <div class="container">
-      {
-        nav.map((item) => (
-          <a href={item.href} aria-current={isActive(item.match) ? 'page' : undefined}>
-            {item.label}
-            <Icon name="arrow-right" size={16} />
-          </a>
-        ))
-      }
+      {nav.map((item) => (
+        <a href={item.href} aria-current={isActive(item.match) ? 'page' : undefined}>
+          {item.label}
+          <Icon name="arrow-right" size={16} />
+        </a>
+      ))}
     </div>
   </nav>
 </header>

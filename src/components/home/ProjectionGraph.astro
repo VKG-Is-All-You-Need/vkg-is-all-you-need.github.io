@@ -74,165 +74,163 @@ const sub = (cls: 'student' | 'teacher') => {
         data-phase="idle"
       >
         <g class="col-labels" aria-hidden="true">
-          <text x={TABLE_X} y="24">关系数据库</text>
-          <text x="288" y="24" text-anchor="middle">映射</text>
-          <text x={ENTITY_X - 8} y="24">虚拟知识图谱</text>
+          <text x={TABLE_X} y="24">
+            关系数据库
+          </text>
+          <text x="288" y="24" text-anchor="middle">
+            映射
+          </text>
+          <text x={ENTITY_X - 8} y="24">
+            虚拟知识图谱
+          </text>
         </g>
 
         <!-- 映射：底线 + 流动虚线 -->
         <g class="maps">
-          {
-            entities.map((entity, i) => (
-              <>
-                <path
-                  class="map-base draw"
-                  d={mapPath(entity.key, entity.y)}
-                  pathLength="1"
-                  style={`--d:${350 + i * 120}ms`}
-                />
-                <path class="map-flow" d={mapPath(entity.key, entity.y)} data-key={entity.key} />
-              </>
-            ))
-          }
+          {entities.map((entity, i) => (
+            <>
+              <path
+                class="map-base draw"
+                d={mapPath(entity.key, entity.y)}
+                pathLength="1"
+                style={`--d:${350 + i * 120}ms`}
+              />
+              <path class="map-flow" d={mapPath(entity.key, entity.y)} data-key={entity.key} />
+            </>
+          ))}
         </g>
 
         <!-- rdf:type -->
         <g class="types">
-          {
-            entities.map((entity, i) => (
-              <path
-                class="type-edge draw"
-                d={typePath(entity.y, entity.cls as keyof typeof classes)}
-                pathLength="1"
-                data-key={entity.key}
-                style={`--d:${1250 + i * 100}ms`}
-              />
-            ))
-          }
+          {entities.map((entity, i) => (
+            <path
+              class="type-edge draw"
+              d={typePath(entity.y, entity.cls as keyof typeof classes)}
+              pathLength="1"
+              data-key={entity.key}
+              style={`--d:${1250 + i * 100}ms`}
+            />
+          ))}
         </g>
 
         <!-- rdfs:subClassOf（本体） -->
         <g class="subs">
-          {
-            (['student', 'teacher'] as const).map((cls, i) => (
-              <>
-                <path
-                  class="sub-base draw"
-                  d={sub(cls)}
-                  pathLength="1"
-                  style={`--d:${1850 + i * 120}ms`}
-                />
-                <path class="sub-flow" d={sub(cls)} />
-              </>
-            ))
-          }
+          {(['student', 'teacher'] as const).map((cls, i) => (
+            <>
+              <path
+                class="sub-base draw"
+                d={sub(cls)}
+                pathLength="1"
+                style={`--d:${1850 + i * 120}ms`}
+              />
+              <path class="sub-flow" d={sub(cls)} />
+            </>
+          ))}
         </g>
 
         <!-- 表 -->
-        {
-          tables.map((table, t) => (
-            <g class="table pop" style={`--d:${t * 120}ms`}>
-              <text class="table-name" x={TABLE_X + 2} y={table.y - 10}>
-                {table.name}
-              </text>
-              <rect
-                class="table-card"
-                x={TABLE_X}
-                y={table.y}
-                width={TABLE_W}
-                height={table.height}
-                rx="9"
-              />
-              <text class="table-head" x={TABLE_X + 16} y={table.y + 18}>
-                id
-              </text>
-              <text class="table-head" x={TABLE_X + 66} y={table.y + 18}>
-                name
-              </text>
-              {table.rows.map((row) => (
-                <g class="row" data-key={row.key}>
-                  <line
-                    class="row-rule"
-                    x1={TABLE_X}
-                    x2={TABLE_X + TABLE_W}
-                    y1={row.y}
-                    y2={row.y}
-                  />
-                  <rect
-                    class="row-bg"
-                    x={TABLE_X + 3}
-                    y={row.y + 3}
-                    width={TABLE_W - 6}
-                    height={ROW_H - 6}
-                    rx="6"
-                  />
-                  <text class="row-text" x={TABLE_X + 16} y={row.y + 21}>
-                    {row.id}
-                  </text>
-                  <text class="row-text" x={TABLE_X + 66} y={row.y + 21}>
-                    {row.name}
-                  </text>
-                  <circle class="port" cx={PORT_X} cy={row.y + ROW_H / 2} r="3" />
-                </g>
-              ))}
-            </g>
-          ))
-        }
+        {tables.map((table, t) => (
+          <g class="table pop" style={`--d:${t * 120}ms`}>
+            <text class="table-name" x={TABLE_X + 2} y={table.y - 10}>
+              {table.name}
+            </text>
+            <rect
+              class="table-card"
+              x={TABLE_X}
+              y={table.y}
+              width={TABLE_W}
+              height={table.height}
+              rx="9"
+            />
+            <text class="table-head" x={TABLE_X + 16} y={table.y + 18}>
+              id
+            </text>
+            <text class="table-head" x={TABLE_X + 66} y={table.y + 18}>
+              name
+            </text>
+            {table.rows.map((row) => (
+              <g class="row" data-key={row.key}>
+                <line class="row-rule" x1={TABLE_X} x2={TABLE_X + TABLE_W} y1={row.y} y2={row.y} />
+                <rect
+                  class="row-bg"
+                  x={TABLE_X + 3}
+                  y={row.y + 3}
+                  width={TABLE_W - 6}
+                  height={ROW_H - 6}
+                  rx="6"
+                />
+                <text class="row-text" x={TABLE_X + 16} y={row.y + 21}>
+                  {row.id}
+                </text>
+                <text class="row-text" x={TABLE_X + 66} y={row.y + 21}>
+                  {row.name}
+                </text>
+                <circle class="port" cx={PORT_X} cy={row.y + ROW_H / 2} r="3" />
+              </g>
+            ))}
+          </g>
+        ))}
 
         <!-- 类 -->
-        {
-          Object.entries(classes).map(([key, cls], i) => (
-            <g
-              class:list={['class-node', 'pop', `class-${key}`]}
-              style={`--d:${key === 'person' ? 2100 : 1450 + i * 120}ms`}
-            >
-              <rect
-                x={cls.x - cls.w / 2}
-                y={cls.y - PILL_H / 2}
-                width={cls.w}
-                height={PILL_H}
-                rx={PILL_H / 2}
-              />
-              <text x={cls.x} y={cls.y + 4} text-anchor="middle">
-                {cls.label}
-              </text>
-            </g>
-          ))
-        }
+        {Object.entries(classes).map(([key, cls], i) => (
+          <g
+            class:list={['class-node', 'pop', `class-${key}`]}
+            style={`--d:${key === 'person' ? 2100 : 1450 + i * 120}ms`}
+          >
+            <rect
+              x={cls.x - cls.w / 2}
+              y={cls.y - PILL_H / 2}
+              width={cls.w}
+              height={PILL_H}
+              rx={PILL_H / 2}
+            />
+            <text x={cls.x} y={cls.y + 4} text-anchor="middle">
+              {cls.label}
+            </text>
+          </g>
+        ))}
         <circle class="person-ring" cx={classes.person.x} cy={classes.person.y} r="18"></circle>
 
         <!-- 实体 -->
-        {
-          entities.map((entity, i) => (
-            <g class="entity pop" data-key={entity.key} style={`--d:${950 + i * 110}ms`}>
-              <circle class="entity-halo" cx={ENTITY_X} cy={entity.y} r="16" />
-              <circle class="entity-ring" cx={ENTITY_X} cy={entity.y} r="7.5" />
-              <circle class="entity-core" cx={ENTITY_X} cy={entity.y} r="2.6" />
-              <text class="entity-iri" x={ENTITY_X} y={entity.y + 24} text-anchor="middle">
-                {entity.iri}
-              </text>
-              <text class="entity-name" x={ENTITY_X} y={entity.y + 39} text-anchor="middle">
-                {entity.name}
-              </text>
-            </g>
-          ))
-        }
+        {entities.map((entity, i) => (
+          <g class="entity pop" data-key={entity.key} style={`--d:${950 + i * 110}ms`}>
+            <circle class="entity-halo" cx={ENTITY_X} cy={entity.y} r="16" />
+            <circle class="entity-ring" cx={ENTITY_X} cy={entity.y} r="7.5" />
+            <circle class="entity-core" cx={ENTITY_X} cy={entity.y} r="2.6" />
+            <text class="entity-iri" x={ENTITY_X} y={entity.y + 24} text-anchor="middle">
+              {entity.iri}
+            </text>
+            <text class="entity-name" x={ENTITY_X} y={entity.y + 39} text-anchor="middle">
+              {entity.name}
+            </text>
+          </g>
+        ))}
 
         <g data-particles></g>
       </svg>
     </div>
 
     <div class="console" aria-live="off">
-      <span class="console-tag" data-console-tag>查询</span>
-      <span class="console-text" data-console-text>?p a :Person → 改写为 SQL → 返回 3 行</span>
+      <span class="console-tag" data-console-tag>
+        查询
+      </span>
+      <span class="console-text" data-console-text>
+        ?p a :Person → 改写为 SQL → 返回 3 行
+      </span>
       <span class="console-caret" aria-hidden="true"></span>
     </div>
   </div>
 
   <figcaption class="legend">
-    <span><i class="swatch swatch-map"></i>映射</span>
-    <span><i class="swatch swatch-type"></i>rdf:type</span>
-    <span><i class="swatch swatch-sub"></i>rdfs:subClassOf（本体）</span>
+    <span>
+      <i class="swatch swatch-map"></i>映射
+    </span>
+    <span>
+      <i class="swatch swatch-type"></i>rdf:type
+    </span>
+    <span>
+      <i class="swatch swatch-sub"></i>rdfs:subClassOf（本体）
+    </span>
   </figcaption>
 </figure>
 

@@ -12,4 +12,8 @@ export default defineConfig({
   integrations: [sitemap()],
   build: { format: 'directory' },
   devToolbar: { enabled: false },
+  vite: {
+    // three.js 场景单独拆包，仅在地理信息示例页按需加载，体积超过默认的 500 kB 提示阈值属预期。
+    build: { chunkSizeWarningLimit: 700 },
+  },
 });

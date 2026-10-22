@@ -6,13 +6,15 @@
 
 ## 本地开发
 
-需要 Node.js 20.3 或更高版本（CI 与线上构建使用 Node 22，见 `.node-version`）。
+需要 Node.js 22.23.4 或更高版本（Astro 7 的最低要求；CI 与线上构建使用的版本见 `.node-version`）。
 
 ```bash
 npm install
 npm run dev                                  # http://localhost:4321
 npm run dev -- --host 0.0.0.0 --port 18766   # 局域网访问
 ```
+
+Astro 7 的开发服务器以后台进程运行，可用 `npx astro dev status`、`npx astro dev logs`、`npx astro dev stop` 查看状态、日志或停止。
 
 | 命令              | 作用                             |
 | ----------------- | -------------------------------- |

@@ -21,13 +21,11 @@ const total = (await getResources()).length;
       link={{ href: '/resources/', label: `查看全部 ${total} 项` }}
     />
     <div class="grid">
-      {
-        featured.map((resource, i) => (
-          <div data-reveal style={`--reveal-delay:${i * 80}ms`}>
-            <ResourceCard resource={resource} showCategory />
-          </div>
-        ))
-      }
+      {featured.map((resource, i) => (
+        <div data-reveal style={`--reveal-delay:${i * 80}ms`}>
+          <ResourceCard resource={resource} showCategory />
+        </div>
+      ))}
     </div>
   </div>
 </section>

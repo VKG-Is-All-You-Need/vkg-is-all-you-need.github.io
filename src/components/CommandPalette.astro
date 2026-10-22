@@ -56,17 +56,25 @@ const payload = JSON.stringify(items).replaceAll('<', '\\u003c');
     </div>
     <div class="palette-body">
       <ul id="palette-list" role="listbox" aria-label="搜索结果" data-palette-list></ul>
-      <p class="palette-empty" data-palette-empty hidden>无匹配结果</p>
+      <p class="palette-empty" data-palette-empty hidden>
+        无匹配结果
+      </p>
     </div>
     <footer class="palette-foot" aria-hidden="true">
-      <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
-      <span><kbd>Enter</kbd> 打开</span>
-      <span><kbd>Esc</kbd> 关闭</span>
+      <span>
+        <kbd>↑</kbd>
+        <kbd>↓</kbd> 选择
+      </span>
+      <span>
+        <kbd>Enter</kbd> 打开
+      </span>
+      <span>
+        <kbd>Esc</kbd> 关闭
+      </span>
     </footer>
   </div>
 </dialog>
 <script type="application/json" data-palette-data set:html={payload} />
-
 <style>
   .palette {
     width: min(640px, 100% - 32px);

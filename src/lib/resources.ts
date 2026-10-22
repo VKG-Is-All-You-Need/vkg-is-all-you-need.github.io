@@ -1,5 +1,6 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import { categories, type Category } from '../data/categories';
+import resourcesYaml from '../data/resources.yaml?raw';
 
 export type Resource = CollectionEntry<'resources'>;
 
@@ -8,9 +9,15 @@ export interface ResourceGroup {
   items: Resource[];
 }
 
+/** 条目在 resources.yaml 中的书写顺序（file() 加载器不保证保留该顺序）。 */
+const ORDER = new Map(
+  [...resourcesYaml.matchAll(/^- id: (\S+)/gm)].map((match, index) => [match[1], index]),
+);
+
 /** 按 resources.yaml 中的书写顺序返回全部资源。 */
-export function getResources(): Promise<Resource[]> {
-  return getCollection('resources');
+export async function getResources(): Promise<Resource[]> {
+  const resources = await getCollection('resources');
+  return resources.sort((a, b) => (ORDER.get(a.id) ?? 0) - (ORDER.get(b.id) ?? 0));
 }
 
 export async function getResourceGroups(): Promise<ResourceGroup[]> {

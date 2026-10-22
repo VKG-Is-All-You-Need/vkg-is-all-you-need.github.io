@@ -73,27 +73,25 @@ const principles: { icon: IconName; title: string; text: string }[] = [
 
     <div class="demo" data-demo data-reveal>
       <div class="demo-steps" role="tablist" aria-label="工作原理步骤" aria-orientation="vertical">
-        {
-          steps.map((step, i) => (
-            <button
-              type="button"
-              role="tab"
-              id={`how-tab-${i}`}
-              aria-controls={`how-panel-${i}`}
-              aria-selected={i === 0 ? 'true' : 'false'}
-              tabindex={i === 0 ? 0 : -1}
-              data-step={i}
-              data-file={step.file}
-            >
-              <span class="step-index">{String(i + 1).padStart(2, '0')}</span>
-              <span class="step-body">
-                <span class="step-title">{step.title}</span>
-                <span class="step-desc">{step.description}</span>
-              </span>
-              <span class="step-progress" aria-hidden="true" />
-            </button>
-          ))
-        }
+        {steps.map((step, i) => (
+          <button
+            type="button"
+            role="tab"
+            id={`how-tab-${i}`}
+            aria-controls={`how-panel-${i}`}
+            aria-selected={i === 0 ? 'true' : 'false'}
+            tabindex={i === 0 ? 0 : -1}
+            data-step={i}
+            data-file={step.file}
+          >
+            <span class="step-index">{String(i + 1).padStart(2, '0')}</span>
+            <span class="step-body">
+              <span class="step-title">{step.title}</span>
+              <span class="step-desc">{step.description}</span>
+            </span>
+            <span class="step-progress" aria-hidden="true" />
+          </button>
+        ))}
       </div>
 
       <div class="demo-window">
@@ -104,7 +102,9 @@ const principles: { icon: IconName; title: string; text: string }[] = [
           </span>
           <label class="switch">
             <input type="checkbox" data-ontology checked />
-            <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+            <span class="switch-track" aria-hidden="true">
+              <span class="switch-thumb"></span>
+            </span>
             <span>加载本体公理</span>
           </label>
         </div>
@@ -112,33 +112,30 @@ const principles: { icon: IconName; title: string; text: string }[] = [
         <div class="demo-panels">
           <div class="demo-panel" role="tabpanel" id="how-panel-0" aria-labelledby="how-tab-0">
             <div class="db-tables">
-              {
-                tables.map((table) => (
-                  <table>
-                    <caption>{table.name}</caption>
-                    <thead>
+              {tables.map((table) => (
+                <table>
+                  <caption>{table.name}</caption>
+                  <thead>
+                    <tr>
+                      <th>id</th>
+                      <th>name</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {table.rows.map(([id, name]) => (
                       <tr>
-                        <th>id</th>
-                        <th>name</th>
+                        <td>{id}</td>
+                        <td>{name}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {table.rows.map(([id, name]) => (
-                        <tr>
-                          <td>{id}</td>
-                          <td>{name}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ))
-              }
+                    ))}
+                  </tbody>
+                </table>
+              ))}
             </div>
           </div>
 
           <div class="demo-panel" role="tabpanel" id="how-panel-1" aria-labelledby="how-tab-1">
-            <pre
-              class="code"><code><span class="k">mappingId</span>  student
+            <pre class="code"><code><span class="k">mappingId</span>  student
 <span class="k">target</span>     :student/<span class="v">&#123;id&#125;</span> <span class="k">a</span> :Student ; :name <span class="v">&#123;name&#125;</span> .
 <span class="k">source</span>     <span class="k">SELECT</span> id, name <span class="k">FROM</span> student
 
@@ -149,16 +146,14 @@ const principles: { icon: IconName; title: string; text: string }[] = [
 
           <div class="demo-panel" role="tabpanel" id="how-panel-2" aria-labelledby="how-tab-2">
             <div class="ontology">
-              <pre
-                class="code"><code>:Student <span class="w">rdfs:subClassOf</span> :Person .
+              <pre class="code"><code>:Student <span class="w">rdfs:subClassOf</span> :Person .
 :Teacher <span class="w">rdfs:subClassOf</span> :Person .</code></pre>
               <p class="ontology-off">未加载本体公理：引擎只使用映射。</p>
             </div>
           </div>
 
           <div class="demo-panel" role="tabpanel" id="how-panel-3" aria-labelledby="how-tab-3">
-            <pre
-              class="code"><code><span class="k">SELECT</span> <span class="v">?name</span> <span class="k">WHERE</span> &#123;
+            <pre class="code"><code><span class="k">SELECT</span> <span class="v">?name</span> <span class="k">WHERE</span> &#123;
   <span class="v">?p</span> <span class="k">a</span> :Person ;
      :name <span class="v">?name</span> .
 &#125;</code></pre>
@@ -166,29 +161,41 @@ const principles: { icon: IconName; title: string; text: string }[] = [
 
           <div class="demo-panel" role="tabpanel" id="how-panel-4" aria-labelledby="how-tab-4">
             <div class="with-ontology">
-              <pre
-                class="code"><code><span class="c">-- 简化形式</span>
+              <pre class="code"><code><span class="c">-- 简化形式</span>
 <span class="k">SELECT</span> name <span class="k">FROM</span> student
 <span class="k">UNION ALL</span>
 <span class="k">SELECT</span> name <span class="k">FROM</span> teacher</code></pre>
               <div class="result">
-                <p class="result-head">结果 <span>3 行</span></p>
+                <p class="result-head">
+                  结果 <span>3 行</span>
+                </p>
                 <table>
-                  <thead><tr><th>name</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th>name</th>
+                    </tr>
+                  </thead>
                   <tbody>
-                    <tr style="--i:0"><td>林晓</td></tr>
-                    <tr style="--i:1"><td>周宁</td></tr>
-                    <tr style="--i:2"><td>陈老师</td></tr>
+                    <tr style="--i:0">
+                      <td>林晓</td>
+                    </tr>
+                    <tr style="--i:1">
+                      <td>周宁</td>
+                    </tr>
+                    <tr style="--i:2">
+                      <td>陈老师</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
             </div>
             <div class="without-ontology">
-              <pre
-                class="code"><code><span class="c">-- 没有映射或公理能推出 :Person 的实例</span>
+              <pre class="code"><code><span class="c">-- 没有映射或公理能推出 :Person 的实例</span>
 <span class="c">-- 查询结果为空</span></code></pre>
               <div class="result">
-                <p class="result-head">结果 <span>0 行</span></p>
+                <p class="result-head">
+                  结果 <span>0 行</span>
+                </p>
                 <p class="result-empty">空结果集</p>
               </div>
             </div>
@@ -198,25 +205,24 @@ const principles: { icon: IconName; title: string; text: string }[] = [
     </div>
 
     <ul class="principles" role="list">
-      {
-        principles.map((item, i) => (
-          <li class="principle spotlight" data-reveal style={`--reveal-delay:${i * 90}ms`}>
-            <span class="principle-icon">
-              <Icon name={item.icon} size={20} />
-            </span>
-            <h3>{item.title}</h3>
-            <p>{item.text}</p>
-          </li>
-        ))
-      }
+      {principles.map((item, i) => (
+        <li class="principle spotlight" data-reveal style={`--reveal-delay:${i * 90}ms`}>
+          <span class="principle-icon">
+            <Icon name={item.icon} size={20} />
+          </span>
+          <h3>{item.title}</h3>
+          <p>{item.text}</p>
+        </li>
+      ))}
     </ul>
 
     <p class="how-foot" data-reveal>
-      示例中的 SQL 为简化形式。实际生成的 SQL 包含表别名与标识符引号，并可能附加 <code
-        >IS NOT NULL</code
-      > 等条件。完整流程参见 <a class="text-link" href="https://ontop-vkg.org/tutorial/"
-        >Ontop 官方教程</a
-      >。
+      示例中的 SQL 为简化形式。实际生成的 SQL 包含表别名与标识符引号，并可能附加{' '}
+      <code>IS NOT NULL</code> 等条件。完整流程参见{' '}
+      <a class="text-link" href="https://ontop-vkg.org/tutorial/">
+        Ontop 官方教程
+      </a>
+      。
     </p>
   </div>
 </section>
