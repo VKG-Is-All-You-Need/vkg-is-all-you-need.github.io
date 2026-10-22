@@ -3,7 +3,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from '../components/ui/Icon.astro';
 ---
 
-<BaseLayout title="页面不存在">
+<BaseLayout title="页面不存在 · Page not found">
   <section class="not-found container">
     <p class="code" aria-hidden="true">
       404
@@ -12,9 +12,16 @@ import Icon from '../components/ui/Icon.astro';
     <p class="text">
       请求的页面不存在或已移动。可返回首页，或通过 <kbd>/</kbd> 搜索资源。
     </p>
+    <p class="text" lang="en">
+      The requested page does not exist or has moved. Return to the home page, or press <kbd>/</kbd>{' '}
+      to search.
+    </p>
     <div class="actions">
       <a class="btn btn-primary" href="/">
         返回首页 <Icon name="arrow-right" />
+      </a>
+      <a class="btn" href="/en/" hreflang="en" lang="en">
+        English home page
       </a>
       <a class="btn" href="/resources/">
         浏览资源

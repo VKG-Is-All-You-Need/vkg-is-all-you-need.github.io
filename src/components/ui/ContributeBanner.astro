@@ -1,6 +1,23 @@
 ---
 import Icon from './Icon.astro';
 import { site } from '../../data/site';
+import { langOf, localize } from '../../i18n';
+
+const lang = langOf(Astro.url.pathname);
+const t = {
+  zh: {
+    title: '参与贡献',
+    text: '补充资源、修正描述或报告失效链接，均可通过 issue 或 pull request 提交。',
+    issue: '提交 issue',
+    guide: '贡献说明',
+  },
+  en: {
+    title: 'Contributing',
+    text: 'New resources, corrections and broken links can be submitted as an issue or a pull request.',
+    issue: 'Open an issue',
+    guide: 'Contribution guide',
+  },
+}[lang];
 ---
 
 <section class="section" aria-labelledby="contribute-title">
@@ -11,15 +28,15 @@ import { site } from '../../data/site';
         <span class="banner-icon">
           <Icon name="git-pull" size={22} />
         </span>
-        <h2 id="contribute-title">参与贡献</h2>
-        <p>补充资源、修正描述或报告失效链接，均可通过 issue 或 pull request 提交。</p>
+        <h2 id="contribute-title">{t.title}</h2>
+        <p>{t.text}</p>
       </div>
       <div class="banner-actions">
         <a class="btn btn-primary" href={site.links.issues}>
-          提交 issue <Icon name="arrow-right" />
+          {t.issue} <Icon name="arrow-right" />
         </a>
-        <a class="btn" href="/about/#contribute">
-          贡献说明
+        <a class="btn" href={localize('/about/#contribute', lang)}>
+          {t.guide}
         </a>
       </div>
     </div>

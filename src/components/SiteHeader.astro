@@ -2,42 +2,90 @@
 import Icon from './ui/Icon.astro';
 import Logo from './ui/Logo.astro';
 import { nav, site } from '../data/site';
+import { LANG_NAMES, LANG_TAGS, basePath, langOf, localize, switchTarget } from '../i18n';
 
-const path = Astro.url.pathname;
+const lang = langOf(Astro.url.pathname);
+const other = lang === 'zh' ? 'en' : 'zh';
+const path = basePath(Astro.url.pathname);
 const isActive = (match: string | null) => match !== null && path.startsWith(match);
+const t = {
+  zh: {
+    home: '首页',
+    nav: '主导航',
+    mobileNav: '移动端导航',
+    search: '搜索',
+    searchLabel: '搜索资源与页面',
+    theme: '切换深色或浅色主题',
+    org: 'GitHub 组织',
+    menu: '打开菜单',
+    switchLabel: 'Switch to English',
+  },
+  en: {
+    home: 'home',
+    nav: 'Main',
+    mobileNav: 'Mobile',
+    search: 'Search',
+    searchLabel: 'Search resources and pages',
+    theme: 'Toggle dark or light theme',
+    org: 'GitHub organization',
+    menu: 'Open menu',
+    switchLabel: '切换到中文',
+  },
+}[lang];
+const langSwitch = {
+  href: switchTarget(Astro.url.pathname, other),
+  hreflang: LANG_TAGS[other],
+  name: LANG_NAMES[other],
+  short: other === 'en' ? 'EN' : '中',
+};
 ---
 
 <header class="site-header" data-header>
   <div class="container header-inner">
-    <a class="brand" href="/" aria-label={`${site.name} 首页`}>
+    <a class="brand" href={localize('/', lang)} aria-label={`${site.name} ${t.home}`}>
       <Logo size={30} />
       <span>
         VKG <em>is all you need</em>
       </span>
     </a>
 
-    <nav class="nav" aria-label="主导航">
+    <nav class="nav" aria-label={t.nav}>
       {nav.map((item) => (
-        <a href={item.href} aria-current={isActive(item.match) ? 'page' : undefined}>
-          {item.label}
+        <a
+          href={localize(item.href, lang)}
+          aria-current={isActive(item.match) ? 'page' : undefined}
+        >
+          {item.label[lang]}
         </a>
       ))}
     </nav>
 
     <div class="actions">
-      <button class="search-trigger" type="button" data-palette-open aria-label="搜索资源与页面">
+      <button class="search-trigger" type="button" data-palette-open aria-label={t.searchLabel}>
         <Icon name="search" size={16} />
-        <span class="search-label">搜索</span>
+        <span class="search-label">{t.search}</span>
         <span class="search-keys" aria-hidden="true">
           <kbd data-mod-key>⌘</kbd>
           <kbd>K</kbd>
         </span>
       </button>
-      <button class="icon-button" type="button" data-theme-toggle aria-label="切换深色或浅色主题">
+      <a
+        class="lang-switch"
+        href={langSwitch.href}
+        hreflang={langSwitch.hreflang}
+        lang={langSwitch.hreflang}
+        aria-label={t.switchLabel}
+        title={langSwitch.name}
+        data-lang-switch={other}
+      >
+        <Icon name="globe" size={16} />
+        <span>{langSwitch.short}</span>
+      </a>
+      <button class="icon-button" type="button" data-theme-toggle aria-label={t.theme}>
         <Icon name="sun" class="icon-sun" />
         <Icon name="moon" class="icon-moon" />
       </button>
-      <a class="icon-button" href={site.links.org} aria-label="GitHub 组织">
+      <a class="icon-button" href={site.links.org} aria-label={t.org}>
         <Icon name="github" />
       </a>
       <button
@@ -46,7 +94,7 @@ const isActive = (match: string | null) => match !== null && path.startsWith(mat
         data-menu-toggle
         aria-expanded="false"
         aria-controls="mobile-nav"
-        aria-label="打开菜单"
+        aria-label={t.menu}
       >
         <Icon name="menu" class="icon-open" />
         <Icon name="close" class="icon-close" />
@@ -54,14 +102,26 @@ const isActive = (match: string | null) => match !== null && path.startsWith(mat
     </div>
   </div>
 
-  <nav id="mobile-nav" class="mobile-nav" aria-label="移动端导航" hidden>
+  <nav id="mobile-nav" class="mobile-nav" aria-label={t.mobileNav} hidden>
     <div class="container">
       {nav.map((item) => (
-        <a href={item.href} aria-current={isActive(item.match) ? 'page' : undefined}>
-          {item.label}
+        <a
+          href={localize(item.href, lang)}
+          aria-current={isActive(item.match) ? 'page' : undefined}
+        >
+          {item.label[lang]}
           <Icon name="arrow-right" size={16} />
         </a>
       ))}
+      <a
+        href={langSwitch.href}
+        hreflang={langSwitch.hreflang}
+        lang={langSwitch.hreflang}
+        data-lang-switch={other}
+      >
+        {langSwitch.name}
+        <Icon name="globe" size={16} />
+      </a>
     </div>
   </nav>
 </header>
@@ -186,6 +246,25 @@ const isActive = (match: string | null) => match !== null && path.startsWith(mat
     gap: 3px;
   }
 
+  .lang-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 36px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font: 500 13px var(--font-sans);
+    color: var(--muted);
+    transition:
+      color 0.2s,
+      background-color 0.2s;
+  }
+
+  .lang-switch:hover {
+    color: var(--ink);
+    background: var(--surface-2);
+  }
+
   .icon-button {
     display: grid;
     place-items: center;
@@ -250,7 +329,8 @@ const isActive = (match: string | null) => match !== null && path.startsWith(mat
     }
 
     .search-label,
-    .search-keys {
+    .search-keys,
+    .lang-switch {
       display: none;
     }
 

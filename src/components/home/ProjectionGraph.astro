@@ -4,6 +4,34 @@
  * 动画与交互见 scripts/projection.ts。
  */
 
+import { langOf } from '../../i18n';
+
+const lang = langOf(Astro.url.pathname);
+const [s1, s2, t1] =
+  lang === 'zh' ? ['林晓', '周宁', '陈老师'] : ['Lin Xiao', 'Zhou Ning', 'Prof. Chen'];
+const t = {
+  zh: {
+    figure:
+      '示意图：student 与 teacher 两张表中的三行数据经映射成为虚拟知识图谱中的三个实体；本体声明 Student 与 Teacher 都是 Person 的子类。',
+    database: '关系数据库',
+    mapping: '映射',
+    graph: '虚拟知识图谱',
+    query: '查询',
+    console: '?p a :Person → 改写为 SQL → 返回 3 行',
+    subclass: 'rdfs:subClassOf（本体）',
+  },
+  en: {
+    figure:
+      'Diagram: three rows in the student and teacher tables become three entities in the virtual knowledge graph through mappings; the ontology states that Student and Teacher are subclasses of Person.',
+    database: 'Relational database',
+    mapping: 'Mappings',
+    graph: 'Virtual knowledge graph',
+    query: 'Query',
+    console: '?p a :Person → rewritten into SQL → 3 rows',
+    subclass: 'rdfs:subClassOf (ontology)',
+  },
+}[lang];
+
 const TABLE_X = 8;
 const TABLE_W = 196;
 const ROW_H = 32;
@@ -16,11 +44,11 @@ const tables = [
     name: 'student',
     y: 72,
     rows: [
-      { key: 's1', id: '1', name: '林晓' },
-      { key: 's2', id: '2', name: '周宁' },
+      { key: 's1', id: '1', name: s1 },
+      { key: 's2', id: '2', name: s2 },
     ],
   },
-  { name: 'teacher', y: 238, rows: [{ key: 't1', id: '1', name: '陈老师' }] },
+  { name: 'teacher', y: 238, rows: [{ key: 't1', id: '1', name: t1 }] },
 ].map((table) => ({
   ...table,
   height: HEAD_H + table.rows.length * ROW_H,
@@ -32,9 +60,9 @@ const rowCenter = Object.fromEntries(
 );
 
 const entities = [
-  { key: 's1', y: 92, iri: ':student/1', name: '林晓', cls: 'student' },
-  { key: 's2', y: 168, iri: ':student/2', name: '周宁', cls: 'student' },
-  { key: 't1', y: 282, iri: ':teacher/1', name: '陈老师', cls: 'teacher' },
+  { key: 's1', y: 92, iri: ':student/1', name: s1, cls: 'student' },
+  { key: 's2', y: 168, iri: ':student/2', name: s2, cls: 'student' },
+  { key: 't1', y: 282, iri: ':teacher/1', name: t1, cls: 'teacher' },
 ];
 
 const classes = {
@@ -67,21 +95,16 @@ const sub = (cls: 'student' | 'teacher') => {
 <figure class="projection" data-projection>
   <div class="frame">
     <div class="canvas">
-      <svg
-        viewBox="0 0 640 330"
-        role="img"
-        aria-label="示意图：student 与 teacher 两张表中的三行数据经映射成为虚拟知识图谱中的三个实体；本体声明 Student 与 Teacher 都是 Person 的子类。"
-        data-phase="idle"
-      >
+      <svg viewBox="0 0 640 330" role="img" aria-label={t.figure} data-phase="idle">
         <g class="col-labels" aria-hidden="true">
           <text x={TABLE_X} y="24">
-            关系数据库
+            {t.database}
           </text>
           <text x="288" y="24" text-anchor="middle">
-            映射
+            {t.mapping}
           </text>
           <text x={ENTITY_X - 8} y="24">
-            虚拟知识图谱
+            {t.graph}
           </text>
         </g>
 
@@ -212,10 +235,10 @@ const sub = (cls: 'student' | 'teacher') => {
 
     <div class="console" aria-live="off">
       <span class="console-tag" data-console-tag>
-        查询
+        {t.query}
       </span>
       <span class="console-text" data-console-text>
-        ?p a :Person → 改写为 SQL → 返回 3 行
+        {t.console}
       </span>
       <span class="console-caret" aria-hidden="true"></span>
     </div>
@@ -223,13 +246,15 @@ const sub = (cls: 'student' | 'teacher') => {
 
   <figcaption class="legend">
     <span>
-      <i class="swatch swatch-map"></i>映射
+      <i class="swatch swatch-map"></i>
+      {t.mapping}
     </span>
     <span>
       <i class="swatch swatch-type"></i>rdf:type
     </span>
     <span>
-      <i class="swatch swatch-sub"></i>rdfs:subClassOf（本体）
+      <i class="swatch swatch-sub"></i>
+      {t.subclass}
     </span>
   </figcaption>
 </figure>

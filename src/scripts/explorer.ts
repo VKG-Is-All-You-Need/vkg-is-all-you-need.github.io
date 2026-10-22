@@ -19,6 +19,7 @@ onPageLoad((signal) => {
   const counter = explorer.querySelector<HTMLElement>('[data-count]')!;
   const empty = explorer.querySelector<HTMLElement>('[data-empty]')!;
   const total = cards.length;
+  const en = document.documentElement.lang === 'en';
 
   const haystack = new Map(
     cards.map((card) => {
@@ -46,7 +47,8 @@ onPageLoad((signal) => {
       group.hidden = visible === 0;
       shown += visible;
     }
-    counter.textContent = shown === total ? `共 ${total} 项` : `${shown} / ${total} 项`;
+    if (en) counter.textContent = shown === total ? `${total} resources` : `${shown} of ${total}`;
+    else counter.textContent = shown === total ? `共 ${total} 项` : `${shown} / ${total} 项`;
     empty.hidden = shown > 0;
     buttons.forEach((button) =>
       button.setAttribute('aria-pressed', String(button.dataset.filter === category)),

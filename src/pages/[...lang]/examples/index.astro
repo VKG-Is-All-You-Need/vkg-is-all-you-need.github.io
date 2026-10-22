@@ -1,0 +1,186 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import PageHeader from '../../../components/ui/PageHeader.astro';
+import Icon, { type IconName } from '../../../components/ui/Icon.astro';
+import { langOf, langPaths, localize, type Lang } from '../../../i18n';
+
+export const getStaticPaths = langPaths;
+
+const lang = langOf(Astro.url.pathname);
+
+type Example = { href: string; icon: IconName; title: string; text: string; tags: string[] };
+
+const texts: Record<
+  Lang,
+  {
+    title: string;
+    meta: string;
+    heading: string;
+    description: string;
+    open: string;
+    examples: Example[];
+  }
+> = {
+  zh: {
+    title: '示例',
+    meta: 'VKG 交互示例：地理信息查询与城市数据融合。',
+    heading: '交互示例',
+    description:
+      '两个示例共用同一座虚构街区：第一个聚焦空间查询与查询改写，第二个聚焦多源融合与动态数据。',
+    open: '打开示例',
+    examples: [
+      {
+        href: '/examples/geo/',
+        icon: 'map',
+        title: 'VKG × 地理信息',
+        text: '一座虚构街区存储在 PostGIS 中。三条 GeoSPARQL 查询演示距离、拓扑关系以及本体推理与空间条件的组合；分层视图展示查询如何经过本体、映射到达数据库。',
+        tags: ['GeoSPARQL', 'PostGIS', '本体推理'],
+      },
+      {
+        href: '/examples/city/',
+        icon: 'layers',
+        title: 'VKG × 城市数据融合',
+        text: '八个独立数据源由一个本体统一描述：交通、出行、传感器、气象、商户、企业与社区。示例覆盖一周，每天天气不同；拖动时间轴查看动态数据，开关数据源比较融合与分离的结果。',
+        tags: ['数据融合', '传感器与气象', 'SOSA/SSN'],
+      },
+    ],
+  },
+  en: {
+    title: 'Examples',
+    meta: 'Interactive VKG examples: geospatial queries and urban data fusion.',
+    heading: 'Interactive examples',
+    description:
+      'Both examples share the same fictional city district: the first focuses on spatial queries and query rewriting, the second on fusing multiple sources and dynamic data. The interfaces of both examples are currently available in Chinese only.',
+    open: 'Open the example',
+    examples: [
+      {
+        href: '/examples/geo/',
+        icon: 'map',
+        title: 'VKG × Geospatial',
+        text: 'A fictional district is stored in PostGIS. Three GeoSPARQL queries demonstrate distance, topological relations, and ontology reasoning combined with spatial conditions; a layered view shows how a query passes through the ontology and mappings to the database.',
+        tags: ['GeoSPARQL', 'PostGIS', 'Ontology reasoning'],
+      },
+      {
+        href: '/examples/city/',
+        icon: 'layers',
+        title: 'VKG × Urban data fusion',
+        text: 'Eight independent data sources are described by a single ontology: traffic, mobility, sensors, weather, shops, companies and the residential community. The example covers one week with different weather each day; drag the timeline to view dynamic data, and switch sources on and off to compare fused and separate results.',
+        tags: ['Data fusion', 'Sensors and weather', 'SOSA/SSN'],
+      },
+    ],
+  },
+};
+const t = texts[lang];
+---
+
+<BaseLayout title={t.title} description={t.meta}>
+  <PageHeader label={t.title} title={t.heading} description={t.description} />
+  <section class="container examples">
+    <ul class="cards" role="list">
+      {t.examples.map((example, i) => (
+        <li data-reveal style={`--reveal-delay:${i * 90}ms`}>
+          <a class="card spotlight" href={localize(example.href, lang)}>
+            <span class="card-icon">
+              <Icon name={example.icon} size={22} />
+            </span>
+            <h2>{example.title}</h2>
+            <p>{example.text}</p>
+            <ul class="tags" role="list">
+              {example.tags.map((tag) => (
+                <li>{tag}</li>
+              ))}
+            </ul>
+            <span class="card-cta">
+              {t.open} <Icon name="arrow-right" size={16} />
+            </span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
+</BaseLayout>
+
+<style>
+  .examples {
+    padding-bottom: clamp(72px, 10vw, 128px);
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 32px 30px 28px;
+  }
+
+  .card:hover {
+    transform: translateY(-3px);
+  }
+
+  .card-icon {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 32px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: linear-gradient(140deg, var(--accent-soft), transparent);
+    color: var(--accent-ink);
+  }
+
+  h2 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+
+  p {
+    margin-top: 10px;
+    color: var(--muted);
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 18px;
+  }
+
+  .tags li {
+    padding: 2px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  .card-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: auto;
+    padding-top: 28px;
+    font-size: 14px;
+    color: var(--accent-ink);
+  }
+
+  .card-cta :global(svg) {
+    transition: transform 0.3s var(--ease);
+  }
+
+  .card:hover .card-cta :global(svg) {
+    transform: translateX(4px);
+  }
+
+  @media (max-width: 760px) {
+    .cards {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

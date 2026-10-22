@@ -1,7 +1,8 @@
 ---
 import Icon from '../ui/Icon.astro';
-import { categoryById } from '../../data/categories';
-import { sourceLabel, type Resource } from '../../lib/resources';
+import { categoryOf } from '../../data/categories';
+import { langOf } from '../../i18n';
+import { resourceText, sourceLabel, type Resource } from '../../lib/resources';
 
 interface Props {
   resource: Resource;
@@ -13,7 +14,9 @@ interface Props {
 
 const { resource, showCategory = false, anchor = false } = Astro.props;
 const { id, data } = resource;
-const category = categoryById.get(data.category);
+const lang = langOf(Astro.url.pathname);
+const category = categoryOf(data.category, lang);
+const text = resourceText(resource, lang);
 ---
 
 <article
@@ -23,29 +26,29 @@ const category = categoryById.get(data.category);
   data-category={data.category}
 >
   <div class="card-meta">
-    {showCategory && category && <span class="card-category">{category.label}</span>}
+    {showCategory && <span class="card-category">{category.label}</span>}
     <span class="card-source">{sourceLabel(data.url)}</span>
   </div>
   <h3 class="card-title">
     <a class="card-link" href={data.url} target="_blank" rel="noopener">
-      {data.title}{' '}
+      {text.title}{' '}
       <Icon name="arrow-up-right" size={16} class="card-arrow" />
     </a>
   </h3>
   {data.venue && <p class="card-venue">{data.venue}</p>}
-  <p class="card-summary">{data.summary}</p>
+  <p class="card-summary">{text.summary}</p>
   {
-    data.note && (
+    text.note && (
       <p class="card-note">
         <Icon name="info" size={15} />
-        <span>{data.note}</span>
+        <span>{text.note}</span>
       </p>
     )
   }
   {
-    data.links.length > 0 && (
+    text.links.length > 0 && (
       <ul class="card-links" role="list">
-        {data.links.map((link) => (
+        {text.links.map((link) => (
           <li>
             <a href={link.url} target="_blank" rel="noopener">
               {link.label}

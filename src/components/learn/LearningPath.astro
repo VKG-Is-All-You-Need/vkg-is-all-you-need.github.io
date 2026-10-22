@@ -1,7 +1,8 @@
 ---
 import Icon from '../ui/Icon.astro';
-import { categoryById } from '../../data/categories';
-import { getResources } from '../../lib/resources';
+import { categoryOf } from '../../data/categories';
+import { langOf, localize, type Lang } from '../../i18n';
+import { getResources, resourceText } from '../../lib/resources';
 
 interface Material {
   title: string;
@@ -10,6 +11,7 @@ interface Material {
   external?: boolean;
 }
 
+const lang = langOf(Astro.url.pathname);
 const resources = await getResources();
 
 /** 引用 resources.yaml 中的条目，链接到资源页对应卡片。 */
@@ -17,50 +19,90 @@ const ref = (id: string, meta?: string): Material => {
   const resource = resources.find((entry) => entry.id === id);
   if (!resource) throw new Error(`未知资源 id：${id}`);
   return {
-    title: resource.data.title,
-    href: `/resources/#${id}`,
-    meta: meta ?? categoryById.get(resource.data.category)?.label ?? '',
+    title: resourceText(resource, lang).title,
+    href: localize(`/resources/#${id}`, lang),
+    meta: meta ?? categoryOf(resource.data.category, lang).label,
   };
 };
 
-const stages: { title: string; goal: string; materials: Material[] }[] = [
-  {
-    title: '建立概念',
-    goal: '明确数据源、映射、本体与查询各自的职责，理解查询改写的基本过程。',
-    materials: [
-      {
-        title: 'Ontop Key Concepts',
-        href: 'https://ontop-vkg.org/guide/concepts.html',
-        meta: '官方文档',
-        external: true,
-      },
-      { title: '工作原理演示', href: '/#how', meta: '本站' },
-      ref('vkg-overview', '综述'),
-    ],
-  },
-  {
-    title: '完成官方教程',
-    goal: '基于大学数据库示例部署 SPARQL endpoint，并执行示例查询。',
-    materials: [ref('ontop-tutorial'), ref('ontop-getting-started')],
-  },
-  {
-    title: '调整映射',
-    goal: '修改 IRI 模板、补充主外键约束，观察生成 SQL 的变化。',
-    materials: [ref('mapping-engineering'), ref('ontop-cli'), ref('ontop-lenses')],
-  },
-  {
-    title: '深入专题',
-    goal: '按研究方向选择基准与文献。',
-    materials: [
-      ref('rodi', '映射质量'),
-      ref('npd-benchmark', '规模与性能'),
-      ref('vig', '数据生成'),
-      ref('obda-survey', '研究现状'),
-      { title: 'VKG × 地理信息示例', href: '/examples/geo/', meta: '本站' },
-      { title: 'VKG × 城市数据融合示例', href: '/examples/city/', meta: '本站' },
-    ],
-  },
-];
+const page = (title: string, href: string, meta: string): Material => ({
+  title,
+  href: localize(href, lang),
+  meta,
+});
+
+const concepts: Material = {
+  title: 'Ontop Key Concepts',
+  href: 'https://ontop-vkg.org/guide/concepts.html',
+  meta: lang === 'zh' ? '官方文档' : 'Documentation',
+  external: true,
+};
+
+const STAGES: Record<Lang, () => { title: string; goal: string; materials: Material[] }[]> = {
+  zh: () => [
+    {
+      title: '建立概念',
+      goal: '明确数据源、映射、本体与查询各自的职责，理解查询改写的基本过程。',
+      materials: [concepts, page('工作原理演示', '/#how', '本站'), ref('vkg-overview', '综述')],
+    },
+    {
+      title: '完成官方教程',
+      goal: '基于大学数据库示例部署 SPARQL endpoint，并执行示例查询。',
+      materials: [ref('ontop-tutorial'), ref('ontop-getting-started')],
+    },
+    {
+      title: '调整映射',
+      goal: '修改 IRI 模板、补充主外键约束，观察生成 SQL 的变化。',
+      materials: [ref('mapping-engineering'), ref('ontop-cli'), ref('ontop-lenses')],
+    },
+    {
+      title: '深入专题',
+      goal: '按研究方向选择基准与文献。',
+      materials: [
+        ref('rodi', '映射质量'),
+        ref('npd-benchmark', '规模与性能'),
+        ref('vig', '数据生成'),
+        ref('obda-survey', '研究现状'),
+        page('VKG × 地理信息示例', '/examples/geo/', '本站'),
+        page('VKG × 城市数据融合示例', '/examples/city/', '本站'),
+      ],
+    },
+  ],
+  en: () => [
+    {
+      title: 'Learn the concepts',
+      goal: 'Understand the roles of data sources, mappings, ontologies and queries, and the basic process of query rewriting.',
+      materials: [
+        concepts,
+        page('How it works', '/#how', 'This site'),
+        ref('vkg-overview', 'Survey'),
+      ],
+    },
+    {
+      title: 'Complete the official tutorial',
+      goal: 'Deploy a SPARQL endpoint for the university database example and run the sample queries.',
+      materials: [ref('ontop-tutorial'), ref('ontop-getting-started')],
+    },
+    {
+      title: 'Refine the mappings',
+      goal: 'Change IRI templates, add primary and foreign key constraints, and observe how the generated SQL changes.',
+      materials: [ref('mapping-engineering'), ref('ontop-cli'), ref('ontop-lenses')],
+    },
+    {
+      title: 'Explore research topics',
+      goal: 'Choose benchmarks and literature by research direction.',
+      materials: [
+        ref('rodi', 'Mapping quality'),
+        ref('npd-benchmark', 'Scale and performance'),
+        ref('vig', 'Data generation'),
+        ref('obda-survey', 'State of the art'),
+        page('VKG × Geospatial example', '/examples/geo/', 'This site'),
+        page('VKG × Urban data fusion example', '/examples/city/', 'This site'),
+      ],
+    },
+  ],
+};
+const stages = STAGES[lang]();
 ---
 
 <ol class="timeline" data-timeline role="list">

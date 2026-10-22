@@ -1,10 +1,32 @@
 ---
 import ResourceCard from './ResourceCard.astro';
 import Icon from '../ui/Icon.astro';
+import { langOf } from '../../i18n';
 import { getResourceGroups } from '../../lib/resources';
 
-const groups = await getResourceGroups();
+const lang = langOf(Astro.url.pathname);
+const groups = await getResourceGroups(lang);
 const total = groups.reduce((sum, group) => sum + group.items.length, 0);
+const t = {
+  zh: {
+    search: '搜索资源',
+    placeholder: '搜索名称、技术或主题',
+    filter: '按类别筛选',
+    all: '全部',
+    count: `共 ${total} 项`,
+    empty: '无匹配结果。请尝试更短的关键词，或清除筛选条件。',
+    reset: '清除筛选',
+  },
+  en: {
+    search: 'Search resources',
+    placeholder: 'Search by name, technology or topic',
+    filter: 'Filter by category',
+    all: 'All',
+    count: `${total} resources`,
+    empty: 'No matching resources. Try a shorter keyword or clear the filters.',
+    reset: 'Clear filters',
+  },
+}[lang];
 ---
 
 <div class="explorer" data-explorer>
@@ -12,19 +34,19 @@ const total = groups.reduce((sum, group) => sum + group.items.length, 0);
     <div class="toolbar-inner">
       <label class="search">
         <Icon name="search" size={16} />
-        <span class="visually-hidden">搜索资源</span>
+        <span class="visually-hidden">{t.search}</span>
         <input
           type="search"
-          placeholder="搜索名称、技术或主题"
+          placeholder={t.placeholder}
           autocomplete="off"
           spellcheck="false"
           data-explorer-search
         />
         <kbd aria-hidden="true">/</kbd>
       </label>
-      <div class="chips" role="group" aria-label="按类别筛选">
+      <div class="chips" role="group" aria-label={t.filter}>
         <button type="button" data-filter="all" aria-pressed="true">
-          全部 <span>{total}</span>
+          {t.all} <span>{total}</span>
         </button>
         {
           groups.map(({ category, items }) => (
@@ -34,7 +56,7 @@ const total = groups.reduce((sum, group) => sum + group.items.length, 0);
           ))
         }
       </div>
-      <p class="count" data-count role="status" aria-live="polite">共 {total} 项</p>
+      <p class="count" data-count role="status" aria-live="polite">{t.count}</p>
     </div>
   </div>
 
@@ -63,8 +85,8 @@ const total = groups.reduce((sum, group) => sum + group.items.length, 0);
   }
 
   <div class="empty" data-empty hidden>
-    <p>无匹配结果。请尝试更短的关键词，或清除筛选条件。</p>
-    <button class="btn" type="button" data-reset>清除筛选</button>
+    <p>{t.empty}</p>
+    <button class="btn" type="button" data-reset>{t.reset}</button>
   </div>
 </div>
 

@@ -9,10 +9,9 @@ export interface PaletteItem {
   keywords?: string;
 }
 
-const GROUPS: Record<PaletteItem['type'], string> = {
-  page: '页面',
-  category: '分类',
-  resource: '资源',
+const GROUPS: Record<'zh' | 'en', Record<PaletteItem['type'], string>> = {
+  zh: { page: '页面', category: '分类', resource: '资源' },
+  en: { page: 'Pages', category: 'Categories', resource: 'Resources' },
 };
 
 const ICONS: Record<PaletteItem['type'], string> = {
@@ -58,7 +57,7 @@ function rank(index: Indexed[], query: string): PaletteItem[] {
   const best = new Map<PaletteItem['type'], number>();
   for (const { item, score } of scored)
     best.set(item.type, Math.max(best.get(item.type) ?? 0, score));
-  const typeOrder = Object.keys(GROUPS);
+  const typeOrder = Object.keys(GROUPS.zh);
   return scored
     .sort(
       (a, b) =>
@@ -88,6 +87,7 @@ onPageLoad((signal) => {
     haystack: normalize([item.title, item.subtitle, item.keywords].filter(Boolean).join(' ')),
   }));
 
+  const groups = GROUPS[document.documentElement.lang === 'en' ? 'en' : 'zh'];
   let results: PaletteItem[] = [];
   let active = 0;
 
@@ -113,7 +113,7 @@ onPageLoad((signal) => {
         const heading = document.createElement('li');
         heading.className = 'palette-group';
         heading.setAttribute('role', 'presentation');
-        heading.textContent = GROUPS[item.type];
+        heading.textContent = groups[item.type];
         list!.append(heading);
       }
       const option = document.createElement('li');

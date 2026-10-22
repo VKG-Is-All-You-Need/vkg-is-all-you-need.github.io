@@ -1,53 +1,95 @@
 ---
 import Icon, { type IconName } from '../ui/Icon.astro';
 import SectionHeading from '../ui/SectionHeading.astro';
+import { langOf, localize, type Lang } from '../../i18n';
 import { getResources } from '../../lib/resources';
 
+const lang = langOf(Astro.url.pathname);
 const total = (await getResources()).length;
 
-const entries: { icon: IconName; title: string; text: string; href: string; cta: string }[] = [
-  {
-    icon: 'route',
-    title: '学习路径',
-    text: '按四个阶段，从核心概念过渡到映射工程与研究专题。',
-    href: '/learn/',
-    cta: '查看路径',
+type Entry = { icon: IconName; title: string; text: string; href: string; cta: string };
+
+const texts: Record<Lang, { title: string; description: string; entries: Entry[] }> = {
+  zh: {
+    title: '从这里开始',
+    description: '根据当前阶段选择入口：系统学习、按需查找、动手示例，或直接阅读文献。',
+    entries: [
+      {
+        icon: 'route',
+        title: '学习路径',
+        text: '按四个阶段，从核心概念过渡到映射工程与研究专题。',
+        href: '/learn/',
+        cta: '查看路径',
+      },
+      {
+        icon: 'grid',
+        title: '资源索引',
+        text: `${total} 项资源，按标准规范、工具、教程与案例、基准测试、论文和相关生态分类。`,
+        href: '/resources/',
+        cta: '浏览资源',
+      },
+      {
+        icon: 'map',
+        title: '交互示例',
+        text: '在三维街区中运行 GeoSPARQL 查询，或开关八个数据源，比较融合与分离的结果。',
+        href: '/examples/',
+        cta: '打开示例',
+      },
+      {
+        icon: 'file',
+        title: '论文',
+        text: '两篇领域综述与近期研究，适合作为系统了解该领域的起点。',
+        href: '/resources/?category=papers',
+        cta: '阅读论文',
+      },
+    ],
   },
-  {
-    icon: 'grid',
-    title: '资源索引',
-    text: `${total} 项资源，按标准规范、工具、教程与案例、基准测试、论文和相关生态分类。`,
-    href: '/resources/',
-    cta: '浏览资源',
+  en: {
+    title: 'Where to start',
+    description:
+      'Choose an entry point for your current stage: structured learning, looking up resources, hands-on examples or the research literature.',
+    entries: [
+      {
+        icon: 'route',
+        title: 'Learning path',
+        text: 'Four stages that lead from the core concepts to mapping engineering and research topics.',
+        href: '/learn/',
+        cta: 'View the path',
+      },
+      {
+        icon: 'grid',
+        title: 'Resources',
+        text: `${total} resources in six categories: standards, tools, tutorials and case studies, benchmarks, papers and the related ecosystem.`,
+        href: '/resources/',
+        cta: 'Browse resources',
+      },
+      {
+        icon: 'map',
+        title: 'Interactive examples',
+        text: 'Run GeoSPARQL queries over a 3D city district, or switch eight data sources on and off to compare fused and separate results.',
+        href: '/examples/',
+        cta: 'Open the examples',
+      },
+      {
+        icon: 'file',
+        title: 'Papers',
+        text: 'Two surveys of the field and recent research, a starting point for a systematic overview.',
+        href: '/resources/?category=papers',
+        cta: 'Read the papers',
+      },
+    ],
   },
-  {
-    icon: 'map',
-    title: '交互示例',
-    text: '在三维街区中运行 GeoSPARQL 查询，或开关八个数据源，比较融合与分离的结果。',
-    href: '/examples/',
-    cta: '打开示例',
-  },
-  {
-    icon: 'file',
-    title: '论文',
-    text: '两篇领域综述与近期研究，适合作为系统了解该领域的起点。',
-    href: '/resources/?category=papers',
-    cta: '阅读论文',
-  },
-];
+};
+const t = texts[lang];
 ---
 
 <section class="section section-rule" aria-labelledby="entry-title">
   <div class="container">
-    <SectionHeading
-      id="entry-title"
-      title="从这里开始"
-      description="根据当前阶段选择入口：系统学习、按需查找、动手示例，或直接阅读文献。"
-    />
+    <SectionHeading id="entry-title" title={t.title} description={t.description} />
     <ul class="entries" role="list">
-      {entries.map((entry, i) => (
+      {t.entries.map((entry, i) => (
         <li data-reveal style={`--reveal-delay:${i * 90}ms`}>
-          <a class="entry spotlight" href={entry.href}>
+          <a class="entry spotlight" href={localize(entry.href, lang)}>
             <span class="entry-icon">
               <Icon name={entry.icon} size={22} />
             </span>

@@ -9,7 +9,8 @@ import { ClientRouter } from 'astro:transitions';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import CommandPalette from '../components/CommandPalette.astro';
-import { site } from '../data/site';
+import { site, siteText } from '../data/site';
+import { LANG_TAGS, LANGS, basePath, hasTranslation, langOf, localize } from '../i18n';
 
 interface Props {
   /** 页面标题，不含站点名；首页留空。 */
@@ -17,20 +18,35 @@ interface Props {
   description?: string;
 }
 
-const { title, description = site.description } = Astro.props;
-const pageTitle = title ? `${title} · ${site.name}` : site.title;
+const lang = langOf(Astro.url.pathname);
+const text = siteText[lang];
+const { title, description = text.description } = Astro.props;
+const pageTitle = title ? `${title} · ${site.name}` : text.title;
 const canonical = new URL(Astro.url.pathname, Astro.site);
+// 有对应译文的页面标注各语言版本，x-default 指向中文版。
+const alternates = hasTranslation(Astro.url.pathname)
+  ? LANGS.map((code) => ({
+      hreflang: LANG_TAGS[code],
+      href: new URL(localize(basePath(Astro.url.pathname), code), Astro.site),
+    }))
+  : [];
 const ogImage = new URL('/og.png', Astro.site);
 ---
 
 <!doctype html>
-<html lang="zh-CN" data-theme="dark">
+<html lang={LANG_TAGS[lang]} data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{pageTitle}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
+    {alternates.map((alternate) => (
+      <link rel="alternate" hreflang={alternate.hreflang} href={alternate.href} />
+    ))}
+    {alternates.length > 0 && (
+      <link rel="alternate" hreflang="x-default" href={alternates[0].href} />
+    )}
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="sitemap" href="/sitemap-index.xml" />
     <meta name="theme-color" content="#07080a" media="(prefers-color-scheme: dark)" />
@@ -41,6 +57,7 @@ const ogImage = new URL('/og.png', Astro.site);
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content={lang === 'zh' ? 'zh_CN' : 'en_US'} />
     <meta property="og:image" content={ogImage} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -67,11 +84,23 @@ const ogImage = new URL('/og.png', Astro.site);
         }
       })();
     </script>
+    <!-- 曾切换到英文的读者从站外进入中文首页时，转到英文首页。 -->
+    <script is:inline>
+      try {
+        if (
+          location.pathname === '/' &&
+          localStorage.getItem('lang') === 'en' &&
+          !document.referrer.startsWith(location.origin)
+        ) {
+          location.replace('/en/' + location.hash);
+        }
+      } catch {}
+    </script>
     <ClientRouter />
   </head>
   <body id="top">
     <a class="skip-link" href="#main">
-      跳至正文
+      {lang === 'zh' ? '跳至正文' : 'Skip to content'}
     </a>
     <SiteHeader />
     <main id="main">

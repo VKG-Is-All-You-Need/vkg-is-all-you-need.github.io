@@ -1,79 +1,180 @@
 ---
 import Icon, { type IconName } from '../ui/Icon.astro';
 import SectionHeading from '../ui/SectionHeading.astro';
+import { langOf, type Lang } from '../../i18n';
 
-const steps = [
+const lang = langOf(Astro.url.pathname);
+
+type Principle = { icon: IconName; title: string; text: string };
+
+const texts: Record<
+  Lang,
   {
-    title: '源数据',
-    file: 'school.sql',
-    description: '学生与教师信息分别存储在两张表中。VKG 不复制、不转换源数据。',
-  },
-  {
-    title: '映射',
-    file: 'school.obda',
+    title: string;
+    description: string;
+    stepsLabel: string;
+    ontology: string;
+    ontologyOff: string;
+    steps: { title: string; file: string; description: string }[];
+    names: [string, string, string];
+    principles: Principle[];
+    simplified: string;
+    noInstances: string;
+    emptyResult: string;
+    result: string;
+    rows: (n: number) => string;
+    empty: string;
+  }
+> = {
+  zh: {
+    title: '工作原理',
     description:
-      '每条映射由源查询（source）与目标模板（target）组成。模板中的 {id}、{name} 由查询结果逐行填充，每一行对应图中的一个实体。',
+      '以一个包含两张表的数据库为例，说明一条 SPARQL 查询如何经由映射与本体改写为 SQL。示例代码省略了前缀声明。',
+    stepsLabel: '工作原理步骤',
+    ontology: '加载本体公理',
+    ontologyOff: '未加载本体公理：引擎只使用映射。',
+    steps: [
+      {
+        title: '源数据',
+        file: 'school.sql',
+        description: '学生与教师信息分别存储在两张表中。VKG 不复制、不转换源数据。',
+      },
+      {
+        title: '映射',
+        file: 'school.obda',
+        description:
+          '每条映射由源查询（source）与目标模板（target）组成。模板中的 {id}、{name} 由查询结果逐行填充，每一行对应图中的一个实体。',
+      },
+      {
+        title: '本体（可选）',
+        file: 'school.ttl',
+        description:
+          '仅凭映射即可查询。加入本体公理后，引擎可利用类与属性之间的关系扩展查询答案。缺少这两条公理时，查询结果为空。',
+      },
+      {
+        title: 'SPARQL 查询',
+        file: 'query.rq',
+        description: '查询仅使用本体词汇，与表结构和列名无关。',
+      },
+      {
+        title: '生成 SQL',
+        file: 'rewritten.sql',
+        description:
+          'Ontop 结合本体与映射，确定 :Person 的实例来自 student 与 teacher 两张表，生成 SQL 交由数据库执行。',
+      },
+    ],
+    names: ['林晓', '周宁', '陈老师'],
+    principles: [
+      {
+        icon: 'database',
+        title: '数据不迁移',
+        text: '查询直接在源数据库上执行，结果与源数据保持一致。',
+      },
+      {
+        icon: 'layers',
+        title: '查询与模式解耦',
+        text: 'SPARQL 只依赖本体词汇；表结构变化时，调整映射即可。',
+      },
+      {
+        icon: 'hierarchy',
+        title: '本体扩展答案',
+        text: '类与属性之间的关系在查询改写阶段生效，无需预先物化推理结果。',
+      },
+    ],
+    simplified: '-- 简化形式',
+    noInstances: '-- 没有映射或公理能推出 :Person 的实例',
+    emptyResult: '-- 查询结果为空',
+    result: '结果',
+    rows: (n) => `${n} 行`,
+    empty: '空结果集',
   },
-  {
-    title: '本体（可选）',
-    file: 'school.ttl',
+  en: {
+    title: 'How it works',
     description:
-      '仅凭映射即可查询。加入本体公理后，引擎可利用类与属性之间的关系扩展查询答案。缺少这两条公理时，查询结果为空。',
+      'A database with two tables shows how a SPARQL query is rewritten into SQL through mappings and an ontology. Prefix declarations are omitted from the code.',
+    stepsLabel: 'Steps',
+    ontology: 'Load ontology axioms',
+    ontologyOff: 'Ontology axioms not loaded: the engine uses the mappings only.',
+    steps: [
+      {
+        title: 'Source data',
+        file: 'school.sql',
+        description:
+          'Students and teachers are stored in two separate tables. A VKG neither copies nor transforms the source data.',
+      },
+      {
+        title: 'Mappings',
+        file: 'school.obda',
+        description:
+          'Each mapping consists of a source query and a target template. The placeholders {id} and {name} are filled from the query results row by row, and each row becomes one entity in the graph.',
+      },
+      {
+        title: 'Ontology (optional)',
+        file: 'school.ttl',
+        description:
+          'Mappings alone are enough to answer queries. With ontology axioms, the engine uses the relations between classes and properties to extend the answers. Without these two axioms, the query returns no results.',
+      },
+      {
+        title: 'SPARQL query',
+        file: 'query.rq',
+        description:
+          'The query uses only the ontology vocabulary and is independent of table structures and column names.',
+      },
+      {
+        title: 'Generated SQL',
+        file: 'rewritten.sql',
+        description:
+          'Combining the ontology and the mappings, Ontop determines that instances of :Person come from the student and teacher tables, and generates SQL for the database to execute.',
+      },
+    ],
+    names: ['Lin Xiao', 'Zhou Ning', 'Prof. Chen'],
+    principles: [
+      {
+        icon: 'database',
+        title: 'No data migration',
+        text: 'Queries run directly on the source database, so results always match the source data.',
+      },
+      {
+        icon: 'layers',
+        title: 'Queries decoupled from schemas',
+        text: 'SPARQL depends only on the ontology vocabulary; when table structures change, only the mappings need adjusting.',
+      },
+      {
+        icon: 'hierarchy',
+        title: 'Ontologies extend answers',
+        text: 'Relations between classes and properties take effect during query rewriting, without materializing inferences in advance.',
+      },
+    ],
+    simplified: '-- simplified',
+    noInstances: '-- no mapping or axiom yields instances of :Person',
+    emptyResult: '-- the query returns no results',
+    result: 'Result',
+    rows: (n) => (n === 1 ? '1 row' : `${n} rows`),
+    empty: 'Empty result set',
   },
-  {
-    title: 'SPARQL 查询',
-    file: 'query.rq',
-    description: '查询仅使用本体词汇，与表结构和列名无关。',
-  },
-  {
-    title: '生成 SQL',
-    file: 'rewritten.sql',
-    description:
-      'Ontop 结合本体与映射，确定 :Person 的实例来自 student 与 teacher 两张表，生成 SQL 交由数据库执行。',
-  },
-];
+};
+const t = texts[lang];
+const [s1, s2, t1] = t.names;
 
 const tables = [
   {
     name: 'student',
     rows: [
-      ['1', '林晓'],
-      ['2', '周宁'],
+      ['1', s1],
+      ['2', s2],
     ],
   },
-  { name: 'teacher', rows: [['1', '陈老师']] },
-];
-
-const principles: { icon: IconName; title: string; text: string }[] = [
-  {
-    icon: 'database',
-    title: '数据不迁移',
-    text: '查询直接在源数据库上执行，结果与源数据保持一致。',
-  },
-  {
-    icon: 'layers',
-    title: '查询与模式解耦',
-    text: 'SPARQL 只依赖本体词汇；表结构变化时，调整映射即可。',
-  },
-  {
-    icon: 'hierarchy',
-    title: '本体扩展答案',
-    text: '类与属性之间的关系在查询改写阶段生效，无需预先物化推理结果。',
-  },
+  { name: 'teacher', rows: [['1', t1]] },
 ];
 ---
 
 <section class="how section" id="how" aria-labelledby="how-title">
   <div class="container">
-    <SectionHeading
-      id="how-title"
-      title="工作原理"
-      description="以一个包含两张表的数据库为例，说明一条 SPARQL 查询如何经由映射与本体改写为 SQL。示例代码省略了前缀声明。"
-    />
+    <SectionHeading id="how-title" title={t.title} description={t.description} />
 
     <div class="demo" data-demo data-reveal>
-      <div class="demo-steps" role="tablist" aria-label="工作原理步骤" aria-orientation="vertical">
-        {steps.map((step, i) => (
+      <div class="demo-steps" role="tablist" aria-label={t.stepsLabel} aria-orientation="vertical">
+        {t.steps.map((step, i) => (
           <button
             type="button"
             role="tab"
@@ -98,14 +199,14 @@ const principles: { icon: IconName; title: string; text: string }[] = [
         <div class="demo-bar">
           <span class="demo-file">
             <Icon name="file" size={14} />
-            <span data-demo-file>{steps[0].file}</span>
+            <span data-demo-file>{t.steps[0].file}</span>
           </span>
           <label class="switch">
             <input type="checkbox" data-ontology checked />
             <span class="switch-track" aria-hidden="true">
               <span class="switch-thumb"></span>
             </span>
-            <span>加载本体公理</span>
+            <span>{t.ontology}</span>
           </label>
         </div>
 
@@ -148,7 +249,7 @@ const principles: { icon: IconName; title: string; text: string }[] = [
             <div class="ontology">
               <pre class="code"><code>:Student <span class="w">rdfs:subClassOf</span> :Person .
 :Teacher <span class="w">rdfs:subClassOf</span> :Person .</code></pre>
-              <p class="ontology-off">未加载本体公理：引擎只使用映射。</p>
+              <p class="ontology-off">{t.ontologyOff}</p>
             </div>
           </div>
 
@@ -161,13 +262,13 @@ const principles: { icon: IconName; title: string; text: string }[] = [
 
           <div class="demo-panel" role="tabpanel" id="how-panel-4" aria-labelledby="how-tab-4">
             <div class="with-ontology">
-              <pre class="code"><code><span class="c">-- 简化形式</span>
+              <pre class="code"><code><span class="c">{t.simplified}</span>
 <span class="k">SELECT</span> name <span class="k">FROM</span> student
 <span class="k">UNION ALL</span>
 <span class="k">SELECT</span> name <span class="k">FROM</span> teacher</code></pre>
               <div class="result">
                 <p class="result-head">
-                  结果 <span>3 行</span>
+                  {t.result} <span>{t.rows(3)}</span>
                 </p>
                 <table>
                   <thead>
@@ -177,26 +278,26 @@ const principles: { icon: IconName; title: string; text: string }[] = [
                   </thead>
                   <tbody>
                     <tr style="--i:0">
-                      <td>林晓</td>
+                      <td>{s1}</td>
                     </tr>
                     <tr style="--i:1">
-                      <td>周宁</td>
+                      <td>{s2}</td>
                     </tr>
                     <tr style="--i:2">
-                      <td>陈老师</td>
+                      <td>{t1}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
             </div>
             <div class="without-ontology">
-              <pre class="code"><code><span class="c">-- 没有映射或公理能推出 :Person 的实例</span>
-<span class="c">-- 查询结果为空</span></code></pre>
+              <pre class="code"><code><span class="c">{t.noInstances}</span>
+<span class="c">{t.emptyResult}</span></code></pre>
               <div class="result">
                 <p class="result-head">
-                  结果 <span>0 行</span>
+                  {t.result} <span>{t.rows(0)}</span>
                 </p>
-                <p class="result-empty">空结果集</p>
+                <p class="result-empty">{t.empty}</p>
               </div>
             </div>
           </div>
@@ -205,7 +306,7 @@ const principles: { icon: IconName; title: string; text: string }[] = [
     </div>
 
     <ul class="principles" role="list">
-      {principles.map((item, i) => (
+      {t.principles.map((item, i) => (
         <li class="principle spotlight" data-reveal style={`--reveal-delay:${i * 90}ms`}>
           <span class="principle-icon">
             <Icon name={item.icon} size={20} />
@@ -216,14 +317,25 @@ const principles: { icon: IconName; title: string; text: string }[] = [
       ))}
     </ul>
 
-    <p class="how-foot" data-reveal>
-      示例中的 SQL 为简化形式。实际生成的 SQL 包含表别名与标识符引号，并可能附加{' '}
-      <code>IS NOT NULL</code> 等条件。完整流程参见{' '}
-      <a class="text-link" href="https://ontop-vkg.org/tutorial/">
-        Ontop 官方教程
-      </a>
-      。
-    </p>
+    {lang === 'zh' ? (
+      <p class="how-foot" data-reveal>
+        示例中的 SQL 为简化形式。实际生成的 SQL 包含表别名与标识符引号，并可能附加{' '}
+        <code>IS NOT NULL</code> 等条件。完整流程参见{' '}
+        <a class="text-link" href="https://ontop-vkg.org/tutorial/">
+          Ontop 官方教程
+        </a>
+        。
+      </p>
+    ) : (
+      <p class="how-foot" data-reveal>
+        The SQL shown is simplified. The actual SQL includes table aliases and quoted identifiers,
+        and may add conditions such as <code>IS NOT NULL</code>. For the complete workflow, see the{' '}
+        <a class="text-link" href="https://ontop-vkg.org/tutorial/">
+          Ontop tutorial
+        </a>
+        .
+      </p>
+    )}
   </div>
 </section>
 

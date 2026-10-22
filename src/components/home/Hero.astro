@@ -1,11 +1,36 @@
 ---
 import ProjectionGraph from './ProjectionGraph.astro';
 import Icon from '../ui/Icon.astro';
-import { categories } from '../../data/categories';
+import { categoriesOf } from '../../data/categories';
 import { site } from '../../data/site';
+import { langOf, localize } from '../../i18n';
 import { getResources } from '../../lib/resources';
 
+const lang = langOf(Astro.url.pathname);
 const total = (await getResources()).length;
+const categoryCount = categoriesOf(lang).length;
+const t = {
+  zh: {
+    label: '虚拟知识图谱 · OBDA · 资源索引',
+    browse: '浏览资源',
+    how: '了解工作原理',
+    resources: '收录资源',
+    resourceCount: `${total} 项`,
+    categories: '资源分类',
+    categoryCount: `${categoryCount} 类`,
+    verified: '最近核对',
+  },
+  en: {
+    label: 'Virtual knowledge graphs · OBDA · Resources',
+    browse: 'Browse resources',
+    how: 'How it works',
+    resources: 'Resources',
+    resourceCount: String(total),
+    categories: 'Categories',
+    categoryCount: String(categoryCount),
+    verified: 'Last verified',
+  },
+}[lang];
 ---
 
 <section class="hero" data-hero>
@@ -18,36 +43,45 @@ const total = (await getResources()).length;
   <div class="container hero-inner">
     <div class="hero-copy">
       <p class="hero-label">
-        <span class="live-dot"></span>虚拟知识图谱 · OBDA · 资源索引
+        <span class="live-dot"></span>
+        {t.label}
       </p>
       <h1>
         <span class="h1-mark">VKG</span>
         <span class="h1-serif">is all you need</span>
       </h1>
-      <p class="hero-lede">
-        虚拟知识图谱（Virtual Knowledge
-        Graph，VKG）以本体和映射为桥梁，将关系数据库中的数据呈现为知识图谱。数据保留在原始数据源中，SPARQL
-        查询在执行时被改写为 SQL。
-      </p>
+      {lang === 'zh' ? (
+        <p class="hero-lede">
+          虚拟知识图谱（Virtual Knowledge
+          Graph，VKG）以本体和映射为桥梁，将关系数据库中的数据呈现为知识图谱。数据保留在原始数据源中，SPARQL
+          查询在执行时被改写为 SQL。
+        </p>
+      ) : (
+        <p class="hero-lede">
+          A virtual knowledge graph (VKG) presents the data in relational databases as a knowledge
+          graph, using an ontology and mappings as the bridge. The data stays in the original
+          sources, and SPARQL queries are rewritten into SQL at query time.
+        </p>
+      )}
       <div class="hero-actions">
-        <a class="btn btn-primary" href="/resources/">
-          浏览资源 <Icon name="arrow-right" />
+        <a class="btn btn-primary" href={localize('/resources/', lang)}>
+          {t.browse} <Icon name="arrow-right" />
         </a>
         <a class="btn" href="#how">
-          了解工作原理
+          {t.how}
         </a>
       </div>
       <dl class="hero-facts">
         <div>
-          <dt>收录资源</dt>
-          <dd>{total} 项</dd>
+          <dt>{t.resources}</dt>
+          <dd>{t.resourceCount}</dd>
         </div>
         <div>
-          <dt>资源分类</dt>
-          <dd>{categories.length} 类</dd>
+          <dt>{t.categories}</dt>
+          <dd>{t.categoryCount}</dd>
         </div>
         <div>
-          <dt>最近核对</dt>
+          <dt>{t.verified}</dt>
           <dd>
             <time datetime={site.verifiedAt}>{site.verifiedAt}</time>
           </dd>

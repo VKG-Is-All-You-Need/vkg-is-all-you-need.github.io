@@ -1,36 +1,77 @@
 ---
 import { site } from '../../data/site';
+import { langOf } from '../../i18n';
+
+const lang = langOf(Astro.url.pathname);
 ---
 
-<dl class="glossary">
-  <div class="term spotlight" data-reveal>
-    <dt>VKG 与 OBDA</dt>
-    <dd>
-      指代同一类方法：数据保留在原始数据源中，通过本体与映射提供可查询的图谱视图。OBDA
-      是较早使用的学术术语。
-    </dd>
-  </div>
-  <div class="term spotlight" data-reveal style="--reveal-delay:80ms">
-    <dt>Ontop</dt>
-    <dd>开源的 VKG/OBDA 引擎，支持 R2RML 与 Ontop 原生映射格式，可部署为 SPARQL endpoint。</dd>
-  </div>
-  <div class="term spotlight" data-reveal style="--reveal-delay:160ms">
-    <dt>Ontopic Studio / Suite</dt>
-    <dd>
-      Ontopic 的商业产品线，并非 Ontop 的别称。二者的关系与产品现状参见{' '}
-      <a class="text-link" href={site.links.distinction}>
-        vkg-resources 中的说明
-      </a>
-      。
-    </dd>
-  </div>
-  <div class="term spotlight" data-reveal style="--reveal-delay:240ms">
-    <dt>RML、YARRRML、Matey</dt>
-    <dd>
-      适用于映射工程，但通常用于生成或物化 RDF。RDF 物化流水线与面向数据库的实时 VKG 查询并不等同。
-    </dd>
-  </div>
-</dl>
+{lang === 'zh' ? (
+  <dl class="glossary">
+    <div class="term spotlight" data-reveal>
+      <dt>VKG 与 OBDA</dt>
+      <dd>
+        指代同一类方法：数据保留在原始数据源中，通过本体与映射提供可查询的图谱视图。OBDA
+        是较早使用的学术术语。
+      </dd>
+    </div>
+    <div class="term spotlight" data-reveal style="--reveal-delay:80ms">
+      <dt>Ontop</dt>
+      <dd>开源的 VKG/OBDA 引擎，支持 R2RML 与 Ontop 原生映射格式，可部署为 SPARQL endpoint。</dd>
+    </div>
+    <div class="term spotlight" data-reveal style="--reveal-delay:160ms">
+      <dt>Ontopic Studio / Suite</dt>
+      <dd>
+        Ontopic 的商业产品线，并非 Ontop 的别称。二者的关系与产品现状参见{' '}
+        <a class="text-link" href={site.links.distinction}>
+          vkg-resources 中的说明
+        </a>
+        。
+      </dd>
+    </div>
+    <div class="term spotlight" data-reveal style="--reveal-delay:240ms">
+      <dt>RML、YARRRML、Matey</dt>
+      <dd>
+        适用于映射工程，但通常用于生成或物化 RDF。RDF 物化流水线与面向数据库的实时 VKG
+        查询并不等同。
+      </dd>
+    </div>
+  </dl>
+) : (
+  <dl class="glossary">
+    <div class="term spotlight" data-reveal>
+      <dt>VKG and OBDA</dt>
+      <dd>
+        Two names for the same approach: the data stays in the original sources, and an ontology and
+        mappings provide a queryable graph view over it. OBDA is the earlier academic term.
+      </dd>
+    </div>
+    <div class="term spotlight" data-reveal style="--reveal-delay:80ms">
+      <dt>Ontop</dt>
+      <dd>
+        An open-source VKG/OBDA engine that supports R2RML and the native Ontop mapping format and
+        can be deployed as a SPARQL endpoint.
+      </dd>
+    </div>
+    <div class="term spotlight" data-reveal style="--reveal-delay:160ms">
+      <dt>Ontopic Studio / Suite</dt>
+      <dd>
+        Commercial products by Ontopic, not another name for Ontop. For the relationship between the
+        two and the current state of the products, see{' '}
+        <a class="text-link" href={site.links.distinction}>
+          the note in vkg-resources
+        </a>{' '}
+        (in Chinese).
+      </dd>
+    </div>
+    <div class="term spotlight" data-reveal style="--reveal-delay:240ms">
+      <dt>RML, YARRRML, Matey</dt>
+      <dd>
+        Useful for mapping engineering, but usually used to generate or materialize RDF. An RDF
+        materialization pipeline is not the same as live VKG queries over a database.
+      </dd>
+    </div>
+  </dl>
+)}
 
 <style>
   .glossary {

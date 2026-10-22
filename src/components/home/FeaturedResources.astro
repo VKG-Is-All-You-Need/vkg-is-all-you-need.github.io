@@ -1,7 +1,10 @@
 ---
 import ResourceCard from '../resources/ResourceCard.astro';
 import SectionHeading from '../ui/SectionHeading.astro';
+import { langOf, localize } from '../../i18n';
 import { getResources, getResourcesById } from '../../lib/resources';
+
+const lang = langOf(Astro.url.pathname);
 
 const featured = await getResourcesById([
   'ontop-tutorial',
@@ -10,15 +13,28 @@ const featured = await getResourcesById([
   'npd-benchmark',
 ]);
 const total = (await getResources()).length;
+const t = {
+  zh: {
+    title: '精选资源',
+    description: '入门阶段最常用的教程、规范、综述与基准。',
+    all: `查看全部 ${total} 项`,
+  },
+  en: {
+    title: 'Featured resources',
+    description:
+      'The tutorial, specification, survey and benchmark most used when getting started.',
+    all: `View all ${total}`,
+  },
+}[lang];
 ---
 
 <section class="section section-rule" aria-labelledby="featured-title">
   <div class="container">
     <SectionHeading
       id="featured-title"
-      title="精选资源"
-      description="入门阶段最常用的教程、规范、综述与基准。"
-      link={{ href: '/resources/', label: `查看全部 ${total} 项` }}
+      title={t.title}
+      description={t.description}
+      link={{ href: localize('/resources/', lang), label: t.all }}
     />
     <div class="grid">
       {featured.map((resource, i) => (

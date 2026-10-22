@@ -1,50 +1,104 @@
 ---
 import Icon from './ui/Icon.astro';
-import { categories, categoryById } from '../data/categories';
-import { getResources } from '../lib/resources';
+import { categoriesOf, categoryOf } from '../data/categories';
+import { langOf, localize } from '../i18n';
+import { getResources, resourceText } from '../lib/resources';
 import type { PaletteItem } from '../scripts/palette';
 
+const lang = langOf(Astro.url.pathname);
 const resources = await getResources();
 
+const t = {
+  zh: {
+    pages: [
+      { title: '首页', href: '/' },
+      { title: '工作原理', href: '/#how', keywords: 'SPARQL SQL 映射 本体 示例' },
+      { title: '资源索引', href: '/resources/', keywords: '标准 工具 教程 基准 论文' },
+      { title: '学习路径', href: '/learn/', keywords: '入门 教程 术语 辨析' },
+      {
+        title: 'VKG × 地理信息示例',
+        href: '/examples/geo/',
+        keywords: 'GeoSPARQL PostGIS 空间 地图 三维 地信 GIS',
+      },
+      {
+        title: 'VKG × 城市数据融合示例',
+        href: '/examples/city/',
+        keywords:
+          '数据融合 动态数据 传感器 温度 湿度 热岛 车辆 轨迹 天气 气象 降雨 大雾 红绿灯 联邦 Trino SOSA',
+      },
+      { title: '关于本站', href: '/about/', keywords: '贡献 来源 issue 致谢' },
+    ],
+    label: '站内搜索',
+    placeholder: '搜索资源、分类与页面',
+    results: '搜索结果',
+    empty: '无匹配结果',
+    select: '选择',
+    open: '打开',
+    close: '关闭',
+  },
+  en: {
+    pages: [
+      { title: 'Home', href: '/' },
+      { title: 'How it works', href: '/#how', keywords: 'SPARQL SQL mapping ontology example' },
+      {
+        title: 'Resources',
+        href: '/resources/',
+        keywords: 'standards tools tutorials benchmarks papers',
+      },
+      { title: 'Learning path', href: '/learn/', keywords: 'getting started tutorial glossary' },
+      {
+        title: 'VKG × Geospatial example',
+        href: '/examples/geo/',
+        keywords: 'GeoSPARQL PostGIS spatial map 3D GIS',
+      },
+      {
+        title: 'VKG × Urban data fusion example',
+        href: '/examples/city/',
+        keywords:
+          'data fusion dynamic data sensors temperature humidity heat island vehicles trajectories weather rain fog traffic lights federation Trino SOSA',
+      },
+      { title: 'About', href: '/about/', keywords: 'contribute sources issue credits' },
+    ],
+    label: 'Site search',
+    placeholder: 'Search resources, categories and pages',
+    results: 'Search results',
+    empty: 'No matches',
+    select: 'Select',
+    open: 'Open',
+    close: 'Close',
+  },
+}[lang];
+
 const items: PaletteItem[] = [
-  { type: 'page', title: '首页', href: '/' },
-  { type: 'page', title: '工作原理', href: '/#how', keywords: 'SPARQL SQL 映射 本体 示例' },
-  { type: 'page', title: '资源索引', href: '/resources/', keywords: '标准 工具 教程 基准 论文' },
-  { type: 'page', title: '学习路径', href: '/learn/', keywords: '入门 教程 术语 辨析' },
-  {
+  ...t.pages.map((page): PaletteItem => ({
     type: 'page',
-    title: 'VKG × 地理信息示例',
-    href: '/examples/geo/',
-    keywords: 'GeoSPARQL PostGIS 空间 地图 三维 地信 GIS',
-  },
-  {
-    type: 'page',
-    title: 'VKG × 城市数据融合示例',
-    href: '/examples/city/',
-    keywords:
-      '数据融合 动态数据 传感器 温度 湿度 热岛 车辆 轨迹 天气 气象 降雨 大雾 红绿灯 联邦 Trino SOSA',
-  },
-  { type: 'page', title: '关于本站', href: '/about/', keywords: '贡献 来源 issue 致谢' },
-  ...categories.map((category): PaletteItem => ({
+    ...page,
+    href: localize(page.href, lang),
+  })),
+  ...categoriesOf(lang).map((category): PaletteItem => ({
     type: 'category',
     title: category.label,
     subtitle: category.description,
-    href: `/resources/?category=${category.id}`,
+    href: localize(`/resources/?category=${category.id}`, lang),
   })),
-  ...resources.map(({ id, data }): PaletteItem => ({
-    type: 'resource',
-    title: data.title,
-    subtitle: [categoryById.get(data.category)?.label, data.venue].filter(Boolean).join(' · '),
-    href: `/resources/#${id}`,
-    keywords: [data.summary, data.note].filter(Boolean).join(' '),
-  })),
+  ...resources.map((resource): PaletteItem => {
+    const { id, data } = resource;
+    const text = resourceText(resource, lang);
+    return {
+      type: 'resource',
+      title: text.title,
+      subtitle: [categoryOf(data.category, lang).label, data.venue].filter(Boolean).join(' · '),
+      href: localize(`/resources/#${id}`, lang),
+      keywords: [text.summary, text.note].filter(Boolean).join(' '),
+    };
+  }),
 ];
 
 // 防止数据中的 “<” 提前闭合 <script>。
 const payload = JSON.stringify(items).replaceAll('<', '\\u003c');
 ---
 
-<dialog class="palette" data-palette aria-label="站内搜索">
+<dialog class="palette" data-palette aria-label={t.label}>
   <div class="palette-panel">
     <div class="palette-search">
       <Icon name="search" />
@@ -57,26 +111,26 @@ const payload = JSON.stringify(items).replaceAll('<', '\\u003c');
         aria-autocomplete="list"
         autocomplete="off"
         spellcheck="false"
-        placeholder="搜索资源、分类与页面"
+        placeholder={t.placeholder}
       />
       <kbd>Esc</kbd>
     </div>
     <div class="palette-body">
-      <ul id="palette-list" role="listbox" aria-label="搜索结果" data-palette-list></ul>
+      <ul id="palette-list" role="listbox" aria-label={t.results} data-palette-list></ul>
       <p class="palette-empty" data-palette-empty hidden>
-        无匹配结果
+        {t.empty}
       </p>
     </div>
     <footer class="palette-foot" aria-hidden="true">
       <span>
         <kbd>↑</kbd>
-        <kbd>↓</kbd> 选择
+        <kbd>↓</kbd> {t.select}
       </span>
       <span>
-        <kbd>Enter</kbd> 打开
+        <kbd>Enter</kbd> {t.open}
       </span>
       <span>
-        <kbd>Esc</kbd> 关闭
+        <kbd>Esc</kbd> {t.close}
       </span>
     </footer>
   </div>

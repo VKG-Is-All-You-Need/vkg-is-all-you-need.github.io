@@ -1,0 +1,56 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/ui/PageHeader.astro';
+import ResourceExplorer from '../../components/resources/ResourceExplorer.astro';
+import { site } from '../../data/site';
+import { langOf, langPaths } from '../../i18n';
+import { getResources } from '../../lib/resources';
+
+export const getStaticPaths = langPaths;
+
+const lang = langOf(Astro.url.pathname);
+const total = (await getResources()).length;
+const t = {
+  zh: {
+    title: '资源索引',
+    meta: `${total} 项 VKG/OBDA 资源，涵盖标准规范、工具、教程与案例、基准测试、论文与相关生态。`,
+    heading: '标准、工具、教程与研究',
+    description: `收录 ${total} 项资源，按用途分为六类，并注明每项资源的适用范围与使用限制。核对范围限于项目页面与文档，未经安装或运行验证；使用前请确认版本、数据与许可证。`,
+    verified: '最近核对',
+  },
+  en: {
+    title: 'Resources',
+    meta: `${total} VKG/OBDA resources: standards, tools, tutorials and case studies, benchmarks, papers and the related ecosystem.`,
+    heading: 'Standards, tools, tutorials and research',
+    description: `${total} resources in six categories by purpose, each with its scope and known limitations. Verification covers project pages and documentation only; nothing has been installed or run. Check versions, data and licenses before use.`,
+    verified: 'Last verified',
+  },
+}[lang];
+---
+
+<BaseLayout title={t.title} description={t.meta}>
+  <PageHeader label={t.title} title={t.heading} description={t.description}>
+    <p class="verified">
+      {t.verified} <time datetime={site.verifiedAt}>{site.verifiedAt}</time>
+    </p>
+  </PageHeader>
+  <div class="container page-body">
+    <ResourceExplorer />
+  </div>
+</BaseLayout>
+
+<style>
+  .verified {
+    display: inline-block;
+    margin-top: 24px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    font: 13px var(--font-mono);
+    color: var(--faint);
+  }
+
+  .page-body {
+    padding-bottom: clamp(72px, 10vw, 128px);
+  }
+</style>

@@ -2,28 +2,35 @@ import { onPageLoad, prefersReducedMotion, watchVisibility } from './lifecycle';
 
 type Phase = 'mapping' | 'query' | 'reason' | 'rewrite' | 'result';
 
-const PHASES: { phase: Phase; tag: string; text: string; duration: number }[] = [
-  {
-    phase: 'mapping',
-    tag: '映射',
-    text: '每一行数据对应图中的一个实体，数据不被复制',
-    duration: 3000,
-  },
-  {
-    phase: 'query',
-    tag: '查询',
-    text: 'SELECT ?name WHERE { ?p a :Person ; :name ?name }',
-    duration: 2400,
-  },
-  { phase: 'reason', tag: '推理', text: ':Student ⊑ :Person，:Teacher ⊑ :Person', duration: 2200 },
-  {
-    phase: 'rewrite',
-    tag: '改写',
-    text: 'SELECT name FROM student UNION ALL SELECT name FROM teacher',
-    duration: 2800,
-  },
-  { phase: 'result', tag: '结果', text: '3 行：林晓、周宁、陈老师', duration: 3000 },
+const PHASES: { phase: Phase; duration: number }[] = [
+  { phase: 'mapping', duration: 3000 },
+  { phase: 'query', duration: 2400 },
+  { phase: 'reason', duration: 2200 },
+  { phase: 'rewrite', duration: 2800 },
+  { phase: 'result', duration: 3000 },
 ];
+
+const QUERY = 'SELECT ?name WHERE { ?p a :Person ; :name ?name }';
+const REASON = ':Student ⊑ :Person，:Teacher ⊑ :Person';
+const SQL = 'SELECT name FROM student UNION ALL SELECT name FROM teacher';
+
+/** 控制台各阶段的标签与文字。 */
+const CONSOLE: Record<'zh' | 'en', Record<Phase, [tag: string, text: string]>> = {
+  zh: {
+    mapping: ['映射', '每一行数据对应图中的一个实体，数据不被复制'],
+    query: ['查询', QUERY],
+    reason: ['推理', REASON],
+    rewrite: ['改写', SQL],
+    result: ['结果', '3 行：林晓、周宁、陈老师'],
+  },
+  en: {
+    mapping: ['Mapping', 'Each row becomes one entity in the graph; no data is copied'],
+    query: ['Query', QUERY],
+    reason: ['Reasoning', REASON.replace('，', ', ')],
+    rewrite: ['Rewriting', SQL],
+    result: ['Result', '3 rows: Lin Xiao, Zhou Ning, Prof. Chen'],
+  },
+};
 
 const KEYS = ['s1', 's2', 't1'] as const;
 
@@ -36,10 +43,17 @@ const FOCUS: Record<Phase, number> = {
   result: 0,
 };
 
-const DESCRIPTIONS: Record<string, string> = {
-  s1: 'student 表第 1 行 ⇄ :student/1 a :Student',
-  s2: 'student 表第 2 行 ⇄ :student/2 a :Student',
-  t1: 'teacher 表第 1 行 ⇄ :teacher/1 a :Teacher',
+const DESCRIPTIONS: Record<'zh' | 'en', Record<string, string>> = {
+  zh: {
+    s1: 'student 表第 1 行 ⇄ :student/1 a :Student',
+    s2: 'student 表第 2 行 ⇄ :student/2 a :Student',
+    t1: 'teacher 表第 1 行 ⇄ :teacher/1 a :Teacher',
+  },
+  en: {
+    s1: 'student row 1 ⇄ :student/1 a :Student',
+    s2: 'student row 2 ⇄ :student/2 a :Student',
+    t1: 'teacher row 1 ⇄ :teacher/1 a :Teacher',
+  },
 };
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -63,6 +77,7 @@ onPageLoad((signal) => {
   if (!root || !svg || !layer || !tagEl || !textEl) return;
 
   const reduced = prefersReducedMotion();
+  const lang = document.documentElement.lang === 'en' ? 'en' : 'zh';
   const canvas = root.querySelector<HTMLElement>('.canvas');
   let userScrolled = false;
   canvas?.addEventListener('pointerdown', () => (userScrolled = true), { signal });
@@ -160,7 +175,8 @@ onPageLoad((signal) => {
 
   let index = 0;
   const runPhase = () => {
-    const { phase, tag, text, duration } = PHASES[index];
+    const { phase, duration } = PHASES[index];
+    const [tag, text] = CONSOLE[lang][phase];
     svg.dataset.phase = phase;
     type(tag, text);
     setHot([]);
@@ -220,7 +236,7 @@ onPageLoad((signal) => {
         hovering = true;
         sync();
         setHot([key]);
-        type('映射', DESCRIPTIONS[key]);
+        type(CONSOLE[lang].mapping[0], DESCRIPTIONS[lang][key]);
       },
       { signal },
     );

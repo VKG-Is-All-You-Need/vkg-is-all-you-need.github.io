@@ -7,8 +7,24 @@ onPageLoad((signal) => {
     element.textContent = isApple ? '⌘' : 'Ctrl';
   });
 
+  // 记住读者选择的语言，供站外进入首页时使用（见 BaseLayout）。
+  document.querySelectorAll<HTMLElement>('[data-lang-switch]').forEach((link) => {
+    link.addEventListener(
+      'click',
+      () => {
+        try {
+          localStorage.setItem('lang', link.dataset.langSwitch!);
+        } catch {
+          // 隐私模式下 localStorage 可能不可用，忽略即可。
+        }
+      },
+      { signal },
+    );
+  });
+
   const header = document.querySelector<HTMLElement>('[data-header]');
   if (!header) return;
+  const en = document.documentElement.lang === 'en';
 
   const syncScrolled = () => header.toggleAttribute('data-scrolled', window.scrollY > 8);
   syncScrolled();
@@ -20,7 +36,10 @@ onPageLoad((signal) => {
 
   const setOpen = (open: boolean) => {
     button.setAttribute('aria-expanded', String(open));
-    button.setAttribute('aria-label', open ? '关闭菜单' : '打开菜单');
+    button.setAttribute(
+      'aria-label',
+      en ? (open ? 'Close menu' : 'Open menu') : open ? '关闭菜单' : '打开菜单',
+    );
     header.toggleAttribute('data-menu-open', open);
     menu.hidden = !open;
   };

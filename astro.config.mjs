@@ -9,7 +9,7 @@ export default defineConfig({
   site,
   trailingSlash: 'ignore',
   prefetch: { prefetchAll: true, defaultStrategy: 'hover' },
-  integrations: [sitemap()],
+  integrations: [sitemap({ i18n: { defaultLocale: 'zh', locales: { zh: 'zh-CN', en: 'en' } } })],
   build: { format: 'directory' },
   devToolbar: { enabled: false },
   vite: {
