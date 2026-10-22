@@ -10,3 +10,4 @@ import './demo';
 import './explorer';
 import './timeline';
 import './geo';
+import './city';

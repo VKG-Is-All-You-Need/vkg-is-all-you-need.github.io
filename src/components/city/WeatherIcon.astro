@@ -1,0 +1,38 @@
+---
+import type { WeatherKind } from '../../lib/city/weather';
+
+interface Props {
+  kind: WeatherKind;
+  size?: number;
+}
+
+const { kind, size = 18 } = Astro.props;
+
+// 线条图标：晴（含晴热）、多云、雨、雾、雷阵雨、大风
+const cloud = (y = 0) =>
+  `<path d="M7 ${18 + y}h10a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.6 1.6A3.2 3.2 0 0 0 7 ${18 + y}z"/>`;
+const icons: Record<WeatherKind, string> = {
+  sunny:
+    '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M2.5 12h2M19.5 12h2M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+  hot: '<circle cx="12" cy="12" r="4.5"/><path d="M12 1.8v2.6M12 19.6v2.6M4.8 4.8l1.8 1.8M17.4 17.4l1.8 1.8M1.8 12h2.6M19.6 12h2.6M4.8 19.2l1.8-1.8M17.4 6.6l1.8-1.8"/>',
+  cloudy: cloud(),
+  rain: `${cloud(-4)}<path d="M9 17.5l-1 3M13 17.5l-1 3M17 17.5l-1 3"/>`,
+  fog: '<path d="M4 8h16M6 12h12M4 16h16M7 20h10"/>',
+  storm: `${cloud(-4)}<path d="M12.5 15l-2.5 4h3.5l-2.5 4"/>`,
+  cold: '<path d="M3 9h11a3 3 0 1 0-3-3M3 15h15a3 3 0 1 1-3 3M3 12h7"/>',
+};
+---
+
+<svg
+  class={`weather-icon weather-${kind}`}
+  width={size}
+  height={size}
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="1.6"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  aria-hidden="true"
+  set:html={icons[kind]}
+/>

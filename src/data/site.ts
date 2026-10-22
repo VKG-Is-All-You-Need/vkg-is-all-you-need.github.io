@@ -20,6 +20,6 @@ export const nav = [
   { href: '/#how', label: '原理', match: null },
   { href: '/resources/', label: '资源', match: '/resources' },
   { href: '/learn/', label: '学习', match: '/learn' },
-  { href: '/examples/geo/', label: '示例', match: '/examples' },
+  { href: '/examples/', label: '示例', match: '/examples' },
   { href: '/about/', label: '关于', match: '/about' },
 ] as const;

@@ -2,7 +2,7 @@
 
 虚拟知识图谱（VKG）与 OBDA 资源索引的站点源码。线上地址：<https://vkg-is-all-you-need.github.io/>
 
-站点基于 [Astro](https://astro.build/) 构建为纯静态页面，可部署到 GitHub Pages 或 Cloudflare。资源数据以 YAML 维护，构建时按 schema 校验。地理信息示例（`/examples/geo/`）的三维场景使用 [three.js](https://threejs.org/)，仅在该页面按需加载。
+站点基于 [Astro](https://astro.build/) 构建为纯静态页面，可部署到 GitHub Pages 或 Cloudflare。资源数据以 YAML 维护，构建时按 schema 校验。两个交互示例（`/examples/geo/` 地理信息、`/examples/city/` 城市数据融合）的三维场景使用 [three.js](https://threejs.org/)，仅在示例页按需加载。
 
 ## 本地开发
 
@@ -32,12 +32,12 @@ Astro 7 的开发服务器以后台进程运行，可用 `npx astro dev status`�
 ├── .github/workflows/     CI 与 GitHub Pages 部署
 ├── public/                原样输出的静态文件（favicon、og.png、品牌素材、_headers）
 ├── src/
-│   ├── components/        组件：home/ resources/ learn/ geo/ ui/ 及全站顶栏、页脚、搜索面板
+│   ├── components/        组件：home/ resources/ learn/ geo/ city/ ui/ 及全站顶栏、页脚、搜索面板
 │   ├── data/              站点配置、资源分类与资源数据（resources.yaml）
 │   ├── layouts/           页面骨架
-│   ├── lib/               数据查询与工具函数；geo/ 为地理信息示例的街区数据与查询
-│   ├── pages/             路由：/、/resources/、/learn/、/examples/geo/、/about/、404、robots.txt
-│   ├── scripts/           客户端交互（主题、动画、搜索、筛选等）；geo/ 为三维场景
+│   ├── lib/               数据查询与工具函数；geo/ 为示例街区与空间查询，city/ 为城市示例的模拟数据源与查询
+│   ├── pages/             路由：/、/resources/、/learn/、/examples/（geo/、city/）、/about/、404、robots.txt
+│   ├── scripts/           客户端交互（主题、动画、搜索、筛选等）；three/ 为两个示例共用的三维舞台与城市模型，geo/、city/ 为各自的场景与页面控制
 │   ├── styles/            设计变量与全局样式
 │   └── content.config.ts  资源数据的 schema
 ├── astro.config.mjs
