@@ -1,0 +1,93 @@
+---
+import Icon from './Icon.astro';
+import { site } from '../../data/site';
+---
+
+<section class="section" aria-labelledby="contribute-title">
+  <div class="container">
+    <div class="banner" data-reveal>
+      <div class="banner-glow" aria-hidden="true"></div>
+      <div class="banner-copy">
+        <span class="banner-icon"><Icon name="git-pull" size={22} /></span>
+        <h2 id="contribute-title">参与贡献</h2>
+        <p>补充资源、修正描述或报告失效链接，均可通过 issue 或 pull request 提交。</p>
+      </div>
+      <div class="banner-actions">
+        <a class="btn btn-primary" href={site.links.issues}
+          >提交 issue <Icon name="arrow-right" /></a
+        >
+        <a class="btn" href="/about/#contribute">贡献说明</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .banner {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 32px;
+    padding: clamp(32px, 5vw, 56px);
+    border-radius: 24px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .banner-glow {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+      radial-gradient(600px circle at 100% 0%, var(--accent-soft), transparent 60%),
+      radial-gradient(
+        500px circle at 0% 100%,
+        color-mix(in srgb, var(--code-var) 8%, transparent),
+        transparent 60%
+      );
+  }
+
+  .banner-glow::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+    background-size: 22px 22px;
+    mask-image: linear-gradient(90deg, transparent 40%, #000);
+    -webkit-mask-image: linear-gradient(90deg, transparent 40%, #000);
+  }
+
+  .banner-icon {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 24px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--accent-ink);
+  }
+
+  h2 {
+    font-size: clamp(28px, 3.6vw, 40px);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+  }
+
+  p {
+    max-width: 32em;
+    margin-top: 10px;
+    color: var(--muted);
+  }
+
+  .banner-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+</style>

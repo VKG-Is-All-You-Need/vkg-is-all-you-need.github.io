@@ -1,0 +1,49 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHeader from '../components/ui/PageHeader.astro';
+import SectionHeading from '../components/ui/SectionHeading.astro';
+import LearningPath from '../components/learn/LearningPath.astro';
+import Glossary from '../components/learn/Glossary.astro';
+import ContributeBanner from '../components/ui/ContributeBanner.astro';
+---
+
+<BaseLayout
+  title="学习路径"
+  description="面向初次接触虚拟知识图谱的读者：四个学习阶段与常见术语辨析。"
+>
+  <PageHeader
+    label="学习路径"
+    title="从概念到映射工程"
+    description="面向初次接触 VKG 的读者，建议按以下四个阶段展开。每个阶段列出学习目标与推荐材料。"
+  />
+
+  <section class="container section-tight" aria-label="学习阶段">
+    <LearningPath />
+  </section>
+
+  <section class="section section-rule" aria-labelledby="terms-title">
+    <div class="container">
+      <SectionHeading
+        id="terms-title"
+        title="术语辨析"
+        description="以下名称在资料中经常并列出现，含义与适用范围并不相同。"
+      />
+      <Glossary />
+      <p class="note">所列外部项目均由其作者独立维护，本组织不代表上述项目。</p>
+    </div>
+  </section>
+
+  <ContributeBanner />
+</BaseLayout>
+
+<style>
+  .section-tight {
+    padding-bottom: clamp(72px, 10vw, 128px);
+  }
+
+  .note {
+    margin-top: 24px;
+    font-size: 14px;
+    color: var(--faint);
+  }
+</style>

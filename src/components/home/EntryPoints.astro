@@ -1,0 +1,131 @@
+---
+import Icon, { type IconName } from '../ui/Icon.astro';
+import SectionHeading from '../ui/SectionHeading.astro';
+import { getResources } from '../../lib/resources';
+
+const total = (await getResources()).length;
+
+const entries: { icon: IconName; title: string; text: string; href: string; cta: string }[] = [
+  {
+    icon: 'route',
+    title: '学习路径',
+    text: '按四个阶段，从核心概念过渡到映射工程与研究专题。',
+    href: '/learn/',
+    cta: '查看路径',
+  },
+  {
+    icon: 'grid',
+    title: '资源索引',
+    text: `${total} 项资源，按标准规范、工具、教程与案例、基准测试、论文和相关生态分类。`,
+    href: '/resources/',
+    cta: '浏览资源',
+  },
+  {
+    icon: 'file',
+    title: '论文',
+    text: '两篇领域综述与近期研究，适合作为系统了解该领域的起点。',
+    href: '/resources/?category=papers',
+    cta: '阅读论文',
+  },
+];
+---
+
+<section class="section section-rule" aria-labelledby="entry-title">
+  <div class="container">
+    <SectionHeading
+      id="entry-title"
+      title="从这里开始"
+      description="根据当前阶段选择入口：系统学习、按需查找，或直接阅读文献。"
+    />
+    <ul class="entries" role="list">
+      {
+        entries.map((entry, i) => (
+          <li data-reveal style={`--reveal-delay:${i * 90}ms`}>
+            <a class="entry spotlight" href={entry.href}>
+              <span class="entry-icon">
+                <Icon name={entry.icon} size={22} />
+              </span>
+              <h3>{entry.title}</h3>
+              <p>{entry.text}</p>
+              <span class="entry-cta">
+                {entry.cta}
+                <Icon name="arrow-right" size={16} />
+              </span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>
+
+<style>
+  .entries {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .entry {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 32px 28px 28px;
+  }
+
+  .entry:hover {
+    transform: translateY(-3px);
+  }
+
+  .entry-icon {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 40px;
+    border-radius: 14px;
+    background: linear-gradient(140deg, var(--accent-soft), transparent);
+    border: 1px solid var(--line);
+    color: var(--accent-ink);
+  }
+
+  h3 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+
+  p {
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: 15px;
+  }
+
+  .entry-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: auto;
+    padding-top: 28px;
+    font-size: 14px;
+    color: var(--accent-ink);
+  }
+
+  .entry-cta :global(svg) {
+    transition: transform 0.3s var(--ease);
+  }
+
+  .entry:hover .entry-cta :global(svg) {
+    transform: translateX(4px);
+  }
+
+  @media (max-width: 860px) {
+    .entries {
+      grid-template-columns: 1fr;
+    }
+
+    .entry-icon {
+      margin-bottom: 24px;
+    }
+  }
+</style>

@@ -1,0 +1,271 @@
+---
+import Icon from './ui/Icon.astro';
+import Logo from './ui/Logo.astro';
+import { nav, site } from '../data/site';
+
+const path = Astro.url.pathname;
+const isActive = (match: string | null) => match !== null && path.startsWith(match);
+---
+
+<header class="site-header" data-header>
+  <div class="container header-inner">
+    <a class="brand" href="/" aria-label={`${site.name} 首页`}>
+      <Logo size={30} />
+      <span>VKG <em>is all you need</em></span>
+    </a>
+
+    <nav class="nav" aria-label="主导航">
+      {
+        nav.map((item) => (
+          <a href={item.href} aria-current={isActive(item.match) ? 'page' : undefined}>
+            {item.label}
+          </a>
+        ))
+      }
+    </nav>
+
+    <div class="actions">
+      <button class="search-trigger" type="button" data-palette-open aria-label="搜索资源与页面">
+        <Icon name="search" size={16} />
+        <span class="search-label">搜索</span>
+        <span class="search-keys" aria-hidden="true"><kbd data-mod-key>⌘</kbd><kbd>K</kbd></span>
+      </button>
+      <button class="icon-button" type="button" data-theme-toggle aria-label="切换深色或浅色主题">
+        <Icon name="sun" class="icon-sun" />
+        <Icon name="moon" class="icon-moon" />
+      </button>
+      <a class="icon-button" href={site.links.org} aria-label="GitHub 组织">
+        <Icon name="github" />
+      </a>
+      <button
+        class="icon-button menu-button"
+        type="button"
+        data-menu-toggle
+        aria-expanded="false"
+        aria-controls="mobile-nav"
+        aria-label="打开菜单"
+      >
+        <Icon name="menu" class="icon-open" />
+        <Icon name="close" class="icon-close" />
+      </button>
+    </div>
+  </div>
+
+  <nav id="mobile-nav" class="mobile-nav" aria-label="移动端导航" hidden>
+    <div class="container">
+      {
+        nav.map((item) => (
+          <a href={item.href} aria-current={isActive(item.match) ? 'page' : undefined}>
+            {item.label}
+            <Icon name="arrow-right" size={16} />
+          </a>
+        ))
+      }
+    </div>
+  </nav>
+</header>
+
+<style>
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    border-bottom: 1px solid transparent;
+    transition:
+      background-color 0.3s,
+      border-color 0.3s,
+      backdrop-filter 0.3s;
+  }
+
+  .site-header[data-scrolled],
+  .site-header[data-menu-open] {
+    background: color-mix(in srgb, var(--bg) 78%, transparent);
+    border-bottom-color: var(--line);
+    backdrop-filter: saturate(160%) blur(14px);
+    -webkit-backdrop-filter: saturate(160%) blur(14px);
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    height: var(--header-h);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 650;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+
+  .brand em {
+    font: italic 400 17px var(--font-serif);
+    color: var(--muted);
+    letter-spacing: 0;
+  }
+
+  .nav {
+    display: flex;
+    gap: 4px;
+  }
+
+  .nav a {
+    position: relative;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 14px;
+    color: var(--muted);
+    transition:
+      color 0.2s,
+      background-color 0.2s;
+  }
+
+  .nav a:hover {
+    color: var(--ink);
+    background: var(--surface-2);
+  }
+
+  .nav a[aria-current='page'] {
+    color: var(--ink);
+  }
+
+  .nav a[aria-current='page']::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: -2px;
+    width: 4px;
+    height: 4px;
+    margin-left: -2px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--glow);
+  }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+  }
+
+  .search-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 36px;
+    padding: 0 8px 0 12px;
+    margin-right: 6px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 14px;
+    transition:
+      border-color 0.2s,
+      color 0.2s;
+  }
+
+  .search-trigger:hover {
+    color: var(--ink);
+    border-color: var(--line-strong);
+  }
+
+  .search-label {
+    min-width: 72px;
+    text-align: left;
+  }
+
+  .search-keys {
+    display: flex;
+    gap: 3px;
+  }
+
+  .icon-button {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    color: var(--muted);
+    transition:
+      color 0.2s,
+      background-color 0.2s;
+  }
+
+  .icon-button:hover {
+    color: var(--ink);
+    background: var(--surface-2);
+  }
+
+  :global([data-theme='light']) .icon-moon,
+  :global([data-theme='dark']) .icon-sun {
+    display: none;
+  }
+
+  .menu-button {
+    display: none;
+  }
+
+  .icon-close,
+  [aria-expanded='true'] .icon-open {
+    display: none;
+  }
+
+  [aria-expanded='true'] .icon-close {
+    display: block;
+  }
+
+  .mobile-nav {
+    border-top: 1px solid var(--line);
+    padding-block: 8px 16px;
+  }
+
+  .mobile-nav a {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 4px;
+    border-bottom: 1px solid var(--line);
+    font-size: 17px;
+    color: var(--ink-2);
+  }
+
+  .mobile-nav a[aria-current='page'] {
+    color: var(--accent-ink);
+  }
+
+  @media (max-width: 860px) {
+    .nav {
+      display: none;
+    }
+
+    .menu-button {
+      display: grid;
+    }
+
+    .search-label,
+    .search-keys {
+      display: none;
+    }
+
+    .search-trigger {
+      width: 36px;
+      padding: 0;
+      justify-content: center;
+      margin-right: 0;
+      border-color: transparent;
+      background: none;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .brand em {
+      display: none;
+    }
+  }
+</style>
