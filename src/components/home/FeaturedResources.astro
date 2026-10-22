@@ -1,0 +1,45 @@
+---
+import ResourceCard from '../resources/ResourceCard.astro';
+import SectionHeading from '../ui/SectionHeading.astro';
+import { getResources, getResourcesById } from '../../lib/resources';
+
+const featured = await getResourcesById([
+  'ontop-tutorial',
+  'r2rml',
+  'vkg-overview',
+  'npd-benchmark',
+]);
+const total = (await getResources()).length;
+---
+
+<section class="section section-rule" aria-labelledby="featured-title">
+  <div class="container">
+    <SectionHeading
+      id="featured-title"
+      title="精选资源"
+      description="入门阶段最常用的教程、规范、综述与基准。"
+      link={{ href: '/resources/', label: `查看全部 ${total} 项` }}
+    />
+    <div class="grid">
+      {
+        featured.map((resource, i) => (
+          <div data-reveal style={`--reveal-delay:${i * 80}ms`}>
+            <ResourceCard resource={resource} showCategory />
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+
+  .grid > div {
+    display: grid;
+  }
+</style>

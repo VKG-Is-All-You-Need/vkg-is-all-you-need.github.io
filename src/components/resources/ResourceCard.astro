@@ -1,0 +1,202 @@
+---
+import Icon from '../ui/Icon.astro';
+import { categoryById } from '../../data/categories';
+import { sourceLabel, type Resource } from '../../lib/resources';
+
+interface Props {
+  resource: Resource;
+  /** 在分组外展示时显示类别标签。 */
+  showCategory?: boolean;
+  /** 资源页的卡片带锚点，供站内链接定位。 */
+  anchor?: boolean;
+}
+
+const { resource, showCategory = false, anchor = false } = Astro.props;
+const { id, data } = resource;
+const category = categoryById.get(data.category);
+---
+
+<article
+  class="resource-card spotlight"
+  id={anchor ? id : undefined}
+  data-resource={id}
+  data-category={data.category}
+>
+  <div class="card-meta">
+    {showCategory && category && <span class="card-category">{category.label}</span>}
+    <span class="card-source">{sourceLabel(data.url)}</span>
+  </div>
+  <h3 class="card-title">
+    <a class="card-link" href={data.url} target="_blank" rel="noopener">
+      {data.title}
+      <Icon name="arrow-up-right" size={16} class="card-arrow" />
+    </a>
+  </h3>
+  {data.venue && <p class="card-venue">{data.venue}</p>}
+  <p class="card-summary">{data.summary}</p>
+  {
+    data.note && (
+      <p class="card-note">
+        <Icon name="info" size={15} />
+        <span>{data.note}</span>
+      </p>
+    )
+  }
+  {
+    data.links.length > 0 && (
+      <ul class="card-links" role="list">
+        {data.links.map((link) => (
+          <li>
+            <a href={link.url} target="_blank" rel="noopener">
+              {link.label}
+              <Icon name="arrow-up-right" size={12} />
+            </a>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</article>
+
+<style>
+  .resource-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 22px 22px 20px;
+    scroll-margin-top: calc(var(--header-h) + 96px);
+  }
+
+  .resource-card:hover {
+    transform: translateY(-2px);
+  }
+
+  .resource-card:target,
+  .resource-card.is-target {
+    border-color: var(--accent);
+    animation: target-pulse 1.8s var(--ease) 2;
+  }
+
+  @keyframes target-pulse {
+    0% {
+      box-shadow: 0 0 0 0 var(--glow);
+    }
+    100% {
+      box-shadow: 0 0 0 14px transparent;
+    }
+  }
+
+  .card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    min-height: 20px;
+    font-size: 12px;
+  }
+
+  .card-category {
+    padding: 1px 9px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+  }
+
+  .card-source {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    color: var(--faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .card-title {
+    font-size: 18px;
+    line-height: 1.4;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+
+  /* 整卡可点击：链接的伪元素铺满卡片 */
+  .card-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+
+  .card-link :global(.card-arrow) {
+    display: inline-block;
+    margin-left: 4px;
+    vertical-align: -2px;
+    color: var(--faint);
+    transition:
+      transform 0.3s var(--ease),
+      color 0.3s;
+  }
+
+  .resource-card:hover :global(.card-arrow) {
+    color: var(--accent-ink);
+    transform: translate(2px, -2px);
+  }
+
+  .card-venue {
+    margin-top: -6px;
+    font-size: 13px;
+    color: var(--faint);
+  }
+
+  .card-summary {
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+
+  .card-note {
+    display: flex;
+    gap: 8px;
+    padding: 9px 12px;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--warn) 9%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warn) 18%, transparent);
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--ink-2);
+  }
+
+  .card-note :global(svg) {
+    flex: none;
+    margin-top: 3px;
+    color: var(--warn);
+  }
+
+  .card-links {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: auto;
+    padding-top: 4px;
+  }
+
+  .card-links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    font-size: 12.5px;
+    color: var(--muted);
+    transition:
+      color 0.2s,
+      border-color 0.2s;
+  }
+
+  .card-links a:hover {
+    color: var(--accent-ink);
+    border-color: var(--accent);
+  }
+</style>

@@ -1,0 +1,620 @@
+---
+/**
+ * 首页主视觉：两张关系表经映射投影为虚拟知识图谱，本体再把 Student、Teacher 归入 Person。
+ * 动画与交互见 scripts/projection.ts。
+ */
+
+const TABLE_X = 8;
+const TABLE_W = 196;
+const ROW_H = 32;
+const HEAD_H = 28;
+const PORT_X = TABLE_X + TABLE_W;
+const ENTITY_X = 372;
+
+const tables = [
+  {
+    name: 'student',
+    y: 72,
+    rows: [
+      { key: 's1', id: '1', name: '林晓' },
+      { key: 's2', id: '2', name: '周宁' },
+    ],
+  },
+  { name: 'teacher', y: 238, rows: [{ key: 't1', id: '1', name: '陈老师' }] },
+].map((table) => ({
+  ...table,
+  height: HEAD_H + table.rows.length * ROW_H,
+  rows: table.rows.map((row, i) => ({ ...row, y: table.y + HEAD_H + i * ROW_H })),
+}));
+
+const rowCenter = Object.fromEntries(
+  tables.flatMap((table) => table.rows.map((row) => [row.key, row.y + ROW_H / 2])),
+);
+
+const entities = [
+  { key: 's1', y: 92, iri: ':student/1', name: '林晓', cls: 'student' },
+  { key: 's2', y: 168, iri: ':student/2', name: '周宁', cls: 'student' },
+  { key: 't1', y: 282, iri: ':teacher/1', name: '陈老师', cls: 'teacher' },
+];
+
+const classes = {
+  student: { label: ':Student', x: 500, y: 130, w: 92 },
+  teacher: { label: ':Teacher', x: 500, y: 282, w: 92 },
+  person: { label: ':Person', x: 588, y: 206, w: 84 },
+};
+const PILL_H = 26;
+
+const mapPath = (key: string, y: number) => {
+  const from = rowCenter[key];
+  return `M${PORT_X} ${from} C${PORT_X + 86} ${from} ${ENTITY_X - 92} ${y} ${ENTITY_X - 8} ${y}`;
+};
+
+const typePath = (y: number, cls: keyof typeof classes) => {
+  const target = classes[cls];
+  const tx = target.x - target.w / 2;
+  return `M${ENTITY_X + 8} ${y} C${ENTITY_X + 46} ${y} ${tx - 38} ${target.y} ${tx} ${target.y}`;
+};
+
+const sub = (cls: 'student' | 'teacher') => {
+  const source = classes[cls];
+  const person = classes.person;
+  const sx = source.x + source.w / 2;
+  const ty = cls === 'student' ? person.y - PILL_H / 2 : person.y + PILL_H / 2;
+  return `M${sx} ${source.y} C${sx + 30} ${source.y} ${person.x} ${source.y + (ty - source.y) * 0.35} ${person.x} ${ty}`;
+};
+---
+
+<figure class="projection" data-projection>
+  <div class="frame">
+    <div class="canvas">
+      <svg
+        viewBox="0 0 640 330"
+        role="img"
+        aria-label="示意图：student 与 teacher 两张表中的三行数据经映射成为虚拟知识图谱中的三个实体；本体声明 Student 与 Teacher 都是 Person 的子类。"
+        data-phase="idle"
+      >
+        <g class="col-labels" aria-hidden="true">
+          <text x={TABLE_X} y="24">关系数据库</text>
+          <text x="288" y="24" text-anchor="middle">映射</text>
+          <text x={ENTITY_X - 8} y="24">虚拟知识图谱</text>
+        </g>
+
+        <!-- 映射：底线 + 流动虚线 -->
+        <g class="maps">
+          {
+            entities.map((entity, i) => (
+              <>
+                <path
+                  class="map-base draw"
+                  d={mapPath(entity.key, entity.y)}
+                  pathLength="1"
+                  style={`--d:${350 + i * 120}ms`}
+                />
+                <path class="map-flow" d={mapPath(entity.key, entity.y)} data-key={entity.key} />
+              </>
+            ))
+          }
+        </g>
+
+        <!-- rdf:type -->
+        <g class="types">
+          {
+            entities.map((entity, i) => (
+              <path
+                class="type-edge draw"
+                d={typePath(entity.y, entity.cls as keyof typeof classes)}
+                pathLength="1"
+                data-key={entity.key}
+                style={`--d:${1250 + i * 100}ms`}
+              />
+            ))
+          }
+        </g>
+
+        <!-- rdfs:subClassOf（本体） -->
+        <g class="subs">
+          {
+            (['student', 'teacher'] as const).map((cls, i) => (
+              <>
+                <path
+                  class="sub-base draw"
+                  d={sub(cls)}
+                  pathLength="1"
+                  style={`--d:${1850 + i * 120}ms`}
+                />
+                <path class="sub-flow" d={sub(cls)} />
+              </>
+            ))
+          }
+        </g>
+
+        <!-- 表 -->
+        {
+          tables.map((table, t) => (
+            <g class="table pop" style={`--d:${t * 120}ms`}>
+              <text class="table-name" x={TABLE_X + 2} y={table.y - 10}>
+                {table.name}
+              </text>
+              <rect
+                class="table-card"
+                x={TABLE_X}
+                y={table.y}
+                width={TABLE_W}
+                height={table.height}
+                rx="9"
+              />
+              <text class="table-head" x={TABLE_X + 16} y={table.y + 18}>
+                id
+              </text>
+              <text class="table-head" x={TABLE_X + 66} y={table.y + 18}>
+                name
+              </text>
+              {table.rows.map((row) => (
+                <g class="row" data-key={row.key}>
+                  <line
+                    class="row-rule"
+                    x1={TABLE_X}
+                    x2={TABLE_X + TABLE_W}
+                    y1={row.y}
+                    y2={row.y}
+                  />
+                  <rect
+                    class="row-bg"
+                    x={TABLE_X + 3}
+                    y={row.y + 3}
+                    width={TABLE_W - 6}
+                    height={ROW_H - 6}
+                    rx="6"
+                  />
+                  <text class="row-text" x={TABLE_X + 16} y={row.y + 21}>
+                    {row.id}
+                  </text>
+                  <text class="row-text" x={TABLE_X + 66} y={row.y + 21}>
+                    {row.name}
+                  </text>
+                  <circle class="port" cx={PORT_X} cy={row.y + ROW_H / 2} r="3" />
+                </g>
+              ))}
+            </g>
+          ))
+        }
+
+        <!-- 类 -->
+        {
+          Object.entries(classes).map(([key, cls], i) => (
+            <g
+              class:list={['class-node', 'pop', `class-${key}`]}
+              style={`--d:${key === 'person' ? 2100 : 1450 + i * 120}ms`}
+            >
+              <rect
+                x={cls.x - cls.w / 2}
+                y={cls.y - PILL_H / 2}
+                width={cls.w}
+                height={PILL_H}
+                rx={PILL_H / 2}
+              />
+              <text x={cls.x} y={cls.y + 4} text-anchor="middle">
+                {cls.label}
+              </text>
+            </g>
+          ))
+        }
+        <circle class="person-ring" cx={classes.person.x} cy={classes.person.y} r="18"></circle>
+
+        <!-- 实体 -->
+        {
+          entities.map((entity, i) => (
+            <g class="entity pop" data-key={entity.key} style={`--d:${950 + i * 110}ms`}>
+              <circle class="entity-halo" cx={ENTITY_X} cy={entity.y} r="16" />
+              <circle class="entity-ring" cx={ENTITY_X} cy={entity.y} r="7.5" />
+              <circle class="entity-core" cx={ENTITY_X} cy={entity.y} r="2.6" />
+              <text class="entity-iri" x={ENTITY_X} y={entity.y + 24} text-anchor="middle">
+                {entity.iri}
+              </text>
+              <text class="entity-name" x={ENTITY_X} y={entity.y + 39} text-anchor="middle">
+                {entity.name}
+              </text>
+            </g>
+          ))
+        }
+
+        <g data-particles></g>
+      </svg>
+    </div>
+
+    <div class="console" aria-live="off">
+      <span class="console-tag" data-console-tag>查询</span>
+      <span class="console-text" data-console-text>?p a :Person → 改写为 SQL → 返回 3 行</span>
+      <span class="console-caret" aria-hidden="true"></span>
+    </div>
+  </div>
+
+  <figcaption class="legend">
+    <span><i class="swatch swatch-map"></i>映射</span>
+    <span><i class="swatch swatch-type"></i>rdf:type</span>
+    <span><i class="swatch swatch-sub"></i>rdfs:subClassOf（本体）</span>
+  </figcaption>
+</figure>
+
+<style>
+  .projection {
+    position: relative;
+  }
+
+  .frame {
+    position: relative;
+    padding: 18px 18px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface) 88%, transparent),
+      color-mix(in srgb, var(--bg-elev) 70%, transparent)
+    );
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(8px);
+  }
+
+  .frame::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(140deg, var(--glow), transparent 35%, transparent 70%, var(--glow));
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  svg {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    font-family: var(--font-mono);
+  }
+
+  /* 窄屏下保持可读尺寸，横向滑动查看 */
+  @media (max-width: 600px) {
+    .canvas {
+      margin-inline: -18px;
+      padding-inline: 18px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .canvas svg {
+      min-width: 540px;
+    }
+  }
+
+  .col-labels text {
+    font: 500 11.5px var(--font-sans);
+    fill: var(--faint);
+    letter-spacing: 0.02em;
+  }
+
+  /* 表 */
+  .table-name {
+    font-size: 12px;
+    font-weight: 600;
+    fill: var(--ink-2);
+  }
+
+  .table-card {
+    fill: var(--surface);
+    stroke: var(--line-strong);
+  }
+
+  .table-head {
+    font-size: 11px;
+    fill: var(--faint);
+  }
+
+  .row-rule {
+    stroke: var(--line);
+  }
+
+  .row-bg {
+    fill: transparent;
+    transition: fill 0.3s;
+  }
+
+  .row-text {
+    font-size: 12.5px;
+    fill: var(--ink-2);
+    transition: fill 0.3s;
+  }
+
+  .port {
+    fill: var(--bg);
+    stroke: var(--accent);
+    stroke-width: 1.4;
+  }
+
+  .row {
+    cursor: pointer;
+  }
+
+  /* 边 */
+  .map-base,
+  .type-edge,
+  .sub-base {
+    fill: none;
+    stroke-width: 1.2;
+  }
+
+  .map-base {
+    stroke: color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+
+  .map-flow {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.4;
+    stroke-dasharray: 3 7;
+    opacity: 0.45;
+    animation: flow 1.6s linear infinite;
+    transition:
+      opacity 0.4s,
+      stroke-width 0.4s;
+  }
+
+  .type-edge {
+    stroke: var(--line-strong);
+    transition: stroke 0.4s;
+  }
+
+  .sub-base {
+    stroke: color-mix(in srgb, var(--code-var) 30%, transparent);
+  }
+
+  .sub-flow {
+    fill: none;
+    stroke: var(--code-var);
+    stroke-width: 1.4;
+    stroke-dasharray: 1 5;
+    stroke-linecap: round;
+    opacity: 0.55;
+    transition: opacity 0.4s;
+  }
+
+  @keyframes flow {
+    to {
+      stroke-dashoffset: -20;
+    }
+  }
+
+  /* 节点 */
+  .class-node rect {
+    fill: var(--surface-2);
+    stroke: var(--line-strong);
+    transition:
+      stroke 0.4s,
+      fill 0.4s;
+  }
+
+  .class-node text {
+    font-size: 12px;
+    fill: var(--ink);
+  }
+
+  .class-person rect {
+    stroke: color-mix(in srgb, var(--code-var) 60%, transparent);
+  }
+
+  .person-ring {
+    fill: none;
+    stroke: var(--code-var);
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .entity {
+    cursor: pointer;
+  }
+
+  .entity-halo {
+    fill: var(--glow);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  .entity-ring {
+    fill: var(--bg);
+    stroke: var(--accent);
+    stroke-width: 1.4;
+    stroke-dasharray: 3 2.4;
+  }
+
+  .entity-core {
+    fill: var(--accent);
+  }
+
+  .entity-iri {
+    font-size: 11px;
+    fill: var(--ink-2);
+  }
+
+  .entity-name {
+    font: 11px var(--font-sans);
+    fill: var(--muted);
+  }
+
+  /* 入场动画（脚本加载前即可播放） */
+  .draw {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: draw 0.9s var(--ease) forwards;
+    animation-delay: var(--d, 0ms);
+  }
+
+  .pop {
+    opacity: 0;
+    animation: pop 0.7s var(--ease) forwards;
+    animation-delay: var(--d, 0ms);
+  }
+
+  @keyframes draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* 高亮：悬停或动画阶段 */
+  .row.is-hot .row-bg {
+    fill: var(--accent-soft);
+  }
+
+  .row.is-hot .row-text {
+    fill: var(--accent-ink);
+  }
+
+  .map-flow.is-hot {
+    opacity: 1;
+    stroke-width: 2;
+  }
+
+  .type-edge.is-hot {
+    stroke: var(--accent);
+  }
+
+  .entity.is-hot .entity-halo {
+    opacity: 0.55;
+  }
+
+  svg[data-phase='query'] .class-person rect,
+  svg[data-phase='reason'] .class-node rect {
+    stroke: var(--code-var);
+    fill: color-mix(in srgb, var(--code-var) 12%, var(--surface-2));
+  }
+
+  svg[data-phase='query'] .person-ring {
+    animation: ring 1.4s var(--ease) infinite;
+  }
+
+  svg[data-phase='reason'] .sub-flow {
+    opacity: 1;
+    animation: flow-reverse 0.9s linear infinite;
+  }
+
+  @keyframes ring {
+    from {
+      opacity: 0.8;
+      transform: scale(0.6);
+    }
+    to {
+      opacity: 0;
+      transform: scale(1.8);
+    }
+  }
+
+  @keyframes flow-reverse {
+    to {
+      stroke-dashoffset: 12;
+    }
+  }
+
+  :global(.particle) {
+    fill: var(--accent);
+    filter: drop-shadow(0 0 4px var(--accent));
+  }
+
+  :global(.particle-warm) {
+    fill: var(--code-var);
+    filter: drop-shadow(0 0 4px var(--code-var));
+  }
+
+  /* 控制台 */
+  .console {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    font: 12px/1.5 var(--font-mono);
+    color: var(--code-ink);
+    overflow: hidden;
+  }
+
+  .console-tag {
+    flex: none;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    color: var(--code-kw);
+    font: 600 11px/1.6 var(--font-sans);
+  }
+
+  .console-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .console-caret {
+    flex: none;
+    width: 7px;
+    height: 14px;
+    margin-left: -6px;
+    background: var(--code-kw);
+    animation: blink 1s steps(1) infinite;
+  }
+
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 20px;
+    margin-top: 14px;
+    font-size: 12px;
+    color: var(--faint);
+  }
+
+  .legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .swatch {
+    width: 22px;
+    height: 0;
+    border-top: 1.5px dashed var(--accent);
+  }
+
+  .swatch-type {
+    border-top-style: solid;
+    border-color: var(--muted);
+  }
+
+  .swatch-sub {
+    border-top: 2px dotted var(--code-var);
+  }
+</style>

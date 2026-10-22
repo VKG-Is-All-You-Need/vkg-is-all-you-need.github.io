@@ -1,0 +1,15 @@
+// @ts-check
+import { defineConfig } from 'astro/config';
+import sitemap from '@astrojs/sitemap';
+
+// 部署到其他域名（如 Cloudflare）时，在构建环境中设置 SITE_URL。
+const site = process.env.SITE_URL ?? 'https://vkg-is-all-you-need.github.io';
+
+export default defineConfig({
+  site,
+  trailingSlash: 'ignore',
+  prefetch: { prefetchAll: true, defaultStrategy: 'hover' },
+  integrations: [sitemap()],
+  build: { format: 'directory' },
+  devToolbar: { enabled: false },
+});

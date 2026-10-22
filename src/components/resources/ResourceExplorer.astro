@@ -1,0 +1,256 @@
+---
+import ResourceCard from './ResourceCard.astro';
+import Icon from '../ui/Icon.astro';
+import { getResourceGroups } from '../../lib/resources';
+
+const groups = await getResourceGroups();
+const total = groups.reduce((sum, group) => sum + group.items.length, 0);
+---
+
+<div class="explorer" data-explorer>
+  <div class="toolbar" data-toolbar hidden>
+    <div class="toolbar-inner">
+      <label class="search">
+        <Icon name="search" size={16} />
+        <span class="visually-hidden">搜索资源</span>
+        <input
+          type="search"
+          placeholder="搜索名称、技术或主题"
+          autocomplete="off"
+          spellcheck="false"
+          data-explorer-search
+        />
+        <kbd aria-hidden="true">/</kbd>
+      </label>
+      <div class="chips" role="group" aria-label="按类别筛选">
+        <button type="button" data-filter="all" aria-pressed="true">
+          全部 <span>{total}</span>
+        </button>
+        {
+          groups.map(({ category, items }) => (
+            <button type="button" data-filter={category.id} aria-pressed="false">
+              {category.label} <span>{items.length}</span>
+            </button>
+          ))
+        }
+      </div>
+      <p class="count" data-count role="status" aria-live="polite">共 {total} 项</p>
+    </div>
+  </div>
+
+  {
+    groups.map(({ category, items }) => (
+      <section
+        class="group"
+        id={category.id}
+        data-group={category.id}
+        aria-labelledby={`group-${category.id}`}
+      >
+        <header class="group-head" data-reveal>
+          <h2 id={`group-${category.id}`}>
+            {category.label}
+            <span>{items.length}</span>
+          </h2>
+          <p>{category.description}</p>
+        </header>
+        <div class="grid">
+          {items.map((resource) => (
+            <ResourceCard resource={resource} anchor />
+          ))}
+        </div>
+      </section>
+    ))
+  }
+
+  <div class="empty" data-empty hidden>
+    <p>无匹配结果。请尝试更短的关键词，或清除筛选条件。</p>
+    <button class="btn" type="button" data-reset>清除筛选</button>
+  </div>
+</div>
+
+<style>
+  .toolbar {
+    position: sticky;
+    top: var(--header-h);
+    z-index: 20;
+    margin-bottom: 8px;
+    padding-block: 14px;
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .toolbar-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 20px;
+  }
+
+  .search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 300px;
+    height: 40px;
+    padding: 0 8px 0 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--faint);
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+  }
+
+  .search:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+
+  .search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    font-size: 14px;
+    color: var(--ink);
+  }
+
+  .search input::placeholder {
+    color: var(--faint);
+  }
+
+  .search input::-webkit-search-cancel-button {
+    filter: grayscale(1);
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .chips button {
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    font-size: 14px;
+    color: var(--muted);
+    transition:
+      color 0.2s,
+      background-color 0.2s,
+      border-color 0.2s;
+  }
+
+  .chips button span {
+    margin-left: 2px;
+    font: 12px var(--font-mono);
+    color: var(--faint);
+  }
+
+  .chips button:hover {
+    color: var(--ink);
+    border-color: var(--line-strong);
+  }
+
+  .chips button[aria-pressed='true'] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--bg);
+  }
+
+  .chips button[aria-pressed='true'] span {
+    color: inherit;
+    opacity: 0.6;
+  }
+
+  .count {
+    margin-left: auto;
+    font: 13px var(--font-mono);
+    color: var(--faint);
+  }
+
+  .group {
+    padding-top: 56px;
+    scroll-margin-top: calc(var(--header-h) + 80px);
+  }
+
+  .group-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 8px 40px;
+    align-items: baseline;
+    margin-bottom: 24px;
+  }
+
+  .group-head h2 {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .group-head h2 span {
+    font: 500 14px var(--font-mono);
+    color: var(--faint);
+  }
+
+  .group-head p {
+    color: var(--muted);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+  }
+
+  .empty {
+    display: grid;
+    justify-items: center;
+    gap: 20px;
+    padding: 96px 0;
+    text-align: center;
+    color: var(--muted);
+  }
+
+  @media (max-width: 860px) {
+    .search {
+      width: 100%;
+    }
+
+    .chips {
+      flex: none;
+      flex-wrap: nowrap;
+      width: calc(100% + var(--gutter) * 2);
+      overflow-x: auto;
+      margin-inline: calc(var(--gutter) * -1);
+      padding-inline: var(--gutter);
+      scrollbar-width: none;
+    }
+
+    .chips button {
+      flex: none;
+    }
+
+    .count {
+      display: none;
+    }
+
+    .group-head {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

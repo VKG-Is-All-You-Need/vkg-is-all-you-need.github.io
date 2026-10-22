@@ -1,0 +1,85 @@
+---
+import '@fontsource-variable/inter';
+import '@fontsource-variable/jetbrains-mono';
+import '@fontsource/instrument-serif/latin-400-italic.css';
+import '../styles/tokens.css';
+import '../styles/global.css';
+
+import { ClientRouter } from 'astro:transitions';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import CommandPalette from '../components/CommandPalette.astro';
+import { site } from '../data/site';
+
+interface Props {
+  /** 页面标题，不含站点名；首页留空。 */
+  title?: string;
+  description?: string;
+}
+
+const { title, description = site.description } = Astro.props;
+const pageTitle = title ? `${title} · ${site.name}` : site.title;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const ogImage = new URL('/og.png', Astro.site);
+---
+
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <meta name="theme-color" content="#07080a" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={site.name} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- 在首次绘制前确定主题，避免闪烁；站内跳转后重新应用。 -->
+    <script is:inline>
+      (() => {
+        const apply = (doc) => {
+          let theme;
+          try {
+            theme = localStorage.getItem('theme');
+          } catch {}
+          if (theme !== 'light' && theme !== 'dark') {
+            theme = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+          }
+          doc.documentElement.dataset.theme = theme;
+          doc.documentElement.classList.add('js');
+        };
+        apply(document);
+        if (!window.__vkgThemeBound) {
+          window.__vkgThemeBound = true;
+          document.addEventListener('astro:before-swap', (event) => apply(event.newDocument));
+        }
+      })();
+    </script>
+
+    <ClientRouter />
+  </head>
+  <body id="top">
+    <a class="skip-link" href="#main">跳至正文</a>
+    <SiteHeader />
+    <main id="main">
+      <slot />
+    </main>
+    <SiteFooter />
+    <CommandPalette />
+    <script>
+      import '../scripts/main';
+    </script>
+  </body>
+</html>

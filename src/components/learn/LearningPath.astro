@@ -1,0 +1,235 @@
+---
+import Icon from '../ui/Icon.astro';
+import { categoryById } from '../../data/categories';
+import { getResources } from '../../lib/resources';
+
+interface Material {
+  title: string;
+  href: string;
+  meta: string;
+  external?: boolean;
+}
+
+const resources = await getResources();
+
+/** 引用 resources.yaml 中的条目，链接到资源页对应卡片。 */
+const ref = (id: string, meta?: string): Material => {
+  const resource = resources.find((entry) => entry.id === id);
+  if (!resource) throw new Error(`未知资源 id：${id}`);
+  return {
+    title: resource.data.title,
+    href: `/resources/#${id}`,
+    meta: meta ?? categoryById.get(resource.data.category)?.label ?? '',
+  };
+};
+
+const stages: { title: string; goal: string; materials: Material[] }[] = [
+  {
+    title: '建立概念',
+    goal: '明确数据源、映射、本体与查询各自的职责，理解查询改写的基本过程。',
+    materials: [
+      {
+        title: 'Ontop Key Concepts',
+        href: 'https://ontop-vkg.org/guide/concepts.html',
+        meta: '官方文档',
+        external: true,
+      },
+      { title: '工作原理演示', href: '/#how', meta: '本站' },
+      ref('vkg-overview', '综述'),
+    ],
+  },
+  {
+    title: '完成官方教程',
+    goal: '基于大学数据库示例部署 SPARQL endpoint，并执行示例查询。',
+    materials: [ref('ontop-tutorial'), ref('ontop-getting-started')],
+  },
+  {
+    title: '调整映射',
+    goal: '修改 IRI 模板、补充主外键约束，观察生成 SQL 的变化。',
+    materials: [ref('mapping-engineering'), ref('ontop-cli'), ref('ontop-lenses')],
+  },
+  {
+    title: '深入专题',
+    goal: '按研究方向选择基准与文献。',
+    materials: [
+      ref('rodi', '映射质量'),
+      ref('npd-benchmark', '规模与性能'),
+      ref('vig', '数据生成'),
+      ref('obda-survey', '研究现状'),
+    ],
+  },
+];
+---
+
+<ol class="timeline" data-timeline role="list">
+  {
+    stages.map((stage, i) => (
+      <li class="stage" data-stage>
+        <span class="stage-node" aria-hidden="true">
+          {String(i + 1).padStart(2, '0')}
+        </span>
+        <div class="stage-card spotlight" data-reveal>
+          <h3>{stage.title}</h3>
+          <p class="stage-goal">{stage.goal}</p>
+          <ul class="materials" role="list">
+            {stage.materials.map((material) => (
+              <li>
+                <a
+                  href={material.href}
+                  target={material.external ? '_blank' : undefined}
+                  rel={material.external ? 'noopener' : undefined}
+                >
+                  <span class="material-title">{material.title}</span>
+                  <span class="material-meta">{material.meta}</span>
+                  <Icon name={material.external ? 'arrow-up-right' : 'arrow-right'} size={16} />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </li>
+    ))
+  }
+</ol>
+
+<style>
+  .timeline {
+    --progress: 0;
+    position: relative;
+    display: grid;
+    gap: 28px;
+    padding-left: 72px;
+  }
+
+  .timeline::before,
+  .timeline::after {
+    content: '';
+    position: absolute;
+    left: 23px;
+    top: 24px;
+    bottom: 24px;
+    width: 2px;
+    border-radius: 2px;
+  }
+
+  .timeline::before {
+    background: var(--line);
+  }
+
+  .timeline::after {
+    background: linear-gradient(var(--accent), var(--code-var));
+    transform: scaleY(var(--progress));
+    transform-origin: top;
+    box-shadow: 0 0 16px var(--glow);
+  }
+
+  .stage {
+    position: relative;
+  }
+
+  .stage-node {
+    position: absolute;
+    left: -72px;
+    top: 4px;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    background: var(--bg);
+    font: 500 14px var(--font-mono);
+    color: var(--faint);
+    transition:
+      color 0.4s,
+      border-color 0.4s,
+      box-shadow 0.4s;
+  }
+
+  .stage.is-active .stage-node {
+    color: var(--accent-ink);
+    border-color: var(--accent);
+    box-shadow:
+      0 0 0 6px var(--accent-soft),
+      0 0 24px var(--glow);
+  }
+
+  .stage-card {
+    padding: 28px;
+  }
+
+  h3 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+
+  .stage-goal {
+    margin-top: 8px;
+    color: var(--muted);
+  }
+
+  .materials {
+    display: grid;
+    margin-top: 20px;
+    border-top: 1px solid var(--line);
+  }
+
+  .materials a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--line);
+    transition: color 0.2s;
+  }
+
+  .materials a:hover {
+    color: var(--accent-ink);
+  }
+
+  .material-title {
+    font-weight: 550;
+  }
+
+  .material-meta {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--faint);
+    white-space: nowrap;
+  }
+
+  .materials a :global(svg) {
+    flex: none;
+    color: var(--faint);
+    transition: transform 0.3s var(--ease);
+  }
+
+  .materials a:hover :global(svg) {
+    color: var(--accent-ink);
+    transform: translateX(3px);
+  }
+
+  @media (max-width: 640px) {
+    .timeline {
+      padding-left: 48px;
+    }
+
+    .timeline::before,
+    .timeline::after {
+      left: 15px;
+    }
+
+    .stage-node {
+      left: -48px;
+      width: 32px;
+      height: 32px;
+      font-size: 12px;
+    }
+
+    .stage-card {
+      padding: 22px 20px;
+    }
+  }
+</style>

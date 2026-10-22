@@ -1,0 +1,22 @@
+# 构建产物
+dist/
+.astro/
+
+# 依赖
+node_modules/
+
+# 本地环境与日志
+.env
+.env.*
+!.env.example
+npm-debug.log*
+.DS_Store
+
+# Cloudflare
+.wrangler/
+
+# 本地预览工具
+.runtime/
+
+# 本地参考文件（不属于站点；仅匹配仓库根目录，不影响 src/ 下的同名目录）
+/resources/

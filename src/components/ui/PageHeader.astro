@@ -1,0 +1,85 @@
+---
+interface Props {
+  title: string;
+  description: string;
+  label?: string;
+}
+
+const { title, description, label } = Astro.props;
+---
+
+<section class="page-header">
+  <div class="backdrop dot-grid" aria-hidden="true"></div>
+  <div class="container">
+    {label && <p class="label">{label}</p>}
+    <h1>{title}</h1>
+    <p class="description">{description}</p>
+    <slot />
+  </div>
+</section>
+
+<style>
+  .page-header {
+    position: relative;
+    margin-top: calc(var(--header-h) * -1);
+    padding-top: calc(var(--header-h) + clamp(56px, 8vw, 96px));
+    padding-bottom: clamp(40px, 6vw, 64px);
+    overflow: hidden;
+  }
+
+  .backdrop {
+    position: absolute;
+    inset: 0;
+    mask-image: radial-gradient(ellipse 60% 90% at 70% 0%, #000 20%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 60% 90% at 70% 0%, #000 20%, transparent 75%);
+  }
+
+  .backdrop::after {
+    content: '';
+    position: absolute;
+    top: -40%;
+    right: 5%;
+    width: 640px;
+    height: 640px;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, var(--glow), transparent);
+    opacity: 0.35;
+    filter: blur(40px);
+  }
+
+  .container {
+    position: relative;
+  }
+
+  .label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    color: var(--accent-ink);
+  }
+
+  .label::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--glow);
+  }
+
+  h1 {
+    font-size: clamp(40px, 6.4vw, 72px);
+    line-height: 1.08;
+    font-weight: 750;
+    letter-spacing: -0.035em;
+  }
+
+  .description {
+    max-width: 40em;
+    margin-top: 20px;
+    font-size: clamp(16px, 1.6vw, 18px);
+    color: var(--muted);
+  }
+</style>

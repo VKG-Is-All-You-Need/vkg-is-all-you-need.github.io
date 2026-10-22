@@ -1,0 +1,180 @@
+---
+import Logo from './ui/Logo.astro';
+import Icon from './ui/Icon.astro';
+import { categories } from '../data/categories';
+import { site } from '../data/site';
+
+const columns = [
+  {
+    title: '站点',
+    links: [
+      { label: '首页', href: '/' },
+      { label: '工作原理', href: '/#how' },
+      { label: '资源索引', href: '/resources/' },
+      { label: '学习路径', href: '/learn/' },
+      { label: '关于本站', href: '/about/' },
+    ],
+  },
+  {
+    title: '资源分类',
+    links: categories.map((category) => ({
+      label: category.label,
+      href: `/resources/?category=${category.id}`,
+    })),
+  },
+  {
+    title: '社区',
+    links: [
+      { label: 'GitHub 组织', href: site.links.org },
+      { label: 'vkg-resources', href: site.links.resources },
+      { label: '提交 issue', href: site.links.issues },
+      { label: '站点源码', href: site.links.repo },
+    ],
+  },
+];
+---
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a class="brand" href="/">
+          <Logo size={34} />
+          <span>VKG <em>is all you need</em></span>
+        </a>
+        <p>虚拟知识图谱（VKG）与 OBDA 资源索引。</p>
+      </div>
+      {
+        columns.map((column) => (
+          <nav class="footer-column" aria-label={column.title}>
+            <h2>{column.title}</h2>
+            <ul role="list">
+              {column.links.map((link) => (
+                <li>
+                  <a href={link.href}>{link.label}</a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ))
+      }
+    </div>
+    <div class="footer-bottom">
+      <p>
+        资源信息最近核对于 <time datetime={site.verifiedAt}>{site.verifiedAt}</time
+        >。外部资源的版权与许可归各自权利人所有。
+      </p>
+      <a class="to-top" href="#top">返回顶部 <Icon name="arrow-up" size={14} /></a>
+    </div>
+  </div>
+  <div class="footer-wordmark" aria-hidden="true">VKG</div>
+</footer>
+
+<style>
+  .site-footer {
+    position: relative;
+    overflow: hidden;
+    border-top: 1px solid var(--line);
+    padding-top: 64px;
+  }
+
+  .footer-top {
+    display: grid;
+    grid-template-columns: 1.6fr repeat(3, 1fr);
+    gap: 40px;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 650;
+  }
+
+  .brand em {
+    font: italic 400 18px var(--font-serif);
+    color: var(--muted);
+  }
+
+  .footer-brand p {
+    margin-top: 14px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .footer-column h2 {
+    margin-bottom: 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--faint);
+  }
+
+  .footer-column ul {
+    display: grid;
+    gap: 8px;
+  }
+
+  .footer-column a {
+    font-size: 14px;
+    color: var(--ink-2);
+    transition: color 0.2s;
+  }
+
+  .footer-column a:hover {
+    color: var(--accent-ink);
+  }
+
+  .footer-bottom {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 12px 32px;
+    margin-top: 56px;
+    padding-block: 24px;
+    border-top: 1px solid var(--line);
+    font-size: 13px;
+    color: var(--faint);
+  }
+
+  .to-top {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.2s;
+  }
+
+  .to-top:hover {
+    color: var(--ink);
+  }
+
+  .footer-wordmark {
+    margin-top: 8px;
+    font-weight: 800;
+    font-size: clamp(120px, 26vw, 360px);
+    line-height: 0.74;
+    letter-spacing: -0.06em;
+    text-align: center;
+    color: transparent;
+    background: linear-gradient(180deg, var(--line-strong), transparent 75%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  @media (max-width: 860px) {
+    .footer-top {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .footer-brand {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .footer-top {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>

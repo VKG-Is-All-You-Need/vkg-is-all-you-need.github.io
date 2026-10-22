@@ -1,0 +1,252 @@
+# 资源数据。字段定义见 src/content.config.ts，构建时会按 schema 校验。
+# category 取值：standards | tools | tutorials | benchmarks | papers | adjacent
+# 条目在页面中的顺序与本文件一致。
+
+# ── 标准规范 ────────────────────────────────────────────────
+
+- id: r2rml
+  category: standards
+  title: R2RML
+  url: https://www.w3.org/TR/r2rml/
+  summary: W3C 推荐标准，定义关系数据库到 RDF 的映射语言。规范不限定执行方式，同时适用于虚拟访问与物化。
+
+- id: direct-mapping
+  category: standards
+  title: Direct Mapping
+  url: https://www.w3.org/TR/rdb-direct-mapping/
+  summary: W3C 推荐标准，依据表、列与主外键约束自动生成 RDF。适合用于理解映射机制；生成的词汇沿用表名与列名，仍需与领域本体对齐。
+
+- id: owl2-ql
+  category: standards
+  title: OWL 2 QL
+  url: https://www.w3.org/TR/owl2-profiles/#OWL_2_QL
+  summary: OWL 2 的一个 profile，专为查询改写设计，使查询能够以 SQL 在关系数据库上求值。OBDA 本体建模通常以其表达能力为界，超出范围的 OWL 2 推理一般不受支持。
+
+- id: sparql-11
+  category: standards
+  title: SPARQL 1.1
+  url: https://www.w3.org/TR/sparql11-query/
+  summary: W3C 推荐的 RDF 查询语言。各引擎支持的特性范围以其兼容性文档为准。
+
+- id: rdb2rdf-test-cases
+  category: standards
+  title: RDB2RDF Test Cases
+  url: https://www.w3.org/TR/rdb2rdf-test-cases/
+  summary: R2RML 与 Direct Mapping 的官方测试集，包含输入数据库、映射与期望的 RDF 输出。用于符合性与回归测试，不用于性能评测。
+
+# ── 工具 ────────────────────────────────────────────────────
+
+- id: ontop
+  category: tools
+  title: Ontop
+  url: https://github.com/ontop/ontop
+  summary: 开源 VKG 引擎，本站收录的多数工具与教程均基于 Ontop。代码与问题跟踪见 GitHub，部署与配置见官方文档。
+  links:
+    - label: 官方文档
+      url: https://ontop-vkg.org/guide/
+
+- id: ontop-getting-started
+  category: tools
+  title: Ontop · Getting Started
+  url: https://ontop-vkg.org/guide/getting-started.html
+  summary: Ontop 入门指南，介绍 Docker、命令行与 Protégé 插件三种使用方式。新项目建议部署为 HTTP SPARQL endpoint。
+
+- id: ontop-cli
+  category: tools
+  title: Ontop CLI
+  url: https://ontop-vkg.org/guide/cli.html
+  summary: Ontop 命令行工具，用于启动 endpoint、执行查询、bootstrap 本体与映射，以及处理映射文件。
+  note: bootstrap 生成的本体与映射仅为初稿，业务语义需人工审核。
+
+- id: protege-mapping-manager
+  category: tools
+  title: Protégé Mapping Manager
+  url: https://ontop-vkg.org/tutorial/basic/university-1.html
+  summary: 在 Protégé 中结合本体编写和管理映射。
+  note: 旧版 Mapping Assistant 面板已移除，早期教程中的界面说明不再适用。
+
+- id: ontop-lenses
+  category: tools
+  title: Ontop Lenses
+  url: https://ontop-vkg.org/guide/advanced/lenses.html
+  summary: 在 Ontop 层定义关系视图，用于整理复杂的源表结构，或适配无法修改的数据库。
+  note: Protégé 插件暂不支持 lenses。
+
+- id: ontop-compliance
+  category: tools
+  title: Ontop 标准兼容性
+  url: https://ontop-vkg.org/guide/compliance.html
+  summary: 说明 Ontop 对 SPARQL、R2RML、GeoSPARQL 等标准的支持范围。
+
+- id: ontopic-repos
+  category: tools
+  title: Ontopic 公开仓库
+  url: https://github.com/ontopic-vkg
+  summary: Ontopic 发布的行业映射、教程与部署示例。
+  note: 各仓库许可证不同，使用前请逐一确认。
+
+# ── 教程与案例 ──────────────────────────────────────────────
+
+- id: ontop-tutorial
+  category: tutorials
+  title: Ontop 官方教程
+  url: https://ontop-vkg.org/tutorial/
+  summary: 以大学数据库为例，涵盖映射、endpoint 部署、查询及进阶主题。推荐作为入门教程。
+  note: 配套文件仓库为文档示例的镜像，文档源码位于 ontop-website 仓库。
+  links:
+    - label: 配套文件
+      url: https://github.com/ontop/ontop-tutorial
+    - label: ontop-website
+      url: https://github.com/ontop/ontop-website
+
+- id: mapping-engineering
+  category: tutorials
+  title: Mapping Engineering
+  url: https://ontop-vkg.org/tutorial/mapping/
+  summary: 映射工程专题，涵盖主键、外键与 IRI 模板。关注语义正确性与生成 SQL 的性能，而不仅是语法有效。
+
+- id: destination-tutorial
+  category: tutorials
+  title: DEST / Destination
+  url: https://github.com/ontopic-vkg/destination-tutorial
+  summary: 基于南蒂罗尔旅游住宿数据，提供数据库、本体、映射练习、SPARQL 查询与参考答案。
+  note: 部分说明基于 Ontop 4.1.0 等历史版本。
+
+- id: bgee-mapping-patterns
+  category: tutorials
+  title: Bgee / Mapping Patterns
+  url: https://github.com/ontop/ontop-patterns-tutorial
+  summary: 基于 Bgee 基因表达数据，提供数据库 dump、本体、OBDA 与 R2RML 映射、查询及部署说明。
+  note: 按目录分别授权：数据 CC0，文字 CC BY 4.0，代码 Apache-2.0。部分命令已过时。
+
+- id: suedtirol-open-data
+  category: tutorials
+  title: Südtirol Open Data OBDA
+  url: https://github.com/dinglinfang/suedTirolOpenDataOBDA
+  summary: 基于天气与交通传感器数据，结合 PostgreSQL/PostGIS 与 Ontop，包含可视分析。
+  note: Apache-2.0。运行环境较旧，需自行适配。
+
+- id: atkis
+  category: tutorials
+  title: ATKIS
+  url: https://github.com/apano-on/atkis
+  summary: 基于德国 DLM250 地形数据，流程为 PostGIS → Ontop/SPARQL → QGIS。
+  note: 该项目为 fork，数据需另行获取；许可证与下载可用性待确认。
+
+- id: adventureworks
+  category: tutorials
+  title: AdventureWorks → schema.org
+  url: https://github.com/ontopic-vkg/adventureworks-sqlserver
+  summary: 将 SQL Server 业务数据映射至 schema.org，提供 R2RML 映射、查询，以及虚拟与物化两种部署示例。
+  note: 包含历史 Suite 项目文件；使用前请核对依赖与许可证。
+
+- id: trino-iceberg
+  category: tutorials
+  title: Ontop + Trino + Iceberg
+  url: https://github.com/ontopic-vkg/ontop-trino-iceberg-playground
+  summary: 数据湖场景下的虚拟访问，组合 Trino、Iceberg、Nessie 与 MinIO。
+  note: 研究性质的 playground（fork），不保证开箱即用。
+
+# ── 基准测试 ────────────────────────────────────────────────
+
+- id: rodi
+  category: benchmarks
+  title: RODI
+  url: https://github.com/chrpin/rodi
+  summary: 评测关系数据库到本体映射的自动及半自动生成质量。
+  note: 评测对象为映射质量，而非查询延迟。复现时需固定场景与版本。
+  links:
+    - label: 项目主页
+      url: https://www.cs.ox.ac.uk/isg/tools/RODI/
+
+- id: npd-benchmark
+  category: benchmarks
+  title: NPD Benchmark
+  url: https://github.com/ontop/npd-benchmark
+  summary: OBDA 查询与扩展性评测，提供关系数据、本体、映射与 SPARQL 查询。
+  note: 数据为 NPD 历史快照，并非实时能源数据服务。
+
+- id: vig
+  category: benchmarks
+  title: VIG
+  url: https://github.com/ontop/vig
+  summary: 数据生成器，依据源数据库与缩放因子生成更大规模的关系数据，用于 OBDA 评测。
+  note: 仅负责生成数据，不是查询引擎，本身也不构成完整的评测方案。
+
+- id: bsbm
+  category: benchmarks
+  title: BSBM
+  url: https://sourceforge.net/projects/bsbmtools/
+  summary: Berlin SPARQL Benchmark。基于电商场景，比较 RDF 存储与关系数据库封装层的 SPARQL 查询性能。
+  note: 经典基准，不专门评测本体推理。
+
+- id: watdiv
+  category: benchmarks
+  title: WatDiv
+  url: https://dsg.uwaterloo.ca/watdiv/index.shtml
+  summary: 评测不同查询结构与数据分布下的 RDF/SPARQL 性能。
+  note: 通用 RDF 基准。用于 VKG 评测时，需说明关系模式、映射设计与适配方式。
+  links:
+    - label: 源码
+      url: https://github.com/dsg-uwaterloo/watdiv
+
+# ── 论文 ────────────────────────────────────────────────────
+
+- id: vkg-overview
+  category: papers
+  title: 'Virtual Knowledge Graphs: An Overview of Systems and Use Cases'
+  url: https://direct.mit.edu/dint/article/1/3/201/9978/Virtual-Knowledge-Graphs-An-Overview-of-Systems
+  venue: Data Intelligence, 2019
+  summary: VKG 综述，涵盖基本概念、代表性系统与应用案例，适合作为系统了解该领域的起点。
+
+- id: obda-survey
+  category: papers
+  title: 'Ontology-Based Data Access: A Survey'
+  url: https://www.ijcai.org/proceedings/2018/777
+  venue: IJCAI 2018
+  summary: OBDA 综述，涵盖整体框架、查询回答、映射管理与开放研究问题。
+
+- id: ontop-publications
+  category: papers
+  title: Ontop 论文目录
+  url: https://ontop-vkg.org/research/publications
+  summary: Ontop 团队在系统、查询优化与应用方面的论文，持续更新。
+
+- id: llm4vkg
+  category: papers
+  title: LLM4VKG
+  url: https://github.com/HomuraT/LLM4VKG
+  venue: IJCAI 2025
+  summary: LLM 辅助的 VKG 构建，涉及映射模式、本体补全、映射生成与评估。
+  note: 需自行配置模型 API、数据库与相关工具；当前可复现性未经验证。
+  links:
+    - label: 论文 PDF
+      url: https://www.ijcai.org/proceedings/2025/0525.pdf
+
+- id: geoqa-portal
+  category: papers
+  title: GeoQA Portal
+  url: https://github.com/nitpicker55555/Geo-QA-Paper
+  summary: 结合 LLM 的地理问答研究。
+  note: 系统架构包含 PostGIS、Neo4j 与 ChromaDB，并非基于 Ontop 的纯虚拟访问，仅供参考。
+
+# ── 相关生态 ────────────────────────────────────────────────
+
+- id: rml
+  category: adjacent
+  title: RML
+  url: https://rml.io/specs/rml/
+  summary: 将 R2RML 的映射方法扩展至 CSV、JSON、XML 等异构数据格式。
+  note: 所链接的规范页标注为 Unofficial Draft，并非 W3C 推荐标准。
+
+- id: yarrrml
+  category: adjacent
+  title: YARRRML
+  url: https://rml.io/yarrrml/
+  summary: 基于 YAML 的映射语法，便于人工读写，可转换为 RML。
+
+- id: matey
+  category: adjacent
+  title: Matey
+  url: https://rml.io/yarrrml/matey/
+  summary: 基于浏览器的 YARRRML 编辑器，可在线编辑映射并查看生成的 RDF。
