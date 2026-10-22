@@ -1,0 +1,567 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/ui/PageHeader.astro';
+import SectionHeading from '../../components/ui/SectionHeading.astro';
+import Icon from '../../components/ui/Icon.astro';
+import GeoExplorer from '../../components/geo/GeoExplorer.astro';
+import { city } from '../../lib/geo/city';
+import { MAPPING, ONTOLOGY, queries } from '../../lib/geo/queries';
+import { pointToWkt, polygonToWkt, rectToWkt } from '../../lib/geo/spatial';
+import { highlight } from '../../lib/highlight';
+
+const nameOf = (id: number) => city.buildings.find((b) => b.id === id)!.name;
+const runs = queries.map((query) => ({ query, result: query.run(city) }));
+const sampleBuildings = city.buildings.slice(0, 8);
+const shorten = (wkt: string, max = 44) => (wkt.length > max ? `${wkt.slice(0, max)}…` : wkt);
+
+const functions = [
+  ['geof:sfWithin', 'ST_Within', '几何 A 完全位于 B 内'],
+  ['geof:sfContains', 'ST_Contains', '几何 A 包含 B'],
+  ['geof:sfIntersects', 'ST_Intersects', '两个几何相交'],
+  ['geof:distance', 'ST_Distance', '两个几何之间的最短距离'],
+  ['geof:buffer', 'ST_Buffer', '按距离生成缓冲区'],
+  ['geof:envelope', 'ST_Envelope', '几何的外包矩形'],
+];
+
+const reading = [
+  {
+    title: 'OGC GeoSPARQL 1.1',
+    meta: '标准规范',
+    href: 'https://docs.ogc.org/is/22-047r1/22-047r1.html',
+    external: true,
+  },
+  {
+    title: 'Ontop 标准兼容性',
+    meta: '含 GeoSPARQL 支持范围',
+    href: '/resources/#ontop-compliance',
+  },
+  {
+    title: 'Südtirol Open Data OBDA',
+    meta: 'PostGIS + Ontop 案例',
+    href: '/resources/#suedtirol-open-data',
+  },
+  { title: 'ATKIS', meta: 'PostGIS → Ontop/SPARQL → QGIS', href: '/resources/#atkis' },
+  { title: 'GeoQA Portal', meta: '地理问答与 LLM', href: '/resources/#geoqa-portal' },
+];
+---
+
+<BaseLayout
+  title="VKG × 地理信息"
+  description="交互示例：PostGIS 中的建筑、地铁站与公园经映射成为 GeoSPARQL 虚拟知识图谱，空间查询在执行时被改写为 PostGIS 空间 SQL。"
+>
+  <PageHeader
+    label="示例"
+    title="VKG × 地理信息"
+    description="一座虚构街区的建筑、地铁站与公园存储在 PostGIS 中。映射将它们以 GeoSPARQL 词汇呈现为虚拟知识图谱，空间查询在执行时被改写为 PostGIS 空间 SQL。选择一个查询查看结果，点击建筑查看对应的数据库记录与虚拟三元组。"
+  />
+
+  <section class="container" aria-label="交互场景">
+    <GeoExplorer />
+    <p class="footnote">
+      示例数据为虚构；坐标为投影坐标，单位为米。查询结果由示例数据实时计算，SQL
+      为便于阅读的简化形式，与 Ontop 的实际输出存在差异。
+    </p>
+  </section>
+
+  <section class="section" aria-labelledby="rewrite-title">
+    <div class="container">
+      <SectionHeading
+        id="rewrite-title"
+        title="查询如何改写"
+        description="左侧为面向本体的 GeoSPARQL 查询，右侧为改写后发往 PostGIS 的 SQL。GeoSPARQL 函数被转换为对应的空间函数，在数据库中执行。代码省略了前缀声明。"
+      />
+      {
+        runs.map(({ query, result }, i) => (
+          <article class="rewrite" data-query-panel={query.id} data-reveal>
+            <header class="rewrite-head">
+              <span class="rewrite-index">{String(i + 1).padStart(2, '0')}</span>
+              <div>
+                <h3>{query.title}</h3>
+                <p>{query.description}</p>
+              </div>
+            </header>
+            <div class="rewrite-grid">
+              <div class="codebox">
+                <p class="codebox-label">GeoSPARQL</p>
+                <pre set:html={`<code>${highlight(query.sparql)}</code>`} />
+              </div>
+              <span class="rewrite-arrow" aria-hidden="true">
+                <Icon name="arrow-right" size={18} />
+              </span>
+              <div class="codebox">
+                <p class="codebox-label">PostGIS SQL（简化）</p>
+                <pre set:html={`<code>${highlight(query.sql)}</code>`} />
+              </div>
+            </div>
+            <p class="rewrite-result">
+              结果：
+              {result.hits.map((hit) => `${nameOf(hit.id)}（${hit.detail}）`).join('、')}
+            </p>
+          </article>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="section section-rule" aria-labelledby="mapping-title">
+    <div class="container">
+      <SectionHeading
+        id="mapping-title"
+        title="映射与本体"
+        description="映射用 ST_AsText 把几何列呈现为 geo:wktLiteral，数据仍保留在 PostGIS 中。本体只有四条公理，用于查询 3 中的 :PublicFacility。"
+      />
+      <div class="mapping-grid" data-reveal>
+        <div class="codebox">
+          <p class="codebox-label">Ontop 映射（节选）</p>
+          <pre set:html={`<code>${highlight(MAPPING)}</code>`} />
+        </div>
+        <div class="mapping-side">
+          <div class="codebox">
+            <p class="codebox-label">本体（Turtle）</p>
+            <pre set:html={`<code>${highlight(ONTOLOGY)}</code>`} />
+          </div>
+          <p class="note">医院、图书馆、博物馆的映射与 school 相同，仅 WHERE 条件不同。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-rule" aria-labelledby="data-title">
+    <div class="container">
+      <SectionHeading
+        id="data-title"
+        title="源数据"
+        description="数据保存在 PostGIS 的三张表中，几何列使用 PostGIS 的 geometry 类型。"
+      />
+      <div class="tables" data-reveal>
+        <figure class="table-card">
+          <figcaption>stations <span>{city.stations.length} 行</span></figcaption>
+          <table>
+            <thead><tr><th>id</th><th>name</th><th>line</th><th>location</th></tr></thead>
+            <tbody>
+              {
+                city.stations.map((s) => (
+                  <tr>
+                    <td>{s.id}</td>
+                    <td>{s.name}</td>
+                    <td>{s.line}</td>
+                    <td class="wkt">{pointToWkt(s.location)}</td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </figure>
+        <figure class="table-card">
+          <figcaption>parks <span>{city.parks.length} 行</span></figcaption>
+          <table>
+            <thead><tr><th>id</th><th>name</th><th>area</th></tr></thead>
+            <tbody>
+              {
+                city.parks.map((p) => (
+                  <tr>
+                    <td>{p.id}</td>
+                    <td>{p.name}</td>
+                    <td class="wkt" title={polygonToWkt(p.area)}>
+                      {shorten(polygonToWkt(p.area))}
+                    </td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </figure>
+        <figure class="table-card table-wide">
+          <figcaption>
+            buildings <span>共 {city.buildings.length} 行，列出前 {sampleBuildings.length} 行</span>
+          </figcaption>
+          <table>
+            <thead
+              ><tr><th>id</th><th>name</th><th>kind</th><th>floors</th><th>footprint</th></tr
+              ></thead
+            >
+            <tbody>
+              {
+                sampleBuildings.map((b) => (
+                  <tr>
+                    <td>{b.id}</td>
+                    <td>{b.name}</td>
+                    <td>{b.kind}</td>
+                    <td>{b.floors}</td>
+                    <td class="wkt" title={rectToWkt(b.footprint)}>
+                      {shorten(rectToWkt(b.footprint), 52)}
+                    </td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-rule" aria-labelledby="points-title">
+    <div class="container">
+      <SectionHeading id="points-title" title="要点" />
+      <ul class="points" role="list">
+        <li class="point spotlight" data-reveal>
+          <span class="point-icon"><Icon name="database" size={20} /></span>
+          <h3>几何保留在数据库中</h3>
+          <p>
+            几何以 PostGIS 类型存储在源表中；映射将其呈现为 geo:wktLiteral，不复制、不转换源数据。
+          </p>
+        </li>
+        <li class="point spotlight" data-reveal style="--reveal-delay:90ms">
+          <span class="point-icon"><Icon name="map" size={20} /></span>
+          <h3>空间函数下推到数据库</h3>
+          <p>
+            geof:distance、geof:sfWithin 等函数在改写时转换为 ST_Distance、ST_Within 等 PostGIS
+            函数，由数据库执行。
+          </p>
+        </li>
+        <li class="point spotlight" data-reveal style="--reveal-delay:180ms">
+          <span class="point-icon"><Icon name="hierarchy" size={20} /></span>
+          <h3>本体与空间条件组合</h3>
+          <p>
+            数据库中没有“公共设施”类别。本体将学校、医院、图书馆与博物馆归入
+            :PublicFacility，再与距离条件组合。
+          </p>
+        </li>
+      </ul>
+
+      <figure class="functions" data-reveal>
+        <figcaption>GeoSPARQL 函数与 PostGIS 函数的常见对应</figcaption>
+        <table>
+          <thead><tr><th>GeoSPARQL</th><th>PostGIS</th><th>含义</th></tr></thead>
+          <tbody>
+            {
+              functions.map(([geof, st, meaning]) => (
+                <tr>
+                  <td>
+                    <code>{geof}</code>
+                  </td>
+                  <td>
+                    <code>{st}</code>
+                  </td>
+                  <td>{meaning}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </figure>
+    </div>
+  </section>
+
+  <section class="section section-rule" aria-labelledby="reading-title">
+    <div class="container">
+      <SectionHeading id="reading-title" title="延伸阅读" />
+      <ul class="reading" role="list" data-reveal>
+        {
+          reading.map((item) => (
+            <li>
+              <a
+                href={item.href}
+                target={item.external ? '_blank' : undefined}
+                rel={item.external ? 'noopener' : undefined}
+              >
+                <span class="reading-title">{item.title}</span>
+                <span class="reading-meta">{item.meta}</span>
+                <Icon name={item.external ? 'arrow-up-right' : 'arrow-right'} size={16} />
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .footnote {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--faint);
+  }
+
+  /* 代码窗口 */
+  .codebox {
+    min-width: 0;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--code-bg);
+    overflow: hidden;
+  }
+
+  .codebox-label {
+    padding: 9px 16px;
+    border-bottom: 1px solid rgb(255 255 255 / 0.07);
+    font: 12px var(--font-mono);
+    color: var(--code-faint);
+  }
+
+  .codebox pre {
+    margin: 0;
+    padding: 16px;
+    font: 13px/1.8 var(--font-mono);
+    color: var(--code-ink);
+    overflow-x: auto;
+  }
+
+  .codebox :global(.k) {
+    color: var(--code-kw);
+  }
+
+  .codebox :global(.v) {
+    color: var(--code-var);
+  }
+
+  .codebox :global(.s) {
+    color: var(--code-str);
+  }
+
+  .codebox :global(.f) {
+    color: #f29fb8;
+  }
+
+  .codebox :global(.c) {
+    color: var(--code-faint);
+  }
+
+  /* 改写对照 */
+  .rewrite + .rewrite {
+    margin-top: 48px;
+  }
+
+  .rewrite-head {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .rewrite-index {
+    font: 500 14px/1.9 var(--font-mono);
+    color: var(--accent-ink);
+  }
+
+  .rewrite-head h3 {
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .rewrite-head p {
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 15px;
+  }
+
+  .rewrite-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+  }
+
+  .rewrite-grid .codebox {
+    align-self: stretch;
+  }
+
+  .rewrite-arrow {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--accent-ink);
+  }
+
+  .rewrite-result {
+    margin-top: 14px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  /* 映射 */
+  .mapping-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+
+  .mapping-side {
+    display: grid;
+    gap: 12px;
+  }
+
+  .note {
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  /* 源数据表 */
+  .tables {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .table-card {
+    margin: 0;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    overflow-x: auto;
+  }
+
+  .table-wide {
+    grid-column: 1 / -1;
+  }
+
+  figcaption {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    font: 600 13px var(--font-mono);
+  }
+
+  figcaption span {
+    font: 400 12px var(--font-sans);
+    color: var(--faint);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+
+  th {
+    padding: 8px 16px;
+    text-align: left;
+    font: 400 12px var(--font-mono);
+    color: var(--faint);
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .wkt {
+    font: 12px var(--font-mono);
+    color: var(--muted);
+  }
+
+  /* 要点 */
+  .points {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .point {
+    padding: 26px;
+  }
+
+  .point-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin-bottom: 18px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--accent-ink);
+  }
+
+  .point h3 {
+    font-size: 18px;
+    font-weight: 650;
+  }
+
+  .point p {
+    margin-top: 8px;
+    font-size: 15px;
+    color: var(--muted);
+  }
+
+  .functions {
+    margin: 32px 0 0;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    overflow-x: auto;
+  }
+
+  .functions figcaption {
+    font: 600 14px var(--font-sans);
+  }
+
+  /* 延伸阅读 */
+  .reading {
+    display: grid;
+    border-top: 1px solid var(--line);
+  }
+
+  .reading a {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 4px;
+    border-bottom: 1px solid var(--line);
+    transition: color 0.2s;
+  }
+
+  .reading a:hover {
+    color: var(--accent-ink);
+  }
+
+  .reading-title {
+    font-weight: 600;
+  }
+
+  .reading-meta {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--faint);
+  }
+
+  .reading a :global(svg) {
+    flex: none;
+    color: var(--faint);
+    transition: transform 0.3s var(--ease);
+  }
+
+  .reading a:hover :global(svg) {
+    color: var(--accent-ink);
+    transform: translateX(3px);
+  }
+
+  @media (max-width: 900px) {
+    .rewrite-grid,
+    .mapping-grid,
+    .tables,
+    .points {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .rewrite-arrow {
+      justify-self: center;
+      rotate: 90deg;
+    }
+  }
+</style>

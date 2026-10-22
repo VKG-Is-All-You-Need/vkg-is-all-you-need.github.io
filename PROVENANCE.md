@@ -7,6 +7,7 @@ Verified source snapshot: 2026-10-22.
 - Resource guide: https://github.com/VKG-Is-All-You-Need/vkg-resources/blob/main/README.md . Resource descriptions and original links retain the guide's qualifications. This website does not claim to have installed or reproduced external tools, examples or research.
 - Organization projects: https://github.com/VKG-Is-All-You-Need . Only vkg-resources and .github were present when checked.
 - Original guide starting point: https://blog.homura.work/posts/study/paper/vkg/ . External papers, datasets and software remain with their original rightsholders; the site links to them rather than redistributing them.
+- The geo example (`/examples/geo/`) uses a fictional district generated in `src/lib/geo/city.ts`. Query results are computed from that data; the PostGIS SQL is a simplified illustration, not verbatim Ontop output. The GeoSPARQL-to-PostGIS function table lists common correspondences, not a statement of any engine's coverage.
 - The worked example on the home page (`student` / `teacher` tables, mappings, ontology axioms and the rewritten SQL) was written for this site. The SQL is a simplified illustration, not verbatim Ontop output.
 
 ## Visual identity
@@ -14,6 +15,7 @@ Verified source snapshot: 2026-10-22.
 - Identity artwork: https://github.com/VKG-Is-All-You-Need/.github/blob/main/profile/assets/vkg-hero.svg . The original banner is kept at `public/brand/vkg-hero.svg`; the geometric mark (`public/brand/vkg-mark.svg`) is extracted from its paths. The header logo, `public/favicon.svg` and `public/og.png` reuse the same paths.
 - Fonts are self-hosted through Fontsource packages and licensed under the SIL Open Font License 1.1: Inter (The Inter Project Authors), Instrument Serif (The Instrument Serif Project Authors) and JetBrains Mono (The JetBrains Mono Project Authors).
 - Icons are simple line drawings written for this site, except the GitHub mark, which is used only to link to GitHub.
+- The 3D scene of the geo example is rendered with three.js (MIT License). Its scene, geometry and shaders were written for this site; no third-party models or textures are used.
 
 ## Design reference
 

@@ -21,6 +21,13 @@ const entries: { icon: IconName; title: string; text: string; href: string; cta:
     cta: '浏览资源',
   },
   {
+    icon: 'map',
+    title: '地理信息示例',
+    text: '在三维街区中运行 GeoSPARQL 查询，观察空间条件如何改写为 PostGIS SQL。',
+    href: '/examples/geo/',
+    cta: '打开示例',
+  },
+  {
     icon: 'file',
     title: '论文',
     text: '两篇领域综述与近期研究，适合作为系统了解该领域的起点。',
@@ -35,7 +42,7 @@ const entries: { icon: IconName; title: string; text: string; href: string; cta:
     <SectionHeading
       id="entry-title"
       title="从这里开始"
-      description="根据当前阶段选择入口：系统学习、按需查找，或直接阅读文献。"
+      description="根据当前阶段选择入口：系统学习、按需查找、动手示例，或直接阅读文献。"
     />
     <ul class="entries" role="list">
       {
@@ -62,7 +69,7 @@ const entries: { icon: IconName; title: string; text: string; href: string; cta:
 <style>
   .entries {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 16px;
   }
 
@@ -119,7 +126,13 @@ const entries: { icon: IconName; title: string; text: string; href: string; cta:
     transform: translateX(4px);
   }
 
-  @media (max-width: 860px) {
+  @media (max-width: 1080px) {
+    .entries {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 640px) {
     .entries {
       grid-template-columns: 1fr;
     }

@@ -1,0 +1,643 @@
+---
+import Icon from '../ui/Icon.astro';
+import { city } from '../../lib/geo/city';
+import { queries } from '../../lib/geo/queries';
+
+const nameOf = (id: number) => city.buildings.find((b) => b.id === id)!.name;
+const first = queries[0].run(city);
+---
+
+<div class="geo" data-geo>
+  <div class="stage" data-geo-stage>
+    <div class="viewport" data-geo-viewport>
+      <div class="pins" data-geo-pins aria-hidden="true"></div>
+      <p class="status" data-geo-status role="status"></p>
+      <div class="toolbar" role="group" aria-label="场景控制">
+        <button type="button" data-geo-mode aria-pressed="true">
+          <Icon name="moon" size={16} class="when-night" />
+          <Icon name="sun" size={16} class="when-day" />
+          <span data-label>夜晚</span>
+        </button>
+        <button type="button" data-geo-rotate aria-pressed="false">
+          <Icon name="rotate" size={16} />
+          <span>自动旋转</span>
+        </button>
+        <button type="button" data-geo-reset>
+          <Icon name="home" size={16} />
+          <span>复位视角</span>
+        </button>
+        <span class="hint">拖动旋转 · 滚轮缩放 · 点击建筑查看数据</span>
+      </div>
+      <figure class="planbox">
+        <canvas data-geo-plan role="img" aria-label="街区平面图，点击可选择建筑"></canvas>
+        <figcaption>平面图 <span>N ↑</span></figcaption>
+      </figure>
+    </div>
+
+    <aside class="panel panel-queries" aria-label="示例查询">
+      <p class="panel-label">示例查询</p>
+      <div class="queries">
+        {
+          queries.map((query, i) => (
+            <button type="button" data-query={query.id} aria-pressed={i === 0 ? 'true' : 'false'}>
+              <span class="q-index">{String(i + 1).padStart(2, '0')}</span>
+              <span class="q-body">
+                <span class="q-title">{query.title}</span>
+                <span class="q-feature">{query.feature}</span>
+              </span>
+            </button>
+          ))
+        }
+      </div>
+      <div class="results" data-geo-results>
+        <p class="results-head">
+          结果 <span>{first.hits.length} 项</span><code>{queries[0].feature}</code>
+        </p>
+        <ul role="list">
+          {
+            first.hits.map((hit) => (
+              <li>
+                <span class="result">
+                  <span class="result-name">{nameOf(hit.id)}</span>
+                  <span class="result-detail">{hit.detail}</span>
+                </span>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </aside>
+
+    <aside class="panel panel-info" data-geo-info aria-live="polite">
+      <p class="info-kind">数据视图</p>
+      <h3 class="info-title">点击任意建筑</h3>
+      <p class="info-text">
+        查看它在 buildings
+        表中的记录，以及映射生成的虚拟三元组。三元组不做物化存储，仅在查询时按需生成。
+      </p>
+      <ul class="legend" role="list">
+        <li><i class="dot dot-hit"></i>查询结果</li>
+        <li><i class="dot dot-station"></i>地铁站</li>
+        <li><i class="dot dot-park"></i>公园</li>
+      </ul>
+    </aside>
+  </div>
+</div>
+
+<style>
+  .stage {
+    position: relative;
+    height: clamp(560px, 78vh, 720px);
+    border-radius: 22px;
+    border: 1px solid var(--line);
+    background:
+      radial-gradient(ellipse at 50% 30%, var(--accent-soft), transparent 60%), var(--bg-elev);
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .viewport {
+    position: absolute;
+    inset: 0;
+  }
+
+  .viewport :global(canvas:not([data-geo-plan])) {
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+    touch-action: none;
+  }
+
+  .stage.is-ready .viewport :global(canvas:not([data-geo-plan])) {
+    animation: scene-in 1.2s var(--ease);
+  }
+
+  @keyframes scene-in {
+    from {
+      opacity: 0;
+      filter: blur(8px);
+    }
+  }
+
+  .status {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    translate: -50% -50%;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .status:empty {
+    display: none;
+  }
+
+  /* 三维标签 */
+  .pins {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .pins :global(.geo-pin) {
+    position: absolute;
+    left: 0;
+    top: 0;
+    translate: -50% -100%;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    background: color-mix(in srgb, var(--surface) 86%, transparent);
+    backdrop-filter: blur(6px);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-2);
+    white-space: nowrap;
+  }
+
+  .pins :global(.pin-station b) {
+    display: grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    background: var(--code-var);
+    color: #241a05;
+    font: 700 10px var(--font-sans);
+  }
+
+  .pins :global(.pin-park) {
+    border-color: rgb(110 160 100 / 0.5);
+    color: var(--muted);
+  }
+
+  .pins :global(.pin-hit) {
+    border-color: var(--accent);
+    color: var(--ink);
+    box-shadow: 0 0 18px var(--glow);
+  }
+
+  .pins :global(.pin-hit span),
+  .pins :global(.pin-hit b) {
+    font-weight: 400;
+  }
+
+  .pins :global(.pin-hit span) {
+    color: var(--accent-ink);
+    font-family: var(--font-mono);
+  }
+
+  .pins :global(.pin-selected) {
+    border-color: var(--ink);
+    color: var(--ink);
+  }
+
+  /* 浮层面板 */
+  .panel {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, var(--surface) 84%, transparent);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    box-shadow: var(--shadow);
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  .panel-queries {
+    top: 16px;
+    left: 16px;
+    bottom: 76px;
+    width: 300px;
+  }
+
+  .panel-info {
+    top: 16px;
+    right: 16px;
+    width: 320px;
+    max-height: calc(100% - 32px - 186px - 12px);
+  }
+
+  .panel-label {
+    font-size: 12px;
+    color: var(--faint);
+  }
+
+  .queries {
+    display: grid;
+    gap: 6px;
+  }
+
+  .queries button {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    text-align: left;
+    transition:
+      background-color 0.25s,
+      border-color 0.25s;
+  }
+
+  .queries button:hover {
+    background: var(--surface-2);
+  }
+
+  .queries button[aria-pressed='true'] {
+    background: var(--accent-soft);
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+
+  .q-index {
+    font: 500 12px/1.9 var(--font-mono);
+    color: var(--faint);
+  }
+
+  [aria-pressed='true'] .q-index {
+    color: var(--accent-ink);
+  }
+
+  .q-body {
+    display: grid;
+    gap: 2px;
+  }
+
+  .q-title {
+    font-size: 14.5px;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  .q-feature {
+    font: 11.5px var(--font-mono);
+    color: var(--faint);
+  }
+
+  /* 结果列表 */
+  .results {
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .results :global(.results-head) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .results :global(.results-head span) {
+    padding: 0 8px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+  }
+
+  .results :global(.results-head code) {
+    margin-left: auto;
+    font-size: 11px;
+    padding: 0;
+    background: none;
+    color: var(--faint);
+  }
+
+  .results :global(.results-sub) {
+    margin: 12px 0 6px;
+    font-size: 12px;
+    color: var(--faint);
+  }
+
+  .results :global(ul) {
+    display: grid;
+    gap: 2px;
+  }
+
+  .results :global(.result) {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: left;
+    transition: background-color 0.2s;
+  }
+
+  .results :global(button.result:hover),
+  .results :global(.result.is-selected) {
+    background: var(--surface-2);
+  }
+
+  .results :global(.result-detail) {
+    font: 12px var(--font-mono);
+    color: var(--accent-ink);
+    white-space: nowrap;
+  }
+
+  .results :global(.is-miss .result-name) {
+    color: var(--muted);
+  }
+
+  .results :global(.is-miss .result-detail) {
+    color: var(--faint);
+  }
+
+  /* 建筑详情 */
+  .panel-info :global(.info-kind) {
+    font-size: 12px;
+    color: var(--accent-ink);
+  }
+
+  .panel-info :global(.info-title) {
+    margin-top: -6px;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .panel-info :global(.info-text),
+  .panel-info :global(.info-meta) {
+    margin-top: -4px;
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+
+  .panel-info :global(.info-label) {
+    font-size: 12px;
+    color: var(--faint);
+  }
+
+  .panel-info :global(.info-row) {
+    display: grid;
+    margin-top: -6px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    font: 12px/1.6 var(--font-mono);
+    overflow: hidden;
+  }
+
+  .panel-info :global(.info-row div) {
+    display: grid;
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+
+  .panel-info :global(.info-row div + div) {
+    border-top: 1px solid var(--line);
+  }
+
+  .panel-info :global(.info-row dt) {
+    padding: 5px 10px;
+    color: var(--faint);
+    background: var(--surface-2);
+  }
+
+  .panel-info :global(.info-row dd) {
+    padding: 5px 10px;
+    font-family: var(--font-mono), var(--font-sans);
+    overflow-wrap: anywhere;
+  }
+
+  .panel-info :global(.code) {
+    margin: -6px 0 0;
+    padding: 12px;
+    border-radius: 10px;
+    background: var(--code-bg);
+    color: var(--code-ink);
+    font: 11.5px/1.7 var(--font-mono);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .panel-info :global(.info-close) {
+    align-self: flex-start;
+    font-size: 13px;
+    color: var(--accent-ink);
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  .legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+  }
+
+  .dot-hit {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--glow);
+  }
+
+  .dot-station {
+    background: var(--code-var);
+    border-radius: 50%;
+  }
+
+  .dot-park {
+    background: rgb(110 160 100 / 0.7);
+  }
+
+  /* 平面图与工具栏 */
+  .planbox {
+    position: absolute;
+    right: 16px;
+    bottom: 16px;
+    z-index: 2;
+    width: 248px;
+    margin: 0;
+    padding: 10px 10px 8px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, var(--surface) 84%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .planbox canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    cursor: crosshair;
+  }
+
+  .planbox figcaption {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--faint);
+  }
+
+  .toolbar {
+    position: absolute;
+    left: 16px;
+    bottom: 16px;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .toolbar button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, var(--surface) 84%, transparent);
+    backdrop-filter: blur(10px);
+    font-size: 13px;
+    color: var(--ink-2);
+    transition:
+      border-color 0.2s,
+      color 0.2s;
+  }
+
+  .toolbar button:hover {
+    border-color: var(--line-strong);
+    color: var(--ink);
+  }
+
+  .toolbar [data-geo-rotate][aria-pressed='true'] {
+    border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+    color: var(--accent-ink);
+  }
+
+  [data-geo-mode][aria-pressed='true'] :global(.when-day),
+  [data-geo-mode][aria-pressed='false'] :global(.when-night) {
+    display: none;
+  }
+
+  .hint {
+    margin-left: 6px;
+    font-size: 12px;
+    color: var(--faint);
+  }
+
+  /* 无 WebGL：平面图放大替代三维场景 */
+  .stage.is-fallback .planbox {
+    left: 332px;
+    right: 352px;
+    top: 16px;
+    bottom: 76px;
+    width: auto;
+    display: grid;
+    place-items: center;
+  }
+
+  .stage.is-fallback .planbox canvas {
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+  }
+
+  .stage.is-fallback .status {
+    top: auto;
+    bottom: 28px;
+    left: auto;
+    right: 352px;
+    translate: none;
+  }
+
+  @media (max-width: 1080px) {
+    .stage {
+      height: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 0 0 12px;
+    }
+
+    .viewport {
+      position: relative;
+      height: min(64vh, 480px);
+      flex: none;
+    }
+
+    .panel {
+      position: static;
+      width: auto;
+      max-height: none;
+      margin-inline: 12px;
+      box-shadow: none;
+    }
+
+    .panel-queries {
+      order: 1;
+    }
+
+    .panel-info {
+      order: 2;
+    }
+
+    .queries {
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(200px, 1fr);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .planbox {
+      width: 156px;
+      padding: 6px;
+    }
+
+    .planbox figcaption,
+    .hint {
+      display: none;
+    }
+
+    .toolbar {
+      left: 12px;
+      bottom: 12px;
+      right: 180px;
+    }
+
+    .toolbar span:not(.hint) {
+      display: none;
+    }
+
+    .toolbar button {
+      width: 36px;
+      padding: 0;
+      justify-content: center;
+    }
+
+    .stage.is-fallback .planbox {
+      inset: 12px;
+      width: auto;
+    }
+  }
+</style>
