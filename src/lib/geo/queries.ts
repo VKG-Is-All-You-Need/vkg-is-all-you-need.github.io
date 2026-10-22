@@ -17,11 +17,39 @@ export interface Hit {
   detail: string;
 }
 
+/** 分层视图中的一个实体节点。key 形如 b:12（建筑）、s:1（地铁站）、p:1（公园）。 */
+export interface PlanEntity {
+  key: string;
+  /** 该实体在本次查询中涉及的类。 */
+  classes: string[];
+  /** 生成该实体的映射。 */
+  mapping: string;
+  hit: boolean;
+}
+
+/** 虚拟知识图谱层中两个实体之间的关系（由空间条件求得）。 */
+export interface PlanRelation {
+  from: string;
+  to: string;
+  label: string;
+  hit: boolean;
+}
+
+/** 一次查询在“本体 → 虚拟知识图谱 → 映射 → 数据源”各层中涉及的内容。 */
+export interface LayerPlan {
+  classes: string[];
+  /** [子类, 父类] */
+  subclass: [string, string][];
+  entities: PlanEntity[];
+  relations: PlanRelation[];
+}
+
 export interface QueryResult {
   hits: Hit[];
   /** 接近条件但未命中的对象，用于对比。 */
   misses: Hit[];
   focus: Focus;
+  plan: LayerPlan;
 }
 
 export interface GeoQuery {
@@ -35,6 +63,13 @@ export interface GeoQuery {
 }
 
 const metres = (value: number) => `${Math.round(value)} 米`;
+
+const FACILITY_MAPPING: Record<string, string> = {
+  学校: 'school',
+  医院: 'hospital',
+  图书馆: 'library',
+  博物馆: 'museum',
+};
 
 /** 点到线段的距离，用于计算建筑到公园边界的距离。 */
 function distanceToSegment(p: Point, a: Point, b: Point): number {
@@ -88,6 +123,25 @@ ORDER  BY dist`,
           .filter(({ d }) => d >= 300)
           .map(({ b, d }) => ({ id: b.id, detail: metres(d) })),
         focus: { type: 'buffer', centers: [station.location], radius: 300 },
+        plan: {
+          classes: [':Station', ':Building'],
+          subclass: [],
+          entities: [
+            { key: `s:${station.id}`, classes: [':Station'], mapping: 'station', hit: true },
+            ...cafes.map(({ b, d }) => ({
+              key: `b:${b.id}`,
+              classes: [':Building'],
+              mapping: 'building',
+              hit: d < 300,
+            })),
+          ],
+          relations: cafes.map(({ b, d }) => ({
+            from: `b:${b.id}`,
+            to: `s:${station.id}`,
+            label: metres(d),
+            hit: d < 300,
+          })),
+        },
       };
     },
   },
@@ -120,6 +174,39 @@ WHERE  p.name = '湖滨公园'
         hits: inside.map((b) => ({ id: b.id, detail: '位于公园内' })),
         misses: near.map(({ b, d }) => ({ id: b.id, detail: `距公园边界 ${metres(d)}` })),
         focus: { type: 'area', polygon: park.area },
+        plan: {
+          classes: [':Park', ':Building'],
+          subclass: [],
+          entities: [
+            { key: `p:${park.id}`, classes: [':Park'], mapping: 'park', hit: true },
+            ...inside.map((b) => ({
+              key: `b:${b.id}`,
+              classes: [':Building'],
+              mapping: 'building',
+              hit: true,
+            })),
+            ...near.map(({ b }) => ({
+              key: `b:${b.id}`,
+              classes: [':Building'],
+              mapping: 'building',
+              hit: false,
+            })),
+          ],
+          relations: [
+            ...inside.map((b) => ({
+              from: `b:${b.id}`,
+              to: `p:${park.id}`,
+              label: 'sfWithin',
+              hit: true,
+            })),
+            ...near.map(({ b, d }) => ({
+              from: `b:${b.id}`,
+              to: `p:${park.id}`,
+              label: `边界外 ${metres(d)}`,
+              hit: false,
+            })),
+          ],
+        },
       };
     },
   },
@@ -155,10 +242,35 @@ WHERE  b.kind IN ('学校', '医院', '图书馆', '博物馆')
         id: b.id,
         detail: `${b.kind} · 距${s.name} ${metres(d)}`,
       });
+      const subclasses = [':School', ':Hospital', ':Library', ':Museum'];
       return {
         hits: facilities.filter(({ d }) => d < 250).map(describe),
         misses: facilities.filter(({ d }) => d >= 250).map(describe),
         focus: { type: 'buffer', centers: city.stations.map((s) => s.location), radius: 250 },
+        plan: {
+          classes: [':PublicFacility', ...subclasses, ':Station'],
+          subclass: subclasses.map((cls): [string, string] => [cls, ':PublicFacility']),
+          entities: [
+            ...city.stations.map((s) => ({
+              key: `s:${s.id}`,
+              classes: [':Station'],
+              mapping: 'station',
+              hit: true,
+            })),
+            ...facilities.map(({ b, d }) => ({
+              key: `b:${b.id}`,
+              classes: [FACILITY_CLASS[b.kind]!],
+              mapping: FACILITY_MAPPING[b.kind],
+              hit: d < 250,
+            })),
+          ],
+          relations: facilities.map(({ b, s, d }) => ({
+            from: `b:${b.id}`,
+            to: `s:${s.id}`,
+            label: metres(d),
+            hit: d < 250,
+          })),
+        },
       };
     },
   },

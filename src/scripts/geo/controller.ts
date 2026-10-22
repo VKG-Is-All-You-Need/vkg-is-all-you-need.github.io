@@ -6,7 +6,7 @@ import { queries, type GeoQuery, type QueryResult } from '../../lib/geo/queries'
 import { rectToWkt, type Point } from '../../lib/geo/spatial';
 import { highlight } from '../../lib/highlight';
 import { prefersReducedMotion } from '../lifecycle';
-import type { GeoScene, Mode, PlanView } from './scene';
+import type { GeoScene, Mode, PlanView, View } from './scene';
 
 const byId = new Map(city.buildings.map((building) => [building.id, building]));
 const results = new Map<GeoQuery['id'], QueryResult>(
@@ -53,6 +53,8 @@ export function initGeo(root: HTMLElement, signal: AbortSignal): void {
   const modeButton = root.querySelector<HTMLButtonElement>('[data-geo-mode]')!;
   const rotateButton = root.querySelector<HTMLButtonElement>('[data-geo-rotate]')!;
   const resetButton = root.querySelector<HTMLButtonElement>('[data-geo-reset]')!;
+  const viewButton = root.querySelector<HTMLButtonElement>('[data-geo-view]')!;
+  const steps = [...root.querySelectorAll<HTMLElement>('[data-geo-step]')];
   const panels = [...document.querySelectorAll<HTMLElement>('[data-query-panel]')];
   const reduced = prefersReducedMotion();
 
@@ -61,6 +63,7 @@ export function initGeo(root: HTMLElement, signal: AbortSignal): void {
   let view: PlanView | null = null;
   let scene: GeoScene | null = null;
   let userMode: Mode | null = null;
+  let sceneView: View = 'layers';
   const themeMode = (): Mode =>
     document.documentElement.dataset.theme === 'light' ? 'day' : 'night';
   const mode = () => userMode ?? themeMode();
@@ -218,12 +221,29 @@ export function initGeo(root: HTMLElement, signal: AbortSignal): void {
       <button type="button" class="info-close" data-select="">返回说明</button>`;
   };
 
+  /** 分层视图中实体节点的标签：名称与 IRI。 */
+  const entityLabel = (key: string) => {
+    const [type, raw] = key.split(':');
+    const id = Number(raw);
+    if (type === 'b') return `<b>${escapeHtml(byId.get(id)!.name)}</b><span>:building/${id}</span>`;
+    // 地铁站与公园是查询的锚点，只显示名称以减少标签重叠
+    if (type === 's') return `<b>${escapeHtml(city.stations.find((s) => s.id === id)!.name)}</b>`;
+    return `<b>${escapeHtml(city.parks.find((p) => p.id === id)!.name)}</b>`;
+  };
+
+  const setPhase = (phase: number) => {
+    steps.forEach((step, i) => {
+      step.classList.toggle('is-done', i < phase);
+      step.classList.toggle('is-current', i === phase);
+    });
+  };
+
   const select = (id: number | null) => {
     selected = id;
     renderResults();
     renderInfo();
     drawPlan();
-    scene?.select(id);
+    scene?.select(id, id === null ? undefined : entityLabel(`b:${id}`));
   };
 
   const showQuery = (id: GeoQuery['id']) => {
@@ -240,8 +260,13 @@ export function initGeo(root: HTMLElement, signal: AbortSignal): void {
         label: `<b>${escapeHtml(byId.get(hit.id)!.name)}</b><span>${escapeHtml(hit.detail)}</span>`,
       })),
       focus: result.focus,
+      plan: result.plan,
+      entityLabels: Object.fromEntries(
+        result.plan.entities.map((entity) => [entity.key, entityLabel(entity.key)]),
+      ),
     });
     scene?.select(null);
+    setPhase(-1);
     renderResults();
     renderInfo();
     drawPlan();
@@ -307,6 +332,23 @@ export function initGeo(root: HTMLElement, signal: AbortSignal): void {
   );
   resetButton.addEventListener('click', () => scene?.resetView(), { signal });
 
+  const syncViewButton = () => {
+    root.dataset.view = sceneView;
+    viewButton.setAttribute('aria-pressed', String(sceneView === 'layers'));
+    viewButton.querySelector('[data-label]')!.textContent =
+      sceneView === 'layers' ? '分层' : '城市';
+  };
+  viewButton.addEventListener(
+    'click',
+    () => {
+      sceneView = sceneView === 'layers' ? 'city' : 'layers';
+      setPhase(-1);
+      scene?.setView(sceneView);
+      syncViewButton();
+    },
+    { signal },
+  );
+
   const themeObserver = new MutationObserver(() => {
     if (!userMode) scene?.setMode(themeMode());
     syncModeButton();
@@ -341,8 +383,9 @@ export function initGeo(root: HTMLElement, signal: AbortSignal): void {
             view = next;
             drawPlan();
           },
+          onPhase: setPhase,
         },
-        { mode: mode(), reducedMotion: reduced },
+        { mode: mode(), view: sceneView, reducedMotion: reduced },
       );
       stage.classList.add('is-ready');
       status.textContent = '';
@@ -376,5 +419,6 @@ export function initGeo(root: HTMLElement, signal: AbortSignal): void {
 
   root.setAttribute('data-ready', '');
   syncModeButton();
+  syncViewButton();
   showQuery(active);
 }
