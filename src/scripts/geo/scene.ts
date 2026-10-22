@@ -299,12 +299,13 @@ export function createGeoScene(
   const fog = new THREE.Fog(0x000000, 1300, 3200);
   scene.fog = fog;
 
-  const camera = new THREE.PerspectiveCamera(36, 1, 5, 8000);
+  const camera = new THREE.PerspectiveCamera(36, 1, 5, 12000);
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.minDistance = 160;
-  controls.maxDistance = 2800;
+  // 竖屏时需要拉远才能看全街区，上限随之放宽
+  controls.maxDistance = 7000;
   controls.minPolarAngle = 0.2;
   controls.maxPolarAngle = 1.36;
   controls.autoRotateSpeed = 0.35;
@@ -1172,18 +1173,19 @@ export function createGeoScene(
   };
 
   // ── 相机 ──
+  /** 画面越窄，相机越远，保证整个街区或分层堆叠在水平方向完整可见。 */
+  const framingScale = (reference: number, max: number) =>
+    THREE.MathUtils.clamp(reference / (camera.aspect || reference), 1, max);
   const homes = {
     city: () => {
-      const aspect = camera.aspect || 1.6;
-      const scale = aspect < 1.2 ? 1.45 : aspect < 1.6 ? 1.15 : 1;
+      const scale = framingScale(1.6, 2.2);
       return {
         position: new THREE.Vector3(420, 560, 780).multiplyScalar(scale),
         target: new THREE.Vector3(30, 0, 30),
       };
     },
     layers: () => {
-      const aspect = camera.aspect || 1.6;
-      const scale = aspect < 1.2 ? 1.5 : aspect < 1.6 ? 1.18 : 1;
+      const scale = framingScale(1.7, 2.4);
       const target = new THREE.Vector3(30, 270, 10);
       return {
         position: target.clone().add(new THREE.Vector3(500, 700, 1740).multiplyScalar(scale)),
@@ -1363,8 +1365,10 @@ export function createGeoScene(
       entry.mesh.position.y = BLOCK_HEIGHT + (h * scale) / 2;
     }
     cityBeams.visible = mix < 0.5;
-    fog.near = 1300 + 900 * mix;
-    fog.far = 3200 + 1800 * mix;
+    // 雾随相机距离变化，拉远时不至于把场景整体淡掉
+    const distance = camera.position.distanceTo(controls.target);
+    fog.near = distance + 250 + 500 * mix;
+    fog.far = distance + 2200 + 1200 * mix;
     // 节点在压缩高度时保持球形
     const inverse = 1 / Math.max(mix, 0.05);
     for (const object of [

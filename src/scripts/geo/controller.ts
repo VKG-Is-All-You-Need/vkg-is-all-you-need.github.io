@@ -349,6 +349,86 @@ export function initGeo(root: HTMLElement, signal: AbortSignal): void {
     { signal },
   );
 
+  // ── 全屏：优先使用 Fullscreen API；不支持时（如 iPhone Safari）以固定定位铺满窗口 ──
+  type FullscreenTarget = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
+  type FullscreenDocument = Document & {
+    webkitFullscreenElement?: Element | null;
+    webkitExitFullscreen?: () => Promise<void> | void;
+  };
+  const fullscreenButton = root.querySelector<HTMLButtonElement>('[data-geo-fullscreen]')!;
+  const doc = document as FullscreenDocument;
+  let pseudoFullscreen = false;
+  const nativeFullscreen = () => (doc.fullscreenElement ?? doc.webkitFullscreenElement) === stage;
+
+  const syncFullscreen = () => {
+    const active = nativeFullscreen() || pseudoFullscreen;
+    stage.classList.toggle('is-fullscreen', active);
+    stage.classList.toggle('is-pseudo-fullscreen', pseudoFullscreen);
+    document.documentElement.classList.toggle('geo-locked', pseudoFullscreen);
+    fullscreenButton.setAttribute('aria-pressed', String(active));
+    fullscreenButton.setAttribute('aria-label', active ? '退出全屏' : '全屏');
+    fullscreenButton.querySelector('[data-label]')!.textContent = active ? '退出全屏' : '全屏';
+    drawPlan();
+    // 画面比例变化较大：等下一帧完成布局与尺寸回调后再重新取景
+    requestAnimationFrame(() => requestAnimationFrame(() => scene?.resetView()));
+  };
+
+  const setPseudoFullscreen = (value: boolean) => {
+    pseudoFullscreen = value;
+    syncFullscreen();
+  };
+
+  const toggleFullscreen = async () => {
+    if (nativeFullscreen()) {
+      await (doc.exitFullscreen?.() ?? doc.webkitExitFullscreen?.());
+      return;
+    }
+    if (pseudoFullscreen) {
+      setPseudoFullscreen(false);
+      return;
+    }
+    const target = stage as FullscreenTarget;
+    try {
+      if (target.requestFullscreen) await target.requestFullscreen({ navigationUI: 'hide' });
+      else if (target.webkitRequestFullscreen) await target.webkitRequestFullscreen();
+      else setPseudoFullscreen(true);
+    } catch {
+      setPseudoFullscreen(true);
+    }
+  };
+
+  const isTyping = (target: EventTarget | null) =>
+    target instanceof HTMLElement &&
+    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+  const stageInView = () => {
+    const rect = stage.getBoundingClientRect();
+    return rect.bottom > 0 && rect.top < window.innerHeight;
+  };
+
+  fullscreenButton.addEventListener('click', () => void toggleFullscreen(), { signal });
+  document.addEventListener('fullscreenchange', syncFullscreen, { signal });
+  document.addEventListener('webkitfullscreenchange', syncFullscreen, { signal });
+  document.addEventListener(
+    'keydown',
+    (event) => {
+      if (event.key === 'Escape' && pseudoFullscreen) {
+        setPseudoFullscreen(false);
+      } else if (
+        event.key.toLowerCase() === 'f' &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !isTyping(event.target) &&
+        !document.querySelector('dialog[open]') &&
+        stageInView()
+      ) {
+        event.preventDefault();
+        void toggleFullscreen();
+      }
+    },
+    { signal },
+  );
+
   const themeObserver = new MutationObserver(() => {
     if (!userMode) scene?.setMode(themeMode());
     syncModeButton();
@@ -410,6 +490,8 @@ export function initGeo(root: HTMLElement, signal: AbortSignal): void {
   loader.observe(stage);
 
   signal.addEventListener('abort', () => {
+    if (nativeFullscreen()) void (doc.exitFullscreen?.() ?? doc.webkitExitFullscreen?.());
+    document.documentElement.classList.remove('geo-locked');
     loader.disconnect();
     themeObserver.disconnect();
     resizeObserver.disconnect();

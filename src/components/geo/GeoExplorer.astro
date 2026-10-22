@@ -44,7 +44,12 @@ const first = queries[0].run(city);
           <Icon name="home" size={16} />
           <span>复位视角</span>
         </button>
-        <span class="hint">拖动旋转 · 滚轮缩放 · 点击建筑查看数据</span>
+        <button type="button" data-geo-fullscreen aria-pressed="false" aria-label="全屏">
+          <Icon name="maximize" size={16} class="when-normal" />
+          <Icon name="minimize" size={16} class="when-full" />
+          <span data-label>全屏</span>
+        </button>
+        <span class="hint">拖动旋转 · 滚轮缩放 · 点击建筑查看数据 · F 全屏</span>
       </div>
       <figure class="planbox">
         <canvas data-geo-plan role="img" aria-label="街区平面图，点击可选择建筑"></canvas>
@@ -715,8 +720,29 @@ const first = queries[0].run(city);
   }
 
   [data-geo-mode][aria-pressed='true'] :global(.when-day),
-  [data-geo-mode][aria-pressed='false'] :global(.when-night) {
+  [data-geo-mode][aria-pressed='false'] :global(.when-night),
+  [data-geo-fullscreen][aria-pressed='true'] :global(.when-normal),
+  [data-geo-fullscreen][aria-pressed='false'] :global(.when-full) {
     display: none;
+  }
+
+  /* 全屏：优先使用原生全屏；不支持时以固定定位铺满窗口 */
+  .stage.is-fullscreen {
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .stage.is-pseudo-fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+  }
+
+  :global(html.geo-locked) {
+    overflow: hidden;
   }
 
   .hint {
@@ -837,6 +863,56 @@ const first = queries[0].run(city);
     .stage.is-fallback .planbox {
       inset: 12px;
       width: auto;
+    }
+
+    /* 窄屏下层名标签放在平面角的内侧，避免溢出画面 */
+    .pins :global(.pin-layer) {
+      translate: 6px -50%;
+      align-items: flex-start;
+      text-align: left;
+    }
+
+    .pins :global(.pin-layer span) {
+      display: none;
+    }
+
+    /* 窄屏全屏：场景铺满，查询以横向卡片浮于顶部，其余面板隐藏 */
+    .stage.is-fullscreen {
+      display: block;
+      padding: 0;
+    }
+
+    .stage.is-fullscreen .viewport {
+      position: absolute;
+      inset: 0;
+      height: auto;
+    }
+
+    .stage.is-fullscreen .panel-info,
+    .stage.is-fullscreen .results,
+    .stage.is-fullscreen .panel-label {
+      display: none;
+    }
+
+    .stage.is-fullscreen .panel-queries {
+      position: absolute;
+      top: 48px;
+      left: 0;
+      right: 0;
+      z-index: 2;
+      margin: 0;
+      padding: 0 12px;
+      border: 0;
+      background: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
+    .stage.is-fullscreen .queries button {
+      border-color: var(--line);
+      background: color-mix(in srgb, var(--surface) 86%, transparent);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
   }
 </style>
