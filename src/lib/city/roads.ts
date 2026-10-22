@@ -117,3 +117,40 @@ export function nextGreen(nodeId: number, axis: Axis, t: number): number {
 }
 
 export const nodePoint = (node: RoadNode): Point => ({ x: node.x, y: node.y });
+
+/** 离某点最近的路口（车辆从这里进出路网）。 */
+export function nearestNode(p: Point): RoadNode {
+  return roads.nodes.reduce((best, node) =>
+    Math.hypot(node.x - p.x, node.y - p.y) < Math.hypot(best.x - p.x, best.y - p.y) ? node : best,
+  );
+}
+
+const pathCache = new Map<string, number[]>();
+
+/** 两个路口之间的最短路径（按路段长度与通行能力加权），返回途经的路口编号。 */
+export function shortestPath(from: number, to: number): number[] {
+  const key = `${from}>${to}`;
+  const cached = pathCache.get(key);
+  if (cached) return cached;
+  const cost = new Map<number, number>([[from, 0]]);
+  const previous = new Map<number, number>();
+  const open = new Set([from]);
+  while (open.size) {
+    let current = -1;
+    for (const id of open) if (current < 0 || cost.get(id)! < cost.get(current)!) current = id;
+    open.delete(current);
+    if (current === to) break;
+    for (const { edge, to: next } of roads.adjacency.get(current) ?? []) {
+      const total = cost.get(current)! + edge.length / edge.factor;
+      if (total < (cost.get(next) ?? Infinity)) {
+        cost.set(next, total);
+        previous.set(next, current);
+        open.add(next);
+      }
+    }
+  }
+  const path = [to];
+  while (path[0] !== from) path.unshift(previous.get(path[0])!);
+  pathCache.set(key, path);
+  return path;
+}

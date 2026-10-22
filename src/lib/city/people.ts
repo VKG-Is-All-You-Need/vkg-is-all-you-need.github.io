@@ -229,6 +229,14 @@ function buildSessions(day: number): WorkSession[] {
   return sessions;
 }
 
+/** 具名人物某天的上下班时刻；不上班时为 null。 */
+export function personaShift(person: string, day: number): [number, number] | null {
+  const plan = PERSONA_SHIFTS[person];
+  if (!plan?.days.includes(day)) return null;
+  const [h0, m0, h1, m1] = plan.shift(day);
+  return [at(day, h0, m0), at(day, h1, m1)];
+}
+
 const sessionCache = new Map<number, WorkSession[]>();
 
 /** 某一天的上下班记录。 */
@@ -319,269 +327,129 @@ export const events: CommunityEvent[] = [
   },
 ];
 
-// ── 具名人物的行程（明细演示用） ──
-export type LegMode = 'home' | 'walk' | 'metro' | 'bike' | 'work' | 'event' | 'run' | 'drive';
+// ── 常用地点 ──
+export const homeOf = (id: string) =>
+  center(city.buildings.find((b) => b.id === personById.get(id)!.homeId)!);
 
-export interface Leg {
-  start: number;
-  end: number;
-  mode: LegMode;
-  path: Point[];
+export const PLACES = {
+  office: center(central),
+  clinic: center(hospital),
+  cafe: center(byName('拾光咖啡')),
+  corner: center(byName('街角咖啡')),
+  mall: center(byName('星河商场')),
+  parkGate: { x: 660, y: 450 },
+  market: { x: 740, y: 470 },
+};
+
+export const stationAt = station;
+
+// ── 车辆登记与停车许可（企业与门禁） ──
+export interface CarOwner {
+  person: string;
+  companyId: number;
+}
+
+/** 有停车许可的员工：周宁与部分员工开车上班，车停在公司车库。 */
+export const carOwners: CarOwner[] = (() => {
+  const owners: CarOwner[] = [{ person: 'P02', companyId: 1 }];
+  const quota = new Map([
+    [1, 18],
+    [2, 10],
+    [3, 12],
+  ]);
+  for (const person of people) {
+    if (person.persona || !person.companyId) continue;
+    const left = quota.get(person.companyId) ?? 0;
+    if (left <= 0) continue;
+    quota.set(person.companyId, left - 1);
+    owners.push({ person: person.id, companyId: person.companyId });
+  }
+  return owners;
+})();
+
+// ── 具名人物需要车辆的出行（交通模拟按此安排车辆） ──
+export interface PersonaTrip {
+  id: string;
+  person: string;
+  mode: 'drive' | 'taxi';
+  /** 出发（自驾）或下单（打车）时刻。 */
+  depart: number;
+  from: Point;
+  to: Point;
   label: string;
 }
 
-/** 沿道路行走的路径：先走到最近的街道，沿街道到达目的地附近，再进入建筑。 */
-function streetPath(from: Point, to: Point): Point[] {
-  const snapX = (x: number) => Math.min(800, Math.max(160, Math.round(x / 160) * 160));
-  const snapY = (y: number) => Math.min(540, Math.max(180, Math.round(y / 180) * 180));
-  const sx = snapX(from.x);
-  const tx = snapX(to.x);
-  const sy = snapY(to.y);
-  return [from, { x: sx, y: from.y }, { x: sx, y: sy }, { x: tx, y: sy }, { x: tx, y: to.y }, to];
-}
-
-const homeOf = (id: string) =>
-  center(city.buildings.find((b) => b.id === personById.get(id)!.homeId)!);
-const cafe = center(byName('拾光咖啡'));
-const corner = center(byName('街角咖啡'));
-const office = center(central);
-const clinic = center(hospital);
-const parkGate = { x: 660, y: 450 };
-const market = { x: 740, y: 470 };
-
-/** 夜跑：绕湖一圈的路径。 */
-const lakeLoop: Point[] = Array.from({ length: 25 }, (_, i) => {
-  const a = (i / 24) * Math.PI * 2;
-  const lake = city.parks[0].lake;
-  return {
-    x: lake.center.x + Math.cos(a) * (lake.rx + 22),
-    y: lake.center.y + Math.sin(a) * (lake.ry + 22),
-  };
-});
-
-/** 按当天的时刻依次排列行程：每段给出结束时刻，起点为上一段的结束。 */
-function schedule(day: number) {
-  const legs: Leg[] = [];
-  let cursor = at(day, 6);
-  const add = (mode: LegMode, until: number, path: Point[], label: string) => {
-    legs.push({ start: cursor, end: until, mode, path, label });
-    cursor = until;
-  };
-  const time = (h: number, m = 0) => at(day, h, m);
-  return {
-    legs,
-    time,
-    /** 停留到某个时刻。 */
-    stay: (mode: LegMode, until: number, place: Point, label: string) =>
-      add(mode, until, [place], label),
-    /** 移动若干分钟。 */
-    move: (mode: LegMode, minutes: number, path: Point[], label: string) =>
-      add(mode, cursor + minutes * 60, path, label),
-    /** 待到当天结束。 */
-    rest: (place: Point, label = '在家') => add('home', time(24), [place], label),
-  };
-}
-
-type Plan = (day: number) => Leg[];
-
-const PLANS: Record<string, Plan> = {
-  // 林晓：住在北站附近，乘地铁通勤；周二下班去读书会，周六去周末市集
-  P01: (day) => {
-    const p = schedule(day);
-    const home = homeOf('P01');
-    if (day === 6) {
-      p.rest(home);
-    } else if (day === 5) {
-      p.stay('home', p.time(9, 30), home, '在家');
-      p.move('walk', 12, streetPath(home, station('北站')), '步行至北站');
-      p.move(
-        'metro',
-        26,
-        [station('北站'), station('中心站'), station('湖滨站')],
-        '地铁 1 号线换 2 号线',
-      );
-      p.move('walk', 8, streetPath(station('湖滨站'), market), '步行至周末市集');
-      p.stay('event', p.time(12), market, '周末市集');
-      p.move('walk', 8, streetPath(market, station('湖滨站')), '步行至湖滨站');
-      p.move(
-        'metro',
-        26,
-        [station('湖滨站'), station('中心站'), station('北站')],
-        '地铁 2 号线换 1 号线',
-      );
-      p.move('walk', 12, streetPath(station('北站'), home), '步行回家');
-      p.rest(home);
-    } else {
-      const [, , h1, m1] = PERSONA_SHIFTS.P01.shift(day);
-      p.stay('home', p.time(7, 50), home, '在家');
-      p.move('walk', 12, streetPath(home, station('北站')), '步行至北站');
-      p.move('metro', 18, [station('北站'), station('中心站')], '地铁 1 号线');
-      p.move('walk', 8, streetPath(station('中心站'), office), '步行至中央大厦');
-      p.stay(
-        'work',
-        p.time(h1, m1),
-        office,
-        day === 3 ? '在星河科技工作（加班）' : '在星河科技工作',
-      );
-      if (day === 1) {
-        p.move('walk', 10, streetPath(office, cafe), '步行至拾光咖啡');
-        p.stay('event', p.time(20, 10), cafe, '读书会');
-        p.move('walk', 6, streetPath(cafe, station('中心站')), '步行至中心站');
-      } else {
-        p.move('walk', 8, streetPath(office, station('中心站')), '步行至中心站');
-      }
-      p.move('metro', 18, [station('中心站'), station('北站')], '地铁 1 号线');
-      p.move('walk', 12, streetPath(station('北站'), home), '步行回家');
-      p.rest(home);
-    }
-    return p.legs;
-  },
-  // 周宁：住湖畔公寓，骑车通勤；周二读书会，周二、周四夜跑，周六逛市集
-  P02: (day) => {
-    const p = schedule(day);
-    const home = homeOf('P02');
-    if (day === 6) {
-      p.rest(home);
-    } else if (day === 5) {
-      p.stay('home', p.time(10, 40), home, '在家');
-      p.move('walk', 12, streetPath(home, market), '步行至周末市集');
-      p.stay('event', p.time(13), market, '周末市集');
-      p.move('walk', 12, streetPath(market, home), '步行回家');
-      p.rest(home);
-    } else {
-      p.stay('home', p.time(9, 5), home, '在家');
-      p.move('bike', 15, streetPath(home, office), '骑车上班');
-      p.stay('work', p.time(18, 35), office, '在星河科技工作');
-      if (day === 1) {
-        p.move('walk', 10, streetPath(office, cafe), '步行至拾光咖啡');
-        p.stay('event', p.time(20, 10), cafe, '读书会');
-        p.move('bike', 15, streetPath(cafe, home), '骑车回家');
-      } else {
-        p.move('bike', 15, streetPath(office, home), '骑车回家');
-      }
-      if (day === 1 || day === 3) {
-        p.stay('home', p.time(20, 50), home, '在家');
-        p.move('walk', 10, streetPath(home, parkGate), '步行至湖滨公园');
-        p.move('run', 40, lakeLoop, '夜跑');
-        p.move('walk', 12, streetPath(parkGate, home), '步行回家');
-      }
-      p.rest(home);
-    }
-    return p.legs;
-  },
-  // 孙浩：步行通勤，常加班；周二、周四下班后直接去夜跑
-  P03: (day) => {
-    const p = schedule(day);
-    const home = homeOf('P03');
-    if (DAYS[day].weekend) {
-      p.rest(home);
-      return p.legs;
-    }
-    p.stay('home', p.time(8, 50), home, '在家');
-    p.move('walk', 20, streetPath(home, office), '步行上班');
-    p.stay('work', p.time(20, 40), office, '在星河科技工作（加班）');
-    if (day === 1 || day === 3) {
-      p.move('walk', 20, streetPath(office, parkGate), '步行至湖滨公园');
-      p.move('run', 40, lakeLoop, '夜跑');
-      p.move('walk', 15, streetPath(parkGate, home), '步行回家');
-    } else {
-      p.move('walk', 20, streetPath(office, home), '步行回家');
-    }
-    p.rest(home);
-    return p.legs;
-  },
-  // 陈雨：市立医院护士，周日上班、周六休息；周二下班去读书会，周六逛市集
-  P04: (day) => {
-    const p = schedule(day);
-    const home = homeOf('P04');
-    if (day === 5) {
-      p.stay('home', p.time(10, 45), home, '在家');
-      p.move('walk', 25, streetPath(home, market), '步行至周末市集');
-      p.stay('event', p.time(12, 30), market, '周末市集');
-      p.move('walk', 25, streetPath(market, home), '步行回家');
-      p.rest(home);
-      return p.legs;
-    }
-    p.stay('home', p.time(7, 12), home, '在家');
-    p.move('walk', 13, streetPath(home, clinic), '步行上班');
-    p.stay('work', p.time(18, 5), clinic, '在市立医院值班');
-    if (day === 1) {
-      p.move('walk', 13, streetPath(clinic, cafe), '步行至拾光咖啡');
-      p.stay('event', p.time(20, 10), cafe, '读书会');
-      p.move('walk', 14, streetPath(cafe, home), '步行回家');
-    } else {
-      p.move('walk', 13, streetPath(clinic, home), '步行回家');
-    }
-    p.rest(home);
-    return p.legs;
-  },
-  // 赵敏：街角咖啡店主，每天开店；周三在店里主持市集筹备会，周六在市集摆摊
-  P06: (day) => {
-    const p = schedule(day);
-    const home = homeOf('P06');
-    p.stay('home', day === 5 ? p.time(8, 15) : p.time(6, 40), home, '在家');
-    if (day === 5) {
-      p.move('walk', 25, streetPath(home, market), '步行至周末市集');
-      p.stay('event', p.time(16, 30), market, '周末市集（摆摊）');
-      p.move('walk', 20, streetPath(market, corner), '步行回店里');
-    } else {
-      p.move('walk', 15, streetPath(home, corner), '步行至店里');
-    }
-    if (day === 2) {
-      p.stay('work', p.time(15), corner, '经营街角咖啡');
-      p.stay('event', p.time(16), corner, '周末市集筹备会');
-    }
-    p.stay('work', p.time(21, 10), corner, '经营街角咖啡');
-    p.move('walk', 15, streetPath(corner, home), '步行回家');
-    p.rest(home);
-    return p.legs;
-  },
-};
-
-const legCache = new Map<string, Leg[]>();
-
-export const hasItinerary = (id: string) => id in PLANS;
-
-/** 具名人物某一天的行程。 */
-export function itinerary(id: string, day: number): Leg[] {
-  const key = `${id}:${day}`;
-  let legs = legCache.get(key);
-  if (!legs) {
-    legs = PLANS[id]?.(day) ?? [];
-    legCache.set(key, legs);
+export function personaTrips(day: number): PersonaTrip[] {
+  const trips: PersonaTrip[] = [];
+  const home = homeOf('P02');
+  // 周宁：工作日开车上下班；周日天冷，开车去商场
+  if (!DAYS[day].weekend) {
+    trips.push(
+      {
+        id: `P02-${day}-am`,
+        person: 'P02',
+        mode: 'drive',
+        depart: at(day, 9, 6),
+        from: home,
+        to: PLACES.office,
+        label: '开车上班',
+      },
+      {
+        id: `P02-${day}-pm`,
+        person: 'P02',
+        mode: 'drive',
+        depart: day === 1 ? at(day, 20, 18) : at(day, 18, 40),
+        from: PLACES.office,
+        to: home,
+        label: '开车回家',
+      },
+    );
   }
-  return legs;
-}
-
-const pathLength = (path: Point[]) =>
-  path.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - path[i].x, p.y - path[i].y), 0);
-
-function along(path: Point[], k: number): Point {
-  if (path.length === 1) return path[0];
-  let remaining = pathLength(path) * k;
-  for (let i = 1; i < path.length; i++) {
-    const a = path[i - 1];
-    const b = path[i];
-    const length = Math.hypot(b.x - a.x, b.y - a.y);
-    if (remaining <= length || i === path.length - 1) {
-      const f = length ? Math.min(1, remaining / length) : 0;
-      return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
-    }
-    remaining -= length;
+  if (day === 6) {
+    trips.push(
+      {
+        id: 'P02-6-out',
+        person: 'P02',
+        mode: 'drive',
+        depart: at(6, 14),
+        from: home,
+        to: PLACES.mall,
+        label: '开车去星河商场',
+      },
+      {
+        id: 'P02-6-back',
+        person: 'P02',
+        mode: 'drive',
+        depart: at(6, 15, 30),
+        from: PLACES.mall,
+        to: home,
+        label: '开车回家',
+      },
+    );
   }
-  return path.at(-1)!;
-}
-
-export interface PersonaState {
-  x: number;
-  y: number;
-  leg: Leg;
-}
-
-export function personaAt(id: string, t: number): PersonaState | null {
-  if (!hasItinerary(id)) return null;
-  const legs = itinerary(id, dayOf(t));
-  const current = legs.find((l) => t >= l.start && t < l.end) ?? legs.at(-1)!;
-  const k = current.end > current.start ? (t - current.start) / (current.end - current.start) : 0;
-  return { ...along(current.path, Math.min(1, Math.max(0, k))), leg: current };
+  // 陈雨：周二下班时正下雨，打车去读书会
+  if (day === 1) {
+    trips.push({
+      id: 'P04-1-taxi',
+      person: 'P04',
+      mode: 'taxi',
+      depart: at(1, 18, 6),
+      from: PLACES.clinic,
+      to: PLACES.cafe,
+      label: '打车去拾光咖啡',
+    });
+  }
+  // 孙浩：周日上午下小雨，打车去商场
+  if (day === 6) {
+    trips.push({
+      id: 'P03-6-taxi',
+      person: 'P03',
+      mode: 'taxi',
+      depart: at(6, 10, 50),
+      from: homeOf('P03'),
+      to: PLACES.mall,
+      label: '打车去星河商场',
+    });
+  }
+  return trips;
 }

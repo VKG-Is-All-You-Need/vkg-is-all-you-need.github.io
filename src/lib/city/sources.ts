@@ -1,6 +1,7 @@
 /** 城市示例中的模拟数据源。每个数据源对应联邦查询引擎中的一个 catalog。 */
 
-export type SourceId = 'gis' | 'traffic' | 'iot' | 'weather' | 'commerce' | 'hr' | 'community';
+export type SourceId =
+  'gis' | 'traffic' | 'mobility' | 'iot' | 'weather' | 'commerce' | 'hr' | 'community';
 
 export interface DataSource {
   id: SourceId;
@@ -37,6 +38,16 @@ export const SOURCES: DataSource[] = [
     color: '#49bbdd',
   },
   {
+    id: 'mobility',
+    name: '出行服务',
+    system: 'Kafka → ClickHouse',
+    catalog: 'mobility',
+    tables: ['transit_taps', 'ride_orders'],
+    refresh: '实时',
+    description: '公交刷卡记录与网约车订单。乘客以居民编号登记，不含车辆位置。',
+    color: '#ff9f6b',
+  },
+  {
     id: 'iot',
     name: '物联网平台',
     system: 'MQTT → TimescaleDB',
@@ -61,9 +72,9 @@ export const SOURCES: DataSource[] = [
     name: '商户系统',
     system: 'MySQL（POS）',
     catalog: 'pos',
-    tables: ['shops', 'sales_hourly'],
+    tables: ['shops', 'sales_hourly', 'member_purchases'],
     refresh: '每小时',
-    description: '商店名称、类别、营业时间与小时订单数。',
+    description: '商店名称、类别、营业时间、小时订单数与会员消费记录。',
     color: '#e6c07b',
   },
   {
@@ -71,9 +82,9 @@ export const SOURCES: DataSource[] = [
     name: '企业与门禁',
     system: 'SQL Server（HR）',
     catalog: 'hr',
-    tables: ['companies', 'employment', 'work_sessions', 'access_hourly'],
+    tables: ['companies', 'employment', 'work_sessions', 'parking_permits', 'garage_entries'],
     refresh: '实时',
-    description: '企业、雇佣关系、上下班记录与楼宇门禁汇总。',
+    description: '企业、雇佣关系、上下班记录、员工停车许可与车库进出记录。',
     color: '#f29fb8',
   },
   {

@@ -43,12 +43,12 @@ const reading = [
 
 <BaseLayout
   title="VKG × 城市数据融合"
-  description="交互示例：七个独立数据源由一个本体统一描述，查询时实时访问。示例覆盖一周的交通、天气、传感器与人员活动；开关数据源可比较融合与分离的结果。"
+  description="交互示例：八个独立数据源由一个本体统一描述，查询时实时访问。示例覆盖一周的交通、天气、传感器与人的出行和消费；开关数据源可比较融合与分离的结果。"
 >
   <PageHeader
     label="示例"
     title="VKG × 城市数据融合"
-    description="城市基础数据、交通时序、物联网平台、气象观测、商户系统、企业门禁与社区应用是七个独立的数据源。VKG 用一个本体统一描述它们，查询时直接访问各个数据源。示例覆盖一周七天，每天的天气不同：切换日期、拖动时间轴查看动态数据，开关数据源比较融合与分离的结果。"
+    description="城市基础数据、交通时序、出行服务、物联网平台、气象观测、商户系统、企业门禁与社区应用是八个独立的数据源。VKG 用一个本体统一描述它们，查询时直接访问各个数据源。示例覆盖一周七天，每天的天气不同，居民开车、坐公交、打车与购物都留下记录：切换日期、拖动时间轴查看动态数据，开关数据源比较融合与分离的结果。"
   />
 
   <section class="wide" aria-label="交互场景">
@@ -107,7 +107,7 @@ const reading = [
     <div class="container">
       <SectionHeading
         id="sources-title"
-        title="七个数据源"
+        title="八个数据源"
         description="每个数据源由不同的系统维护，结构与更新频率各不相同。联邦查询引擎为每个数据源提供一个 catalog，Ontop 通过它访问全部数据。"
       />
       <ul class="source-cards" role="list">
@@ -135,7 +135,7 @@ const reading = [
       <SectionHeading
         id="mapping-title"
         title="映射与本体"
-        description="融合的关键在映射：社区应用与企业系统中的居民记录使用同一个 IRI 模板 :person/{id}，在图谱中自动汇合为同一个实体；客流计数器与商户系统通过 building_id 汇合到同一家店；温湿度读数与气象站观测都归入 sosa:Observation，可以在同一条查询中比较。"
+        description="融合的关键在映射：社区应用与企业系统中的居民记录使用同一个 IRI 模板 :person/{id}，在图谱中自动汇合为同一个实体；客流计数器与商户系统通过 building_id 汇合到同一家店；停车许可把车牌对应到员工，车牌又出现在交通时序中；温湿度读数与气象站观测都归入 sosa:Observation，可以在同一条查询中比较。"
       />
       <div class="mapping-grid" data-reveal>
         <div class="codebox">

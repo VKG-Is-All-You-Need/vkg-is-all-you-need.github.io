@@ -18,7 +18,7 @@ const presets = [
   { id: 'all', label: '全部接入' },
   { id: 'gis', label: '只接 GIS' },
   { id: 'mobility', label: '交通 + 气象' },
-  { id: 'people', label: '企业 + 社区' },
+  { id: 'people', label: '人与出行' },
 ];
 ---
 
@@ -461,6 +461,11 @@ const presets = [
     margin-top: 10px;
     font-size: 12px;
     color: var(--faint);
+  }
+
+  /* 查询列表较长：只在选中的查询下显示所需数据源 */
+  .queries button[aria-pressed='false'] .q-feature {
+    display: none;
   }
 
   /* 查询分组 */
@@ -933,6 +938,26 @@ const presets = [
     height: 7px;
     border-radius: 50%;
     background: var(--c);
+  }
+
+  .city :global(.pins .pin-bus) {
+    padding: 1px 8px;
+    border-color: color-mix(in srgb, #ff9f6b 55%, transparent);
+    font-size: 11px;
+  }
+
+  .city :global(.pins .pin-bus span) {
+    font-family: var(--font-mono);
+    color: var(--muted);
+  }
+
+  .city :global(.pins .pin-weather) {
+    border-color: color-mix(in srgb, #9aa8ff 70%, transparent);
+  }
+
+  .city :global(.pins .pin-weather span) {
+    font: 11px var(--font-mono);
+    color: var(--muted);
   }
 
   .city :global(.pins .pin-relation) {

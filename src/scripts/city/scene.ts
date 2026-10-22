@@ -5,7 +5,7 @@
  * 两种视图：
  * - 城市：按模拟时间呈现信号灯、车辆、商店客流、温湿度传感器、天气（雨、雾、阴天、雷电）与昼夜。各数据源贡献的内容以该数据源的颜色标识，
  *   关闭数据源后相应内容淡出。
- * - 分层：底部是七个独立的数据源，向上依次为映射、虚拟知识图谱与本体。查询结果中的每个实体都连到
+ * - 分层：底部是八个独立的数据源，向上依次为映射、虚拟知识图谱与本体。查询结果中的每个实体都连到
  *   描述它的数据源；连到多个数据源的实体，就是融合的结果。
  */
 import * as THREE from 'three';
@@ -14,12 +14,11 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CITY, city, type Building } from '../../lib/geo/city';
 import { pointInPolygon, rectCenter, seededRandom, type Point } from '../../lib/geo/spatial';
 import { footfallRate, shopById, shops, type Shop } from '../../lib/city/commerce';
+import { busLoad, hasItinerary, isRide, personaAt } from '../../lib/city/mobility';
 import {
   companies,
   companyById,
   events,
-  hasItinerary,
-  personaAt,
   personById,
   personas,
   presence,
@@ -35,10 +34,11 @@ import {
 } from '../../lib/city/roads';
 import { SOURCES, sourceById, type DataSource, type SourceId } from '../../lib/city/sources';
 import { ENV_SENSORS, STATION, readingAt, sensorById } from '../../lib/city/sensors';
-import { at, hours, timeOfDay } from '../../lib/city/time';
+import { at, dayOf, hours, timeOfDay } from '../../lib/city/time';
 import {
   queuesAt,
   statesAt,
+  tripsOf,
   vehicles,
   type Vehicle,
   type VehicleState,
@@ -716,6 +716,15 @@ export function createCityScene(
       return { person, body, ring, pin, label: '' };
     });
 
+  // 公交车上人数（出行服务的刷卡记录）
+  const busPins = vehicles
+    .filter((vehicle) => vehicle.kind === 'bus')
+    .map((vehicle) => ({
+      vehicle,
+      pin: stage.addPin('', new THREE.Vector3(), 'pin-bus', 'city', false),
+      text: '',
+    }));
+
   // ─────────────────────────── 降雨（气象观测） ───────────────────────────
 
   const RAIN = 4200;
@@ -1112,7 +1121,7 @@ export function createCityScene(
     'layers',
   );
   stage.addPin(
-    layerLabel('数据源', '七个独立系统，查询时访问'),
+    layerLabel('数据源', '八个独立系统，查询时访问'),
     new THREE.Vector3(-HALF_W, 0, HALF_D),
     'pin-layer pin-layer-data',
     'layers',
@@ -1289,6 +1298,12 @@ export function createCityScene(
       }
       case 'building':
         return centerOf(entity.ref as number);
+      case 'order': {
+        const trip = tripsOf(dayOf(simT)).find((t) => t.id === entity.ref);
+        return trip ? trip.from : null;
+      }
+      case 'stop':
+        return nodeById.get(entity.ref as number)!;
     }
   };
 
@@ -1974,19 +1989,24 @@ export function createCityScene(
       avatar.pin.shown = false;
       const state = personaAt(avatar.person.id, simT);
       const showing = detail && known > 0.5 && state !== null && state.leg.mode !== 'home';
-      avatar.body.visible = avatar.ring.visible = showing && state!.leg.mode !== 'metro';
+      // 乘车时人物在车内：只显示车辆周围的光圈
+      const riding = showing && isRide(state!.leg.mode);
+      avatar.body.visible = showing && state!.leg.mode !== 'metro' && !riding;
+      avatar.ring.visible = showing && state!.leg.mode !== 'metro';
       if (!showing || !state) continue;
-      const building = buildingAt(state);
+      const building = riding ? undefined : buildingAt(state);
       const height = building
         ? roofOf(building)
-        : pointInPolygon(state, park.area)
+        : !riding && pointInPolygon(state, park.area)
           ? BLOCK_HEIGHT
           : 0.2;
       const p = toWorld(state, height);
       avatar.body.position.copy(p);
       avatar.ring.position.copy(p).setY(height + 0.3);
-      avatar.ring.scale.setScalar(markedPersonas.has(avatar.person.id) ? 1.6 : 1);
-      avatar.pin.anchor.copy(p).setY(height + 14);
+      avatar.ring.scale.setScalar(
+        (markedPersonas.has(avatar.person.id) ? 1.6 : 1) * (riding ? 1.9 : 1),
+      );
+      avatar.pin.anchor.copy(p).setY(height + (riding ? 18 : 14));
       const key = building
         ? `b${building.id}`
         : `${Math.round(state.x / 12)},${Math.round(state.y / 12)}`;
@@ -2009,13 +2029,33 @@ export function createCityScene(
         'is-hit',
         members.some((member) => markedPersonas.has(member.person.id)),
       );
-      const activity = personaAt(lead.person.id, simT)!.leg.label;
+      const leg = personaAt(lead.person.id, simT)!.leg;
+      const plate =
+        leg.vehicle && isRide(leg.mode) && fade.traffic > 0.5
+          ? `（${vehicleViewById.get(leg.vehicle)!.vehicle.plate}）`
+          : '';
+      const activity = `${leg.label}${plate}`;
       const label = `${members.map((m) => `<i style="--c:${m.person.color}"></i>`).join('')}<b>${members
         .map((m) => escapeHtml(m.person.name!))
         .join('、')}</b><span>${escapeHtml(activity)}</span>`;
       if (label !== lead.label) {
         lead.label = label;
         lead.pin.element.innerHTML = label;
+      }
+    }
+  };
+
+  const updateBusPins = () => {
+    const show = fade.mobility > 0.5 && fade.traffic > 0.5 && stage.mix < 0.4;
+    for (const entry of busPins) {
+      const view = vehicleViewById.get(entry.vehicle.id)!;
+      entry.pin.shown = show && view.active;
+      if (!entry.pin.shown) continue;
+      entry.pin.anchor.copy(view.position).setY(14);
+      const text = `<b>${escapeHtml(entry.vehicle.plate)}</b><span>${busLoad(entry.vehicle.id, simT)} 人</span>`;
+      if (text !== entry.text) {
+        entry.text = text;
+        entry.pin.element.innerHTML = text;
       }
     }
   };
@@ -2200,6 +2240,7 @@ export function createCityScene(
     updateVehicles();
     updateWalkers();
     updateAvatars();
+    updateBusPins();
     updateMarks(now);
     if (mix > 0.01) updateGraph(now, dt);
 

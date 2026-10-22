@@ -7,11 +7,19 @@ import { city } from '../geo/city';
 import { rectCenter, type Point } from '../geo/spatial';
 import { footfallCount, shops, type Shop } from './commerce';
 import {
+  hasItinerary,
+  isRide,
+  itinerary,
+  placeName,
+  purchasesOf,
+  tapsOf,
+  type Leg,
+} from './mobility';
+import {
+  carOwners,
   companies,
   companyById,
   events,
-  hasItinerary,
-  itinerary,
   personById,
   personas,
   presence,
@@ -31,8 +39,18 @@ import {
 } from './sensors';
 import { sourceById, type SourceId } from './sources';
 import { DAY, DAYS, at, dayOf, formatDayTime, formatTime, hours, startOfDay } from './time';
-import { edgeSpeeds, queuesAt, statesAt, trajectory, vehicleById, vehicles } from './traffic';
-import { adverseWindows, observationAt, rainWindows } from './weather';
+import {
+  edgeSpeeds,
+  queuesAt,
+  statesAt,
+  trajectory,
+  tripsOf,
+  vehicleAt,
+  vehicleById,
+  vehicleByOwner,
+  vehicles,
+} from './traffic';
+import { adverseWindows, badWeatherWindows, observationAt, rainWindows } from './weather';
 
 export type QueryGroup = 'dynamic' | 'fusion' | 'life';
 
@@ -74,7 +92,9 @@ export type EntityKind =
   | 'company'
   | 'event'
   | 'building'
-  | 'sensor';
+  | 'sensor'
+  | 'order'
+  | 'stop';
 
 /** 分层视图中的实体：同一个实体可能由多个数据源共同描述。 */
 export interface FusionEntity {
@@ -121,7 +141,10 @@ export interface CityQuery {
     | 'weatherSpeed'
     | 'heatIsland'
     | 'persona'
-    | 'afterwork';
+    | 'afterwork'
+    | 'commuteCars'
+    | 'weatherTaxi'
+    | 'busShopping';
   group: QueryGroup;
   title: string;
   description: string;
@@ -896,14 +919,40 @@ GROUP  BY r.device, r.temp_c, w.temperature`,
 
 const personLabel = (person: Person, ctx: CityContext) =>
   ctx.detail && person.persona ? person.name! : `居民 ${person.id}`;
+const labelOf = (id: string, ctx: CityContext) => personLabel(personById.get(id)!, ctx);
+
+/** 某段行程能否由已接入的数据源得知。 */
+function knows(leg: Leg, ctx: CityContext): boolean {
+  const has = (id: SourceId) => ctx.sources.has(id);
+  switch (leg.mode) {
+    case 'home':
+    case 'event':
+      return has('community');
+    case 'work':
+      return has('hr');
+    case 'drive':
+      // 停车许可把车牌对应到人，车辆轨迹给出行驶过程
+      return has('hr') && has('traffic');
+    case 'bus':
+    case 'taxi':
+    case 'wait':
+      return has('mobility');
+    case 'shop':
+      return has('commerce');
+    default:
+      // 步行与地铁没有直接记录，由前后两段记录推断
+      return has('hr') && has('community');
+  }
+}
 
 const persona: CityQuery = {
   id: 'persona',
   group: 'life',
   title: '林晓的一天',
-  description: '住址来自社区应用，上下班来自门禁，活动来自社区报名，场所名称来自商户系统。',
-  sources: ['community', 'hr', 'commerce', 'gis'],
-  suggest: at(1, 19, 30),
+  description:
+    '住址与活动来自社区应用，上下班来自门禁，乘车来自出行服务，消费来自商户系统，车辆位置来自交通时序。',
+  sources: ['community', 'hr', 'mobility', 'commerce', 'traffic', 'gis'],
+  suggest: at(2, 19, 40),
   personal: true,
   text: {
     sparql: `# 聚合视图：楼宇在岗人数与当天的活动参与
@@ -951,7 +1000,7 @@ ORDER  BY 2`,
     }
     const day = dayOf(ctx.t);
     const today = events.filter((e) => dayOf(e.start) === day && e.start <= ctx.t);
-    result.classes = [':Person', ':Employee', ':Company', ':SocialEvent', ':Shop'];
+    result.classes = [':Person', ':Employee', ':Company', ':SocialEvent', ':Shop', ':Vehicle'];
     result.subclass = [[':Employee', ':Person']];
 
     if (!ctx.detail) {
@@ -1016,13 +1065,10 @@ ORDER  BY 2`,
     }
 
     // 明细视图：虚构人物林晓
+    const mobility = ctx.sources.has('mobility');
+    const traffic = ctx.sources.has('traffic');
     const legs = itinerary('P01', day).filter((leg) => leg.start <= ctx.t);
-    const known = legs.filter((leg) => {
-      if (leg.mode === 'home') return community;
-      if (leg.mode === 'work') return hr;
-      if (leg.mode === 'event') return community;
-      return hr && community;
-    });
+    const known = legs.filter((leg) => knows(leg, ctx));
     const attended = today.filter((e) => e.attendees.includes('P01'));
     for (const leg of known) {
       let label = leg.label;
@@ -1030,6 +1076,10 @@ ORDER  BY 2`,
       if (event && !commerce && event.venue.kind === 'building') {
         label = `${leg.label}（场所：建筑 #${event.venue.id}）`;
       }
+      if (leg.vehicle && isRide(leg.mode) && traffic) {
+        label = `${label}（${vehicleById.get(leg.vehicle)!.plate}）`;
+      }
+      if (leg.mode === 'shop' && leg.amount) label = `${label} · ${leg.amount} 元`;
       result.rows.push({
         key: `l${leg.start}`,
         title: label,
@@ -1109,6 +1159,46 @@ ORDER  BY 2`,
       }
     } else {
       result.notes.push('社区应用未接入：不知道林晓住在哪里、下班后参加了什么活动。');
+    }
+    for (const leg of known.filter((l) => l.vehicle && isRide(l.mode))) {
+      const vehicle = vehicleById.get(leg.vehicle!)!;
+      const key = `v${vehicle.id}`;
+      if (result.entities.some((e) => e.key === key)) continue;
+      const by: SourceId = leg.mode === 'drive' ? 'hr' : 'mobility';
+      result.entities.push({
+        key,
+        kind: 'vehicle',
+        ref: vehicle.id,
+        label: vehicle.plate,
+        cls: vehicle.kind === 'bus' ? ':Bus' : vehicle.kind === 'taxi' ? ':Taxi' : ':Vehicle',
+        sources: ([by, 'traffic'] as SourceId[]).filter((id) => ctx.sources.has(id)),
+        hit: true,
+      });
+      result.relations.push({
+        from: 'pP01',
+        to: key,
+        label: leg.mode === 'drive' ? 'drives' : 'rode',
+      });
+    }
+    for (const leg of known.filter((l) => l.mode === 'shop')) {
+      const key = `shop${leg.shop}`;
+      if (result.entities.some((e) => e.key === key)) continue;
+      result.entities.push({
+        key,
+        kind: 'shop',
+        ref: leg.shop!,
+        label: shops.find((s) => s.id === leg.shop)!.name,
+        cls: ':Shop',
+        sources: (['commerce', 'gis'] as SourceId[]).filter((id) => ctx.sources.has(id)),
+        hit: true,
+      });
+      result.relations.push({ from: 'pP01', to: key, label: 'boughtAt' });
+    }
+    if (!mobility && legs.some((l) => l.mode === 'bus' || l.mode === 'taxi')) {
+      result.notes.push('出行服务未接入：没有公交刷卡与网约车订单，乘车的行程缺失。');
+    }
+    if (!commerce && legs.some((l) => l.mode === 'shop')) {
+      result.notes.push('商户系统未接入：没有会员消费记录。');
     }
     if (!commerce && attended.some((e) => e.venue.kind === 'building')) {
       result.notes.push('商户系统未接入：活动场所只能显示为建筑编号。');
@@ -1281,6 +1371,560 @@ WHERE  hour(e.start_ts) >= 17`,
   },
 };
 
+const commuteCars: CityQuery = {
+  id: 'commuteCars',
+  group: 'life',
+  title: '开车上班的员工今天几点到、车在哪里',
+  description: '停车许可与车库进出记录来自企业系统，车辆位置来自交通时序；车牌把两者连在一起。',
+  sources: ['hr', 'traffic', 'gis'],
+  suggest: at(0, 9, 30),
+  personal: true,
+  text: {
+    sparql: `SELECT ?company ?status (COUNT(?permit) AS ?n) WHERE {
+  ?p :worksFor ?c ; :hasParkingPermit ?permit .
+  ?c :name ?company .
+  ?permit :plate ?plate .
+  OPTIONAL { ?entry a :GarageEntry ; :plate ?plate ;
+                    :enteredAt ?in . FILTER NOT EXISTS { ?entry :leftAt ?out } }
+  OPTIONAL { ?car :plate ?plate ; :hasPosition [ :time ?now ] .
+             BIND (true AS ?moving) }
+  BIND (IF(BOUND(?in), "车库", IF(BOUND(?moving), "路上", "未到")) AS ?status)
+}
+GROUP BY ?company ?status`,
+    sql: `SELECT c.name,
+       COUNT(g.plate)  FILTER (WHERE g.left_at IS NULL) AS parked,
+       COUNT(v.plate)  AS driving
+FROM   hr.public.parking_permits p
+JOIN   hr.public.companies c ON c.id = p.company_id
+LEFT JOIN hr.public.garage_entries g
+       ON g.plate = p.plate AND CAST(g.entered_at AS date) = :today
+LEFT JOIN traffic.public.vehicle_positions v
+       ON v.plate = p.plate AND v.ts = :now
+GROUP  BY c.name`,
+  },
+  detailText: {
+    sparql: `SELECT ?name ?plate ?in ?road WHERE {
+  ?p :name ?name ; :hasParkingPermit/:plate ?plate .
+  OPTIONAL { ?e a :GarageEntry ; :plate ?plate ; :enteredAt ?in }
+  OPTIONAL { ?car :plate ?plate ;
+                  :hasPosition [ :time ?now ; :onSegment/:name ?road ] }
+}`,
+    sql: `SELECT r.id, p.plate, g.entered_at, s.name AS road
+FROM   hr.public.parking_permits p
+JOIN   community.public.residents r ON r.id = p.person_id
+LEFT JOIN hr.public.garage_entries g
+       ON g.plate = p.plate AND CAST(g.entered_at AS date) = :today
+LEFT JOIN traffic.public.vehicle_positions v
+       ON v.plate = p.plate AND v.ts = :now
+LEFT JOIN gis.public.roads s ON s.id = v.road_id`,
+  },
+  run(ctx) {
+    const result = base(this, ctx);
+    if (!ctx.sources.has('hr')) {
+      return unavailable(result, '企业与门禁未接入：不知道哪些车属于员工。');
+    }
+    const traffic = ctx.sources.has('traffic');
+    const gis = ctx.sources.has('gis');
+    const day = dayOf(ctx.t);
+    const trips = tripsOf(day).filter((trip) => trip.kind === 'drive');
+    const near = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y) < 5;
+    // 车库进出：开到公司的行程到达即入库，从公司出发即驶出
+    const status = carOwners.map((owner) => {
+      const work = buildingCenter(companyById.get(owner.companyId)!.buildingId);
+      const mine = trips.filter((trip) => trip.person === owner.person);
+      const moving = mine.find((trip) => trip.pickup <= ctx.t && ctx.t < trip.arrive);
+      const entered = mine.find((trip) => near(trip.to, work) && trip.arrive <= ctx.t)?.arrive;
+      const left = mine.find((trip) => near(trip.from, work) && trip.pickup <= ctx.t)?.pickup;
+      const parked = entered !== undefined && left === undefined && !moving;
+      return { owner, moving, entered, left, parked };
+    });
+    for (const company of companies.filter((c) => c.buildingId)) {
+      const staff = status.filter((s) => s.owner.companyId === company.id);
+      const parked = staff.filter((s) => s.parked).length;
+      const arrived = staff.filter((s) => s.entered !== undefined).length;
+      const driving = staff.filter((s) => s.moving).length;
+      result.rows.push({
+        key: `c${company.id}`,
+        title: `${company.name} · ${staff.length} 张停车许可`,
+        detail: `今日入库 ${arrived} · 在库 ${parked}${traffic ? ` · 路上 ${driving}` : ''}`,
+        hit: arrived > 0,
+      });
+      result.entities.push({
+        key: `c${company.id}`,
+        kind: 'company',
+        ref: company.id,
+        label: company.name,
+        cls: ':Company',
+        sources: ['hr'],
+        hit: true,
+      });
+      if (gis) {
+        result.highlights.push({
+          type: 'place',
+          at: buildingCenter(company.buildingId),
+          label: `${company.name}车库 · ${parked} 辆`,
+        });
+      }
+    }
+    if (traffic) {
+      for (const { owner } of status.filter((s) => s.moving)) {
+        const vehicle = vehicleByOwner.get(owner.person)!;
+        result.highlights.push({
+          type: 'vehicle',
+          id: vehicle.id,
+          label: ctx.detail ? `${labelOf(owner.person, ctx)} · ${vehicle.plate}` : vehicle.plate,
+        });
+        result.entities.push({
+          key: `v${vehicle.id}`,
+          kind: 'vehicle',
+          ref: vehicle.id,
+          label: vehicle.plate,
+          cls: ':Vehicle',
+          sources: ['hr', 'traffic'],
+          hit: true,
+        });
+        result.relations.push({
+          from: `v${vehicle.id}`,
+          to: `c${owner.companyId}`,
+          label: 'permitFor',
+        });
+      }
+    } else {
+      result.notes.push('交通时序未接入：只知道车库进出记录，不知道车辆是否在路上、在哪条路上。');
+    }
+    if (ctx.detail) {
+      const recent = status
+        .filter((s) => s.moving || s.entered !== undefined || s.left !== undefined)
+        .sort(
+          (a, b) =>
+            (b.left ?? b.entered ?? b.moving!.pickup) - (a.left ?? a.entered ?? a.moving!.pickup),
+        )
+        .sort(
+          (a, b) => Number(hasItinerary(b.owner.person)) - Number(hasItinerary(a.owner.person)),
+        );
+      for (const { owner, moving, entered, left } of recent.slice(0, 8)) {
+        const vehicle = vehicleByOwner.get(owner.person)!;
+        let detail: string;
+        if (moving && traffic) {
+          const state = vehicleAt(vehicle, ctx.t);
+          detail = `行驶中 · ${state && gis ? edgeById.get(state.edge)!.name : vehicle.plate}`;
+        } else if (left !== undefined) {
+          detail = `${formatTime(left)} 驶出车库`;
+        } else if (entered !== undefined) {
+          detail = `${formatTime(entered)} 入库`;
+        } else {
+          detail = '已出发';
+        }
+        result.rows.push({
+          key: `d${owner.person}`,
+          title: labelOf(owner.person, ctx),
+          detail,
+          hit: Boolean(moving),
+        });
+        result.entities.push({
+          key: `p${owner.person}`,
+          kind: 'person',
+          ref: owner.person,
+          label: labelOf(owner.person, ctx),
+          cls: ':Employee',
+          sources: ['hr'],
+          hit: true,
+        });
+        result.relations.push({
+          from: `p${owner.person}`,
+          to: `c${owner.companyId}`,
+          label: 'worksFor',
+        });
+        if (hasItinerary(owner.person) && gis) {
+          result.highlights.push({
+            type: 'persona',
+            id: owner.person,
+            path: [],
+            label: labelOf(owner.person, ctx),
+          });
+        }
+      }
+      result.notes.push(
+        '人物为虚构。停车许可登记了车牌与员工编号，车牌出现在交通时序中，即可得知是谁的车。',
+      );
+    } else {
+      result.notes.push('当前为聚合视图：只给出各公司车库与路上的车辆数。');
+    }
+    const arrived = status.filter((s) => s.entered !== undefined).length;
+    result.summary = `${arrived} 辆已入库`;
+    result.notes.push('街区不大，开车上班通常只需一两分钟，同一时刻在路上的员工车辆很少。');
+    if (DAYS[day].weekend) result.notes.push('周末不上班，车库基本是空的。');
+    result.classes = [':Employee', ':Person', ':Company', ':Vehicle', ':ParkingPermit'];
+    result.subclass = [[':Employee', ':Person']];
+    return result;
+  },
+};
+
+/** 某人此前（本周、早于 day）是否叫过网约车。 */
+const orderedBefore = (person: string, day: number) =>
+  Array.from({ length: day }, (_, d) => tripsOf(d)).some((trips) =>
+    trips.some((trip) => trip.kind === 'taxi' && trip.person === person),
+  );
+
+const weatherTaxi: CityQuery = {
+  id: 'weatherTaxi',
+  group: 'life',
+  title: '恶劣天气时改乘网约车的居民',
+  description:
+    '订单来自出行服务，天气来自气象观测，住址来自社区应用；与此前同类日同时段的订单量比较。',
+  sources: ['mobility', 'weather', 'community'],
+  suggest: at(1, 18, 40),
+  personal: true,
+  text: {
+    sparql: `SELECT (COUNT(?o) AS ?orders) WHERE {
+  ?o a :RideOrder ; :requestedAt ?t .
+  ?w a :WeatherObservation ; :interval ?iv ;
+     :precipitation ?mm ; :visibility ?vis ; :windSpeed ?wind .
+  FILTER (?t >= ?iv_start && ?t < ?iv_end)
+  FILTER (?mm > 0 || ?vis < 1000 || ?wind >= 8)
+}`,
+    sql: `SELECT COUNT(*) AS orders
+FROM   mobility.public.ride_orders o
+JOIN   weather.obs.observations w
+       ON o.requested_at >= w.ts
+      AND o.requested_at < w.ts + INTERVAL '10' MINUTE
+WHERE  w.precipitation > 0 OR w.visibility < 1000 OR w.wind >= 8`,
+  },
+  detailText: {
+    sparql: `SELECT ?person ?from ?to WHERE {
+  ?o a :RideOrder ; :passenger ?person ; :requestedAt ?t ;
+     :pickup ?from ; :dropoff ?to ; :duringBadWeather true .
+  FILTER NOT EXISTS {
+    ?earlier a :RideOrder ; :passenger ?person ; :requestedAt ?t0 .
+    FILTER (?t0 < ?weekStart || ?t0 < ?today)
+  }
+}`,
+    sql: `SELECT o.passenger_id, o.pickup, o.dropoff
+FROM   mobility.public.ride_orders o
+WHERE  o.during_bad_weather
+  AND  NOT EXISTS (
+         SELECT 1 FROM mobility.public.ride_orders e
+         WHERE  e.passenger_id = o.passenger_id
+           AND  e.requested_at < :today)`,
+  },
+  run(ctx) {
+    const result = base(this, ctx);
+    if (!ctx.sources.has('mobility'))
+      return unavailable(result, '出行服务未接入：没有网约车订单。');
+    const weather = ctx.sources.has('weather');
+    const gis = ctx.sources.has('gis');
+    const day = dayOf(ctx.t);
+    const windows: [number, number][] = weather
+      ? badWeatherWindows(ctx.t)
+      : [[startOfDay(day), ctx.t]];
+    if (weather && !windows.length) {
+      result.summary = '尚无恶劣天气';
+      result.notes.push(
+        `${DAYS[day].label}截至 ${formatTime(ctx.t)} 没有恶劣天气。本周周二傍晚降雨、周三早晨大雾、周五午后雷阵雨、周日大风降温。`,
+      );
+      return result;
+    }
+    const inside = (t: number, shift = 0) =>
+      windows.some(([a, b]) => t >= a - shift && t < Math.min(b, ctx.t) - shift);
+    const orders = tripsOf(day).filter(
+      (trip) => trip.kind === 'taxi' && trip.request <= ctx.t && inside(trip.request),
+    );
+    const days = baselineDays(ctx.t, windows, weather);
+    const baseline = days.length
+      ? days.reduce(
+          (sum, d) =>
+            sum +
+            tripsOf(d).filter(
+              (trip) => trip.kind === 'taxi' && inside(trip.request, (day - d) * DAY),
+            ).length,
+          0,
+        ) / days.length
+      : null;
+
+    for (const [a, b] of windows) {
+      const end = Math.min(b, ctx.t);
+      const n = orders.filter((o) => o.request >= a && o.request < end).length;
+      result.rows.push({
+        key: `w${a}`,
+        title: `${weather ? observationAt((a + end) / 2).condition : '今天'} ${formatTime(a)}–${formatTime(end)}`,
+        detail: `${n} 单`,
+        hit: true,
+      });
+    }
+    if (baseline !== null) {
+      result.notes.push(
+        `同时段共 ${orders.length} 单，此前同类日（${days.map((d) => DAYS[d].label).join('、')}）平均 ${baseline.toFixed(1)} 单。`,
+      );
+    }
+    if (!weather) result.notes.push('气象观测未接入：无法区分天气，下面是今天截至此刻的全部订单。');
+    result.summary = `${orders.length} 单`;
+
+    if (ctx.detail) {
+      // 具名人物排在前面，其余按时间倒序
+      const firstTime = orders
+        .filter((o) => !orderedBefore(o.person, day))
+        .reverse()
+        .sort((a, b) => Number(hasItinerary(b.person)) - Number(hasItinerary(a.person)));
+      for (const order of firstTime.slice(0, 8)) {
+        const who = ctx.sources.has('community')
+          ? labelOf(order.person, ctx)
+          : `乘客 ${order.person}`;
+        const route = gis
+          ? `${placeName(order.from)} → ${placeName(order.to)}`
+          : `订单 ${order.id}`;
+        result.rows.push({
+          key: `o${order.id}`,
+          title: who,
+          detail: `${formatTime(order.request)} · ${route}`,
+          hit: true,
+        });
+        result.entities.push({
+          key: `p${order.person}`,
+          kind: 'person',
+          ref: order.person,
+          label: who,
+          cls: ':Person',
+          sources: (['mobility', 'community'] as SourceId[]).filter((id) => ctx.sources.has(id)),
+          hit: true,
+        });
+        result.relations.push({ from: `p${order.person}`, to: `o${order.id}`, label: 'requested' });
+        if (hasItinerary(order.person) && gis) {
+          result.highlights.push({ type: 'persona', id: order.person, path: [], label: who });
+        }
+      }
+      result.notes.push('明细只列出本周此前没有叫过车的乘客。人物为虚构。');
+    } else {
+      result.notes.push('当前为聚合视图：只给出订单数量，不涉及具体乘客。');
+    }
+    for (const order of orders.slice(-8)) {
+      result.entities.push({
+        key: `o${order.id}`,
+        kind: 'order',
+        ref: order.id,
+        label: `订单 ${order.id}`,
+        cls: ':RideOrder',
+        sources: ['mobility'],
+        hit: true,
+      });
+      if (weather) result.relations.push({ from: `o${order.id}`, to: 'weather', label: 'during' });
+      if (order.pickup <= ctx.t && ctx.t < order.arrive) {
+        // 明细视图中具名人物自带标签，不再重复标注车辆
+        const named = ctx.detail && hasItinerary(order.person);
+        result.highlights.push({
+          type: 'vehicle',
+          id: order.vehicle,
+          label: named
+            ? undefined
+            : ctx.detail
+              ? `${labelOf(order.person, ctx)} · 乘车中`
+              : '载客中',
+        });
+      }
+    }
+    if (weather) {
+      result.entities.push({
+        key: 'weather',
+        kind: 'weather',
+        ref: 0,
+        label: '恶劣天气观测',
+        cls: ':WeatherObservation',
+        sources: ['weather'],
+        hit: true,
+      });
+    }
+    result.classes = [
+      ':RideOrder',
+      ':TravelRecord',
+      ':WeatherObservation',
+      'sosa:Observation',
+      ':Person',
+    ];
+    result.subclass = [
+      [':RideOrder', ':TravelRecord'],
+      [':WeatherObservation', 'sosa:Observation'],
+    ];
+    return result;
+  },
+};
+
+const busShopping: CityQuery = {
+  id: 'busShopping',
+  group: 'life',
+  title: '下公交后 30 分钟内在附近消费的乘客',
+  description: '刷卡记录来自出行服务，会员消费来自商户系统，站点与商店的距离来自城市基础数据。',
+  sources: ['mobility', 'commerce', 'gis'],
+  suggest: at(2, 19, 30),
+  personal: true,
+  text: {
+    sparql: `SELECT ?shop (COUNT(DISTINCT ?p) AS ?riders) WHERE {
+  ?tap a :TransitTap ; :holder ?p ; :alightAt ?stop ; :time ?t1 .
+  ?buy a :Purchase ; :member ?p ; :atShop ?s ; :time ?t2 .
+  FILTER (?t2 > ?t1 && ?t2 < ?t1 + "PT30M"^^xsd:duration)
+  ?stop geo:hasGeometry/geo:asWKT ?a .
+  ?s geo:hasGeometry/geo:asWKT ?b ; :name ?shop .
+  FILTER (geof:distance(?a, ?b, uom:metre) < 300)
+}
+GROUP BY ?shop`,
+    sql: `SELECT p.name, COUNT(DISTINCT t.card_holder) AS riders
+FROM   mobility.public.transit_taps t
+JOIN   pos.shop.member_purchases m
+       ON m.member_id = t.card_holder
+      AND m.ts BETWEEN t.ts AND t.ts + INTERVAL '30' MINUTE
+JOIN   pos.shop.shops p     ON p.building_id = m.building_id
+JOIN   gis.public.stops s   ON s.id = t.stop_id
+JOIN   gis.public.buildings b ON b.id = p.building_id
+WHERE  t.kind = 'alight'
+  AND  ST_DWithin(s.location, b.footprint, 300)
+GROUP  BY p.name`,
+  },
+  detailText: {
+    sparql: `SELECT ?p ?stop ?t1 ?shop ?t2 WHERE {
+  ?tap a :TransitTap ; :holder ?p ; :alightAt ?stop ; :time ?t1 .
+  ?buy a :Purchase ; :member ?p ; :atShop/:name ?shop ; :time ?t2 .
+  FILTER (?t2 > ?t1 && ?t2 < ?t1 + "PT30M"^^xsd:duration)
+}`,
+    sql: `SELECT t.card_holder, t.stop_id, t.ts, m.building_id, m.ts
+FROM   mobility.public.transit_taps t
+JOIN   pos.shop.member_purchases m
+       ON m.member_id = t.card_holder
+      AND m.ts BETWEEN t.ts AND t.ts + INTERVAL '30' MINUTE
+WHERE  t.kind = 'alight'`,
+  },
+  run(ctx) {
+    const result = base(this, ctx);
+    if (!ctx.sources.has('mobility'))
+      return unavailable(result, '出行服务未接入：没有公交刷卡记录。');
+    if (!ctx.sources.has('commerce'))
+      return unavailable(result, '商户系统未接入：没有会员消费记录。');
+    const gis = ctx.sources.has('gis');
+    const day = dayOf(ctx.t);
+    const alights = tapsOf(day).filter((tap) => tap.kind === 'alight' && tap.time <= ctx.t);
+    const matches = purchasesOf(day)
+      .filter((p) => p.time <= ctx.t)
+      .flatMap((purchase) => {
+        const tap = alights.find((a) => {
+          if (
+            a.card !== purchase.member ||
+            purchase.time <= a.time ||
+            purchase.time > a.time + 1800
+          )
+            return false;
+          if (!gis) return true;
+          const stop = nodeById.get(a.node)!;
+          const c = buildingCenter(shops.find((s) => s.id === purchase.shop)!.buildingId);
+          return Math.hypot(c.x - stop.x, c.y - stop.y) < 300;
+        });
+        return tap ? [{ purchase, tap }] : [];
+      });
+    const byShop = new Map<number, typeof matches>();
+    for (const match of matches) {
+      byShop.set(match.purchase.shop, [...(byShop.get(match.purchase.shop) ?? []), match]);
+    }
+    const ranked = [...byShop.entries()].sort((a, b) => b[1].length - a[1].length);
+    for (const [index, [shopId, list]] of ranked.entries()) {
+      const shop = shops.find((s) => s.id === shopId)!;
+      const riders = new Set(list.map((m) => m.purchase.member)).size;
+      if (!ctx.detail) {
+        result.rows.push({
+          key: `shop${shopId}`,
+          title: shop.name,
+          detail: `${riders} 人`,
+          hit: true,
+        });
+      }
+      if (gis) {
+        result.highlights.push({
+          type: 'place',
+          at: buildingCenter(shop.buildingId),
+          label: `${shop.name} · ${riders} 人`,
+        });
+      }
+      // 分层视图只展示人数最多的五家店及对应站点
+      if (index >= 5) continue;
+      result.entities.push({
+        key: `shop${shopId}`,
+        kind: 'shop',
+        ref: shopId,
+        label: shop.name,
+        cls: shop.category === '咖啡' ? ':Cafe' : ':Shop',
+        sources: (['commerce', 'gis'] as SourceId[]).filter((id) => ctx.sources.has(id)),
+        hit: true,
+      });
+      // 每家店只连到下车人数最多的站点
+      const counts = new Map<number, number>();
+      for (const m of list) counts.set(m.tap.node, (counts.get(m.tap.node) ?? 0) + 1);
+      const busiest = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+      for (const node of [busiest]) {
+        const key = `stop${node}`;
+        if (!result.entities.some((e) => e.key === key)) {
+          result.entities.push({
+            key,
+            kind: 'stop',
+            ref: node,
+            label: gis ? `${nodeById.get(node)!.name} 站` : `站点 #${node}`,
+            cls: ':BusStop',
+            sources: (['mobility', 'gis'] as SourceId[]).filter((id) => ctx.sources.has(id)),
+            hit: true,
+          });
+        }
+        result.relations.push({ from: key, to: `shop${shopId}`, label: 'nearby' });
+      }
+    }
+    if (ctx.detail) {
+      // 每人每店一行；具名人物排在前面，其余按时间倒序
+      const seen = new Set<string>();
+      const listed = matches
+        .slice()
+        .reverse()
+        .filter(({ purchase }) => {
+          const key = `${purchase.member}:${purchase.shop}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .sort(
+          (a, b) =>
+            Number(hasItinerary(b.purchase.member)) - Number(hasItinerary(a.purchase.member)),
+        );
+      for (const { purchase, tap } of listed.slice(0, 10)) {
+        const shop = shops.find((s) => s.id === purchase.shop)!;
+        const stop = gis ? nodeById.get(tap.node)!.name : `站点 #${tap.node}`;
+        result.rows.push({
+          key: `m${purchase.shop}:${purchase.member}:${Math.round(purchase.time)}`,
+          title: labelOf(purchase.member, ctx),
+          detail: `${formatTime(tap.time)} ${stop} 下车 → ${formatTime(purchase.time)} ${shop.name}`,
+          hit: true,
+        });
+        if (hasItinerary(purchase.member) && gis) {
+          result.highlights.push({
+            type: 'persona',
+            id: purchase.member,
+            path: [],
+            label: labelOf(purchase.member, ctx),
+          });
+        }
+      }
+      result.notes.push(
+        '人物为虚构。刷卡卡号与会员号都登记为居民编号，映射为同一个 IRI :person/{id}。',
+      );
+    } else {
+      result.notes.push('当前为聚合视图：按商店统计人数，不涉及具体乘客。');
+    }
+    result.summary = `${new Set(matches.map((m) => m.purchase.member)).size} 人`;
+    result.notes.push(
+      gis
+        ? `${DAYS[day].label}截至 ${formatTime(ctx.t)}：下车后 30 分钟内、在站点 300 米内的商店消费。`
+        : '城市基础数据未接入：无法计算站点与商店的距离，结果包含远处的消费。',
+    );
+    result.classes = [':TransitTap', ':TravelRecord', ':Purchase', ':Shop', ':Cafe', ':Person'];
+    result.subclass = [
+      [':TransitTap', ':TravelRecord'],
+      [':Cafe', ':Shop'],
+    ];
+    return result;
+  },
+};
+
 function buildingCenter(id: number): Point {
   const b = city.buildings.find((x) => x.id === id)!;
   return { x: b.footprint.x + b.footprint.w / 2, y: b.footprint.y + b.footprint.h / 2 };
@@ -1305,6 +1949,9 @@ export const cityQueries: CityQuery[] = [
   heatIsland,
   persona,
   afterwork,
+  commuteCars,
+  weatherTaxi,
+  busShopping,
 ];
 
 export const QUERY_GROUPS: { id: QueryGroup; label: string }[] = [
@@ -1337,7 +1984,18 @@ source     SELECT device, ts, temp_c FROM iot.public.env_readings
 
 mappingId  shop
 target     :shop/{building_id} a :Shop ; :name {name} ; :category {category} .
-source     SELECT building_id, name, category FROM pos.shop.shops`;
+source     SELECT building_id, name, category FROM pos.shop.shops
+
+mappingId  parking_permit
+target     :person/{person_id} :hasParkingPermit :permit/{plate} .
+           :permit/{plate} a :ParkingPermit ; :plate {plate} .
+source     SELECT person_id, plate FROM hr.public.parking_permits
+
+mappingId  ride_order
+target     :order/{id} a :RideOrder ; :passenger :person/{passenger_id} ;
+               :requestedAt {requested_at} ; :vehicle :vehicle/{plate} .
+source     SELECT id, passenger_id, requested_at, plate
+           FROM mobility.public.ride_orders`;
 
 export const CITY_ONTOLOGY = `:Cafe                   rdfs:subClassOf :Shop .
 :Bus                    rdfs:subClassOf :ServiceVehicle .
@@ -1347,5 +2005,8 @@ export const CITY_ONTOLOGY = `:Cafe                   rdfs:subClassOf :Shop .
 :FootfallCount          rdfs:subClassOf sosa:Observation .
 :TemperatureObservation rdfs:subClassOf sosa:Observation .
 :WeatherObservation     rdfs:subClassOf sosa:Observation .
+:RideOrder              rdfs:subClassOf :TravelRecord .
+:TransitTap             rdfs:subClassOf :TravelRecord .
 :Employee               rdfs:subClassOf :Person .
-:worksFor               rdfs:domain     :Employee .`;
+:worksFor               rdfs:domain     :Employee .
+:hasParkingPermit       rdfs:domain     :Employee .`;

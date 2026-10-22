@@ -4,7 +4,16 @@
  */
 import { city } from '../../lib/geo/city';
 import { footfallCount, footfallRate, shopById, shopByBuilding } from '../../lib/city/commerce';
-import { companies, companyById, events, people, presence } from '../../lib/city/people';
+import { busLoad, tapsOf } from '../../lib/city/mobility';
+import {
+  carOwners,
+  companies,
+  companyById,
+  events,
+  people,
+  personById,
+  presence,
+} from '../../lib/city/people';
 import {
   cityQueries,
   type CityQuery,
@@ -27,7 +36,7 @@ import {
   startOfDay,
   timeOfDay,
 } from '../../lib/city/time';
-import { vehicleAt, vehicleById } from '../../lib/city/traffic';
+import { tripsOf, vehicleAt, vehicleById, vehicleByOwner } from '../../lib/city/traffic';
 import { observationAt } from '../../lib/city/weather';
 import { prefersReducedMotion } from '../lifecycle';
 import type { CityScene, FocusTarget, Insets, Selection, SelectionInfo, View } from './scene';
@@ -36,7 +45,7 @@ const PRESETS: Record<string, SourceId[]> = {
   all: ALL_SOURCES,
   gis: ['gis'],
   mobility: ['gis', 'traffic', 'weather'],
-  people: ['gis', 'hr', 'community'],
+  people: ['gis', 'traffic', 'mobility', 'commerce', 'hr', 'community'],
 };
 
 /** 播放时结果列表与详情卡片的刷新间隔（毫秒）。 */
@@ -151,6 +160,39 @@ function vehicleCard(id: string, t: number, detail: boolean): Card {
         : '司机为畅行出行员工（聚合视图不显示姓名）',
     });
   }
+  if (vehicle.owner) {
+    const owner = personById.get(vehicle.owner)!;
+    const company = companyById.get(carOwners.find((c) => c.person === owner.id)!.companyId)!;
+    rows.push({
+      source: 'hr',
+      text: `停车许可 · ${company.name}员工${detail && owner.persona ? ` ${owner.name}` : `（${owner.id}）`}`,
+    });
+  }
+  const day = dayOf(t);
+  if (vehicle.kind === 'bus') {
+    const taps = tapsOf(day).filter(
+      (tap) => tap.bus === id && tap.time <= t && tap.kind === 'board',
+    );
+    rows.push({
+      source: 'mobility',
+      text: `车上 ${busLoad(id, t)} 人 · 今日上车刷卡 ${taps.length} 次`,
+    });
+  }
+  if (vehicle.kind === 'taxi') {
+    const trips = tripsOf(day).filter((trip) => trip.vehicle === id);
+    const current = trips.find((trip) => trip.request <= t && t < trip.arrive);
+    const done = trips.filter((trip) => trip.arrive <= t).length;
+    const passenger = (person: string) => {
+      const p = personById.get(person)!;
+      return detail && p.persona ? p.name! : p.id;
+    };
+    rows.push({
+      source: 'mobility',
+      text: current
+        ? `${t < current.pickup ? '前往接客' : '载客中'} · 乘客 ${passenger(current.person)} · 今日已完成 ${done} 单`
+        : `空车 · 今日已完成 ${done} 单`,
+    });
+  }
   return {
     kind,
     title: vehicle.plate,
@@ -215,6 +257,27 @@ function focusFor(query: CityQuery, row: ResultRow): FocusTarget | null {
     case 'afterwork': {
       const match = /^e(\d+)/.exec(key);
       return match ? eventFocus(Number(match[1])) : null;
+    }
+    case 'commuteCars': {
+      if (key.startsWith('d')) {
+        const vehicle = vehicleByOwner.get(key.slice(1));
+        return vehicle ? { type: 'vehicle', id: vehicle.id } : null;
+      }
+      const company = companyById.get(Number(key.slice(1)));
+      return company?.buildingId ? { type: 'building', id: company.buildingId } : null;
+    }
+    case 'weatherTaxi': {
+      if (!key.startsWith('o')) return null;
+      const id = key.slice(1);
+      for (let day = 0; day < DAY_COUNT; day++) {
+        const trip = tripsOf(day).find((t) => t.id === id);
+        if (trip) return { type: 'vehicle', id: trip.vehicle };
+      }
+      return null;
+    }
+    case 'busShopping': {
+      const shop = shopById.get(Number(key.slice(key.startsWith('m') ? 1 : 4).split(':')[0]));
+      return shop ? { type: 'building', id: shop.buildingId } : null;
     }
   }
 }

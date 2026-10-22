@@ -284,6 +284,10 @@ function windowsWhere(until: number, test: (o: Observation) => boolean): [number
 /** 当天截至 until 的降水时段。 */
 export const rainWindows = (until: number) => windowsWhere(until, (o) => o.precipitation > 0);
 
+/** 当天截至 until 的恶劣天气时段：有降水、能见度不足 1000 米或风速达到 8 米/秒。 */
+export const badWeatherWindows = (until: number) =>
+  windowsWhere(until, (o) => o.precipitation > 0 || o.visibility < 1000 || o.wind >= 8);
+
 /** 当天截至 until 的不利天气时段：有降水或能见度不足 1000 米。 */
 export const adverseWindows = (until: number) =>
   windowsWhere(until, (o) => o.precipitation > 0 || o.visibility < 1000);
