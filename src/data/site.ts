@@ -33,6 +33,7 @@ export const siteText: Record<Lang, { title: string; description: string }> = {
 export const nav: { href: string; match: string | null; label: Record<Lang, string> }[] = [
   { href: '/#how', match: null, label: { zh: '原理', en: 'How it works' } },
   { href: '/resources/', match: '/resources', label: { zh: '资源', en: 'Resources' } },
+  { href: '/papers/', match: '/papers', label: { zh: '文献', en: 'Papers' } },
   { href: '/learn/', match: '/learn', label: { zh: '学习', en: 'Learn' } },
   { href: '/examples/', match: '/examples', label: { zh: '示例', en: 'Examples' } },
   { href: '/about/', match: '/about', label: { zh: '关于', en: 'About' } },

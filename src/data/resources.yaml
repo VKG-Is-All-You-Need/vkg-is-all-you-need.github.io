@@ -1,8 +1,7 @@
 # 资源数据。字段定义见 src/content.config.ts，构建时会按 schema 校验。
 # category 取值：standards | tools | tutorials | benchmarks | papers | adjacent
 # 条目在页面中的顺序与本文件一致。
-# 以 _en 结尾的字段为英文版文字：summary_en 必填，有 note 时须同时填写 note_en；
-# 名称本身为英文时可省略 title_en 与 label_en。
+# 以 _en 结尾的字段为英文版文字：summary_en 必填；名称本身为英文时可省略 title_en 与 label_en。
 
 # ── 标准规范 ────────────────────────────────────────────────
 
@@ -67,8 +66,6 @@
   url: https://ontop-vkg.org/guide/cli.html
   summary: Ontop 命令行工具，用于启动 endpoint、执行查询、bootstrap 本体与映射，以及处理映射文件。
   summary_en: The Ontop command-line tool for starting an endpoint, running queries, bootstrapping an ontology and mappings, and processing mapping files.
-  note: bootstrap 生成的本体与映射仅为初稿，业务语义需人工审核。
-  note_en: The ontology and mappings produced by bootstrap are only a first draft; their domain semantics require manual review.
 
 - id: protege-mapping-manager
   category: tools
@@ -76,8 +73,6 @@
   url: https://ontop-vkg.org/tutorial/basic/university-1.html
   summary: 在 Protégé 中结合本体编写和管理映射。
   summary_en: Writes and manages mappings together with the ontology in Protégé.
-  note: 旧版 Mapping Assistant 面板已移除，早期教程中的界面说明不再适用。
-  note_en: The former Mapping Assistant panel has been removed; interface descriptions in older tutorials no longer apply.
 
 - id: ontop-lenses
   category: tools
@@ -85,8 +80,6 @@
   url: https://ontop-vkg.org/guide/advanced/lenses.html
   summary: 在 Ontop 层定义关系视图，用于整理复杂的源表结构，或适配无法修改的数据库。
   summary_en: Defines relational views at the Ontop level, used to reorganize complex source schemas or to adapt databases that cannot be modified.
-  note: Protégé 插件暂不支持 lenses。
-  note_en: The Protégé plugin does not yet support lenses.
 
 - id: ontop-compliance
   category: tools
@@ -103,8 +96,6 @@
   url: https://github.com/ontopic-vkg
   summary: Ontopic 发布的行业映射、教程与部署示例。
   summary_en: Industry mappings, tutorials and deployment examples published by Ontopic.
-  note: 各仓库许可证不同，使用前请逐一确认。
-  note_en: Licenses differ between repositories; check each one before use.
 
 # ── 教程与案例 ──────────────────────────────────────────────
 
@@ -115,8 +106,6 @@
   url: https://ontop-vkg.org/tutorial/
   summary: 以大学数据库为例，涵盖映射、endpoint 部署、查询及进阶主题。推荐作为入门教程。
   summary_en: Uses a university database to cover mappings, endpoint deployment, queries and advanced topics. Recommended as the introductory tutorial.
-  note: 配套文件仓库为文档示例的镜像，文档源码位于 ontop-website 仓库。
-  note_en: The companion files repository mirrors the examples in the documentation; the documentation source is in the ontop-website repository.
   links:
     - label: 配套文件
       label_en: Companion files
@@ -137,8 +126,6 @@
   url: https://github.com/ontopic-vkg/destination-tutorial
   summary: 基于南蒂罗尔旅游住宿数据，提供数据库、本体、映射练习、SPARQL 查询与参考答案。
   summary_en: Based on tourism accommodation data from South Tyrol, with a database, an ontology, mapping exercises, SPARQL queries and reference solutions.
-  note: 部分说明基于 Ontop 4.1.0 等历史版本。
-  note_en: Parts of the instructions refer to historical versions such as Ontop 4.1.0.
 
 - id: bgee-mapping-patterns
   category: tutorials
@@ -146,8 +133,6 @@
   url: https://github.com/ontop/ontop-patterns-tutorial
   summary: 基于 Bgee 基因表达数据，提供数据库 dump、本体、OBDA 与 R2RML 映射、查询及部署说明。
   summary_en: Based on Bgee gene expression data, with a database dump, an ontology, OBDA and R2RML mappings, queries and deployment instructions.
-  note: 按目录分别授权：数据 CC0，文字 CC BY 4.0，代码 Apache-2.0。部分命令已过时。
-  note_en: 'Licensed per directory: data CC0, text CC BY 4.0, code Apache-2.0. Some commands are outdated.'
 
 - id: suedtirol-open-data
   category: tutorials
@@ -155,8 +140,6 @@
   url: https://github.com/dinglinfang/suedTirolOpenDataOBDA
   summary: 基于天气与交通传感器数据，结合 PostgreSQL/PostGIS 与 Ontop，包含可视分析。
   summary_en: Combines weather and traffic sensor data with PostgreSQL/PostGIS and Ontop, including visual analytics.
-  note: Apache-2.0。运行环境较旧，需自行适配。
-  note_en: Apache-2.0. The runtime environment is dated and needs adapting.
 
 - id: atkis
   category: tutorials
@@ -164,8 +147,6 @@
   url: https://github.com/apano-on/atkis
   summary: 基于德国 DLM250 地形数据，流程为 PostGIS → Ontop/SPARQL → QGIS。
   summary_en: Based on the German DLM250 topographic data, following the pipeline PostGIS → Ontop/SPARQL → QGIS.
-  note: 该项目为 fork，数据需另行获取；许可证与下载可用性待确认。
-  note_en: The project is a fork and the data must be obtained separately; the license and download availability are unconfirmed.
 
 - id: adventureworks
   category: tutorials
@@ -173,8 +154,6 @@
   url: https://github.com/ontopic-vkg/adventureworks-sqlserver
   summary: 将 SQL Server 业务数据映射至 schema.org，提供 R2RML 映射、查询，以及虚拟与物化两种部署示例。
   summary_en: Maps SQL Server business data to schema.org, with R2RML mappings, queries, and deployment examples for both virtual and materialized access.
-  note: 包含历史 Suite 项目文件；使用前请核对依赖与许可证。
-  note_en: Contains historical Suite project files; check dependencies and licenses before use.
 
 - id: trino-iceberg
   category: tutorials
@@ -182,8 +161,6 @@
   url: https://github.com/ontopic-vkg/ontop-trino-iceberg-playground
   summary: 数据湖场景下的虚拟访问，组合 Trino、Iceberg、Nessie 与 MinIO。
   summary_en: Virtual access in a data lake setting, combining Trino, Iceberg, Nessie and MinIO.
-  note: 研究性质的 playground（fork），不保证开箱即用。
-  note_en: A research playground (fork); it is not guaranteed to work out of the box.
 
 # ── 基准测试 ────────────────────────────────────────────────
 
@@ -193,8 +170,6 @@
   url: https://github.com/chrpin/rodi
   summary: 评测关系数据库到本体映射的自动及半自动生成质量。
   summary_en: Evaluates the quality of automatically and semi-automatically generated mappings from relational databases to ontologies.
-  note: 评测对象为映射质量，而非查询延迟。复现时需固定场景与版本。
-  note_en: It evaluates mapping quality, not query latency. Fix the scenarios and versions when reproducing results.
   links:
     - label: 项目主页
       label_en: Project page
@@ -206,8 +181,6 @@
   url: https://github.com/ontop/npd-benchmark
   summary: OBDA 查询与扩展性评测，提供关系数据、本体、映射与 SPARQL 查询。
   summary_en: An OBDA benchmark for query answering and scalability, providing relational data, an ontology, mappings and SPARQL queries.
-  note: 数据为 NPD 历史快照，并非实时能源数据服务。
-  note_en: The data is a historical NPD snapshot, not a live energy data service.
 
 - id: vig
   category: benchmarks
@@ -215,8 +188,6 @@
   url: https://github.com/ontop/vig
   summary: 数据生成器，依据源数据库与缩放因子生成更大规模的关系数据，用于 OBDA 评测。
   summary_en: A data generator that scales up a source database by a given factor to produce larger relational data sets for OBDA evaluation.
-  note: 仅负责生成数据，不是查询引擎，本身也不构成完整的评测方案。
-  note_en: It only generates data; it is not a query engine and does not constitute a complete benchmark on its own.
 
 - id: bsbm
   category: benchmarks
@@ -224,8 +195,6 @@
   url: https://sourceforge.net/projects/bsbmtools/
   summary: Berlin SPARQL Benchmark。基于电商场景，比较 RDF 存储与关系数据库封装层的 SPARQL 查询性能。
   summary_en: The Berlin SPARQL Benchmark. Based on an e-commerce scenario, it compares SPARQL query performance across RDF stores and relational database wrappers.
-  note: 经典基准，不专门评测本体推理。
-  note_en: A classic benchmark that does not specifically evaluate ontology reasoning.
 
 - id: watdiv
   category: benchmarks
@@ -233,8 +202,6 @@
   url: https://dsg.uwaterloo.ca/watdiv/index.shtml
   summary: 评测不同查询结构与数据分布下的 RDF/SPARQL 性能。
   summary_en: Evaluates RDF/SPARQL performance across different query shapes and data distributions.
-  note: 通用 RDF 基准。用于 VKG 评测时，需说明关系模式、映射设计与适配方式。
-  note_en: A general-purpose RDF benchmark. When used for VKG evaluation, the relational schema, mapping design and adaptations need to be documented.
   links:
     - label: 源码
       label_en: Source code
@@ -273,8 +240,6 @@
   venue: IJCAI 2025
   summary: LLM 辅助的 VKG 构建，涉及映射模式、本体补全、映射生成与评估。
   summary_en: LLM-assisted VKG construction, covering mapping patterns, ontology completion, mapping generation and evaluation.
-  note: 需自行配置模型 API、数据库与相关工具；当前可复现性未经验证。
-  note_en: Requires configuring a model API, a database and related tools; reproducibility has not been verified.
   links:
     - label: 论文 PDF
       label_en: Paper (PDF)
@@ -284,10 +249,8 @@
   category: papers
   title: GeoQA Portal
   url: https://github.com/nitpicker55555/Geo-QA-Paper
-  summary: 结合 LLM 的地理问答研究。
-  summary_en: Research on geographic question answering with LLMs.
-  note: 系统架构包含 PostGIS、Neo4j 与 ChromaDB，并非基于 Ontop 的纯虚拟访问，仅供参考。
-  note_en: The architecture combines PostGIS, Neo4j and ChromaDB rather than pure virtual access based on Ontop; listed for reference only.
+  summary: 结合 LLM 的地理问答研究，系统由 PostGIS、Neo4j 与 ChromaDB 组成。
+  summary_en: Research on geographic question answering with LLMs, built on PostGIS, Neo4j and ChromaDB.
 
 # ── 相关生态 ────────────────────────────────────────────────
 
@@ -297,8 +260,6 @@
   url: https://rml.io/specs/rml/
   summary: 将 R2RML 的映射方法扩展至 CSV、JSON、XML 等异构数据格式。
   summary_en: Extends the R2RML mapping approach to heterogeneous formats such as CSV, JSON and XML.
-  note: 所链接的规范页标注为 Unofficial Draft，并非 W3C 推荐标准。
-  note_en: The linked specification is marked as an Unofficial Draft and is not a W3C Recommendation.
 
 - id: yarrrml
   category: adjacent

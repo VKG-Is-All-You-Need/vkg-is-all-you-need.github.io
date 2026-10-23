@@ -1,0 +1,527 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/ui/PageHeader.astro';
+import Icon from '../../components/ui/Icon.astro';
+import { paperTopics, repoGroups } from '../../data/papers';
+import { langOf, langPaths } from '../../i18n';
+import { getPapers, getRepos, paperSummary, shortTitle } from '../../lib/papers';
+
+export const getStaticPaths = langPaths;
+
+const lang = langOf(Astro.url.pathname);
+const papers = await getPapers();
+const repos = await getRepos();
+const withCode = papers.filter((paper) => paper.data.code).length;
+const topics = paperTopics(lang).map((topic) => ({
+  ...topic,
+  items: papers.filter((paper) => paper.data.topic === topic.id),
+}));
+const groups = repoGroups(lang).map((group) => ({
+  ...group,
+  items: repos.filter((repo) => repo.data.group === group.id),
+}));
+const paperById = new Map(papers.map((paper) => [paper.id, paper]));
+
+const t = {
+  zh: {
+    title: '文献',
+    meta: `VKG 与 OBDA 方向的 ${papers.length} 篇讲义与论文、${repos.length} 个代码仓库，按主题排列。`,
+    heading: '论文与代码仓库',
+    description: `VKG 与 OBDA 方向的讲义、论文与开源仓库，按主题排列：共 ${papers.length} 篇论文，其中 ${withCode} 篇附有代码，另有 ${repos.length} 个仓库。`,
+    search: '搜索论文与仓库',
+    placeholder: '搜索标题、作者、会议或主题',
+    codeOnly: '只看有代码',
+    sections: '本页分区',
+    repos: '代码仓库',
+    reposDescription: 'VKG 系统、教程案例、基准与论文实现的公开仓库。',
+    paper: '论文',
+    code: '代码',
+    relatedPaper: '论文：',
+    count: (n: number) => `${n} 篇论文`,
+    empty: '无匹配结果。请尝试更短的关键词，或关闭“只看有代码”。',
+  },
+  en: {
+    title: 'Papers',
+    meta: `${papers.length} lectures and papers and ${repos.length} code repositories on VKG and OBDA, arranged by topic.`,
+    heading: 'Papers and repositories',
+    description: `Lectures, papers and open-source repositories on VKG and OBDA, arranged by topic: ${papers.length} papers, ${withCode} of them with code, and ${repos.length} repositories.`,
+    search: 'Search papers and repositories',
+    placeholder: 'Search by title, author, venue or topic',
+    codeOnly: 'With code only',
+    sections: 'Sections',
+    repos: 'Repositories',
+    reposDescription:
+      'Public repositories of VKG systems, tutorials and case studies, benchmarks and paper implementations.',
+    paper: 'Paper',
+    code: 'Code',
+    relatedPaper: 'Paper: ',
+    count: (n: number) => `${n} papers`,
+    empty: 'No matches. Try a shorter keyword or turn off "With code only".',
+  },
+}[lang];
+---
+
+<BaseLayout title={t.title} description={t.meta}>
+  <PageHeader label={t.title} title={t.heading} description={t.description} />
+
+  <div class="container page-body" data-papers>
+    <div class="toolbar">
+      <label class="search">
+        <Icon name="search" size={16} />
+        <span class="visually-hidden">{t.search}</span>
+        <input
+          type="search"
+          placeholder={t.placeholder}
+          autocomplete="off"
+          spellcheck="false"
+          data-papers-search
+        />
+      </label>
+      <button type="button" class="code-toggle" aria-pressed="false" data-papers-code>
+        <Icon name="github" size={14} />
+        {t.codeOnly}
+      </button>
+      <p class="count" role="status" aria-live="polite" data-papers-count>
+        {t.count(papers.length)}
+      </p>
+      <nav class="jump" aria-label={t.sections}>
+        {topics.map((topic) => (
+          <a href={`#${topic.id}`}>
+            {topic.label}
+            <span>{topic.items.length}</span>
+          </a>
+        ))}
+        <a href="#repos">
+          {t.repos}
+          <span>{repos.length}</span>
+        </a>
+      </nav>
+    </div>
+
+    {topics.map((topic) => (
+      <section class="topic" id={topic.id} data-topic aria-labelledby={`${topic.id}-title`}>
+        <header class="topic-head">
+          <h2 id={`${topic.id}-title`}>
+            {topic.label}
+            <span>{topic.items.length}</span>
+          </h2>
+          <p>{topic.description}</p>
+        </header>
+        <ol class="papers" role="list">
+          {topic.items.map((paper) => (
+            <li class="paper" id={paper.id} data-paper data-code={paper.data.code ? '' : undefined}>
+              <span class="paper-year">{paper.data.year}</span>
+              <div class="paper-body">
+                <h3>
+                  <a href={paper.data.url} target="_blank" rel="noopener">
+                    {paper.data.title}
+                  </a>
+                </h3>
+                <p class="paper-meta">
+                  {paper.data.authors} · <em>{paper.data.venue}</em>
+                </p>
+                <p class="paper-summary">{paperSummary(paper, lang)}</p>
+              </div>
+              <div class="paper-links">
+                <a href={paper.data.url} target="_blank" rel="noopener">
+                  {t.paper}
+                  <Icon name="arrow-up-right" size={12} />
+                </a>
+                {paper.data.code && (
+                  <a class="is-code" href={paper.data.code} target="_blank" rel="noopener">
+                    <Icon name="github" size={12} />
+                    {t.code}
+                  </a>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+    ))}
+
+    <p class="empty" data-papers-empty hidden>
+      {t.empty}
+    </p>
+
+    <section class="topic" id="repos" data-topic aria-labelledby="repos-title">
+      <header class="topic-head">
+        <h2 id="repos-title">
+          {t.repos}
+          <span>{repos.length}</span>
+        </h2>
+        <p>{t.reposDescription}</p>
+      </header>
+      {groups.map((group) => (
+        <div class="repo-group" data-repo-group>
+          <h3 class="repo-group-title">{group.label}</h3>
+          <ul class="repos" role="list">
+            {group.items.map((repo) => {
+              const paper = repo.data.paper ? paperById.get(repo.data.paper) : undefined;
+              return (
+                <li class="repo" data-repo>
+                  <a
+                    class="repo-name"
+                    href={`https://github.com/${repo.data.repo}`}
+                    target="_blank"
+                    rel="noopener"
+                  >
+                    <Icon name="github" size={14} />
+                    <span>{repo.data.repo}</span>
+                  </a>
+                  <p class="repo-summary">{paperSummary(repo, lang)}</p>
+                  {paper && (
+                    <a class="repo-paper" href={`#${paper.id}`}>
+                      {t.relatedPaper}
+                      {shortTitle(paper.data.title)}
+                    </a>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .page-body {
+    padding-bottom: clamp(72px, 10vw, 128px);
+  }
+
+  /* 工具栏 */
+  .toolbar {
+    position: sticky;
+    top: var(--header-h);
+    z-index: 20;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+    padding-block: 14px 10px;
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 320px;
+    height: 38px;
+    padding: 0 12px 0 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--faint);
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+  }
+
+  .search:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+
+  .search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    font-size: 14px;
+    color: var(--ink);
+  }
+
+  .search input::placeholder {
+    color: var(--faint);
+  }
+
+  .code-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    font-size: 14px;
+    color: var(--muted);
+    transition:
+      color 0.2s,
+      background-color 0.2s,
+      border-color 0.2s;
+  }
+
+  .code-toggle:hover {
+    color: var(--ink);
+    border-color: var(--line-strong);
+  }
+
+  .code-toggle[aria-pressed='true'] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--bg);
+  }
+
+  .count {
+    margin-left: auto;
+    font: 13px var(--font-mono);
+    color: var(--faint);
+  }
+
+  .jump {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 18px;
+    width: 100%;
+    font-size: 13px;
+  }
+
+  .jump a {
+    color: var(--muted);
+    transition: color 0.2s;
+  }
+
+  .jump a:hover {
+    color: var(--accent-ink);
+  }
+
+  .jump span {
+    margin-left: 4px;
+    font: 11px var(--font-mono);
+    color: var(--faint);
+  }
+
+  /* 主题分区 */
+  .topic {
+    padding-top: 48px;
+    scroll-margin-top: calc(var(--header-h) + 96px);
+  }
+
+  .topic-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 4px 40px;
+    align-items: baseline;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line-strong);
+  }
+
+  .topic-head h2 {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+
+  .topic-head h2 span {
+    font: 500 13px var(--font-mono);
+    color: var(--faint);
+  }
+
+  .topic-head p {
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  /* 论文条目 */
+  .paper {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+    gap: 4px 20px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+    scroll-margin-top: calc(var(--header-h) + 110px);
+  }
+
+  .paper:target {
+    background: linear-gradient(90deg, var(--accent-soft), transparent 70%);
+  }
+
+  .paper-year {
+    padding-top: 2px;
+    font: 500 13px var(--font-mono);
+    color: var(--faint);
+  }
+
+  .paper h3 {
+    font-size: 15.5px;
+    font-weight: 600;
+    line-height: 1.45;
+    letter-spacing: -0.005em;
+  }
+
+  .paper h3 a {
+    transition: color 0.2s;
+  }
+
+  .paper h3 a:hover {
+    color: var(--accent-ink);
+  }
+
+  .paper-meta {
+    margin-top: 3px;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--faint);
+  }
+
+  .paper-meta em {
+    font-style: normal;
+    color: var(--muted);
+  }
+
+  .paper-summary {
+    margin-top: 4px;
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
+  .paper-links {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    padding-top: 2px;
+  }
+
+  .paper-links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    font-size: 12px;
+    white-space: nowrap;
+    color: var(--muted);
+    transition:
+      color 0.2s,
+      border-color 0.2s;
+  }
+
+  .paper-links a:hover {
+    color: var(--accent-ink);
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+
+  .paper-links a.is-code {
+    color: var(--ink-2);
+  }
+
+  .empty {
+    padding: 64px 0;
+    text-align: center;
+    color: var(--muted);
+  }
+
+  /* 仓库 */
+  .repo-group {
+    padding-top: 20px;
+  }
+
+  .repo-group-title {
+    margin-bottom: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--faint);
+  }
+
+  .repos {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 10px;
+  }
+
+  .repo {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .repo-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    font: 500 13.5px var(--font-mono);
+    color: var(--ink);
+    transition: color 0.2s;
+  }
+
+  .repo-name span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .repo-name:hover {
+    color: var(--accent-ink);
+  }
+
+  .repo-summary {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+
+  .repo-paper {
+    margin-top: auto;
+    padding-top: 2px;
+    font-size: 12px;
+    color: var(--accent-ink);
+  }
+
+  .repo-paper:hover {
+    text-decoration: underline;
+  }
+
+  @media (max-width: 860px) {
+    .search {
+      width: 100%;
+    }
+
+    .jump {
+      flex-wrap: nowrap;
+      width: calc(100% + var(--gutter) * 2);
+      margin-inline: calc(var(--gutter) * -1);
+      padding-inline: var(--gutter);
+      overflow-x: auto;
+      white-space: nowrap;
+      scrollbar-width: none;
+    }
+
+    .topic-head {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .paper {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .paper-year {
+      padding-top: 0;
+    }
+
+    .paper-links {
+      flex-direction: row;
+      align-items: center;
+      padding-top: 4px;
+    }
+  }
+</style>

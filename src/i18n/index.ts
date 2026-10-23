@@ -15,6 +15,7 @@ export const LANG_NAMES: Record<Lang, string> = { zh: '中文', en: 'English' };
 const TRANSLATED = new Set([
   '/',
   '/resources/',
+  '/papers/',
   '/learn/',
   '/about/',
   '/examples/',

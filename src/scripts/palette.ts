@@ -2,7 +2,7 @@ import { navigate } from 'astro:transitions/client';
 import { onPageLoad } from './lifecycle';
 
 export interface PaletteItem {
-  type: 'page' | 'category' | 'resource';
+  type: 'page' | 'category' | 'resource' | 'paper';
   title: string;
   subtitle?: string;
   href: string;
@@ -10,13 +10,15 @@ export interface PaletteItem {
 }
 
 const GROUPS: Record<'zh' | 'en', Record<PaletteItem['type'], string>> = {
-  zh: { page: '页面', category: '分类', resource: '资源' },
-  en: { page: 'Pages', category: 'Categories', resource: 'Resources' },
+  zh: { page: '页面', category: '分类', resource: '资源', paper: '论文' },
+  en: { page: 'Pages', category: 'Categories', resource: 'Resources', paper: 'Papers' },
 };
 
 const ICONS: Record<PaletteItem['type'], string> = {
   page: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/>',
   category: '<path d="M5 9h14M5 15h14M10 4 8 20M16 4l-2 16"/>',
+  paper:
+    '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
   resource:
     '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>',
 };

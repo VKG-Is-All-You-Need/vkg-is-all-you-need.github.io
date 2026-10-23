@@ -1,0 +1,218 @@
+# 代码仓库，显示在 /papers/ 页面下方。字段定义见 src/content.config.ts。
+# group 取值：system | examples | benchmarks | research；paper 为 papers.yaml 中对应论文的 id。
+
+# ── 系统与工具 ──────────────────────────────────────────────
+
+- id: ontop
+  group: system
+  repo: ontop/ontop
+  summary: 开源 VKG 引擎，支持 R2RML 与 Ontop 映射语言，可部署为 SPARQL endpoint。
+  summary_en: Open-source VKG engine that supports R2RML and the Ontop mapping language and can be deployed as a SPARQL endpoint.
+  paper: ontop-iswc
+
+- id: ontop-website
+  group: system
+  repo: ontop/ontop-website
+  summary: Ontop 官方网站与文档的源码，教程与配置说明在此维护。
+  summary_en: Source of the Ontop website and documentation, where the tutorials and configuration guides are maintained.
+
+- id: ontop-eo
+  group: system
+  repo: apano-on/ontopEO
+  summary: Ontop 的扩展，把 openEO 地球观测数据作为虚拟知识图谱查询。
+  summary_en: An Ontop extension for querying openEO Earth observation data as a virtual knowledge graph.
+
+- id: onprom
+  group: system
+  repo: onprom/onprom
+  summary: 基于 OBDA 的事件日志提取工具集。
+  summary_en: A tool suite for OBDA-based event log extraction.
+  paper: ocel
+
+- id: d2rq
+  group: system
+  repo: d2rq/d2rq
+  summary: D2RQ 平台：把关系数据库作为虚拟的只读 RDF 图访问，并提供 SPARQL 服务。
+  summary_en: The D2RQ platform, which accesses relational databases as virtual read-only RDF graphs and serves them over SPARQL.
+
+- id: ontop-spatial
+  group: system
+  repo: ConstantB/ontop-spatial
+  summary: Ontop-spatial：支持 GeoSPARQL 的 Ontop 分支。
+  summary_en: Ontop-spatial, a fork of Ontop with GeoSPARQL support.
+  paper: ontop-spatial
+
+- id: morph-csv
+  group: system
+  repo: oeg-upm/morph-csv
+  summary: Morph-CSV：以 RML 与 CSVW 增强表格数据上的虚拟访问。
+  summary_en: Morph-CSV, which enhances virtual access over tabular data with RML and CSVW.
+  paper: morph-csv
+
+- id: ontop-spark
+  group: system
+  repo: chimera-suite/OntopSpark
+  summary: Ontop 的扩展，以 Apache Spark 作为查询执行引擎。
+  summary_en: An Ontop extension that uses Apache Spark as its query engine.
+  paper: chimera
+
+- id: ontop-stream
+  group: system
+  repo: chimera-suite/OntopStream
+  summary: Ontop 的扩展，以 Apache Flink 处理流数据。
+  summary_en: An Ontop extension that processes streams with Apache Flink.
+  paper: chimera
+
+- id: chrontext
+  group: system
+  repo: magbak/chrontext
+  summary: Chrontext：在上下文图与时序数据库之间拆分执行 SPARQL 查询。
+  summary_en: Chrontext, which splits SPARQL queries between a context graph and a time series database.
+  paper: chrontext
+
+- id: meteor
+  group: system
+  repo: wdimmy/MeTeoR
+  summary: MeTeoR：DatalogMTL 推理系统。
+  summary_en: MeTeoR, a DatalogMTL reasoner.
+  paper: meteor
+
+- id: ontoripple
+  group: system
+  repo: oeg-upm/OntoRipple
+  summary: 把本体的变化传播到 RML 映射等知识图谱资产（原 OCP2KG）。
+  summary_en: Propagates ontology changes to knowledge graph assets such as RML mappings (formerly OCP2KG).
+  paper: ocp2kg
+
+# ── 教程与案例 ──────────────────────────────────────────────
+
+- id: ontop-tutorial
+  group: examples
+  repo: ontop/ontop-tutorial
+  summary: Ontop 官方教程的配套文件，以大学数据库为例。
+  summary_en: Companion files for the official Ontop tutorial, based on a university database.
+
+- id: ontop-examples
+  group: examples
+  repo: ontop/ontop-examples
+  summary: Ontop 相关论文与教程中的示例，按发表场合分目录存放。
+  summary_en: Examples from Ontop papers and tutorials, organized in one directory per venue.
+
+- id: ontop-patterns-tutorial
+  group: examples
+  repo: ontop/ontop-patterns-tutorial
+  summary: 基于 Bgee 基因表达数据的映射模式教程，包含数据库、本体、映射与查询。
+  summary_en: A mapping patterns tutorial on Bgee gene expression data, with a database, ontology, mappings and queries.
+  paper: ontop-patterns
+
+- id: destination-tutorial
+  group: examples
+  repo: ontopic-vkg/destination-tutorial
+  summary: 南蒂罗尔旅游住宿数据的 VKG 练习，包含本体、映射练习与参考答案。
+  summary_en: VKG exercises on tourism accommodation data from South Tyrol, with an ontology, mapping exercises and reference solutions.
+
+- id: suedtirol
+  group: examples
+  repo: dinglinfang/suedTirolOpenDataOBDA
+  summary: 南蒂罗尔天气与交通传感器数据的 OBDA 案例，结合 PostGIS 与 Ontop。
+  summary_en: An OBDA case study on weather and traffic sensor data from South Tyrol, combining PostGIS and Ontop.
+
+- id: atkis
+  group: examples
+  repo: apano-on/atkis
+  summary: 德国 ATKIS 地形数据的 VKG 案例，流程为 PostGIS → Ontop → QGIS。
+  summary_en: A VKG case study on German ATKIS topographic data, following the pipeline PostGIS → Ontop → QGIS.
+  paper: atkis-dlm-kg
+
+- id: fhir-ontop-omop
+  group: examples
+  repo: fhircat/FHIROntopOMOP
+  summary: FHIR-Ontop-OMOP 的实现，把 OMOP CDM 映射为 FHIR RDF。
+  summary_en: The FHIR-Ontop-OMOP implementation, which maps the OMOP CDM to FHIR RDF.
+  paper: fhir-ontop-omop
+
+- id: adventureworks
+  group: examples
+  repo: ontopic-vkg/adventureworks-sqlserver
+  summary: 把 SQL Server 示例数据库 AdventureWorks 映射到 schema.org。
+  summary_en: Maps the AdventureWorks SQL Server sample database to schema.org.
+
+- id: music-vkg
+  group: examples
+  repo: ontopic-vkg/music-vkg
+  summary: 以 VKG 方式查询 MusicBrainz 音乐数据。
+  summary_en: Explores MusicBrainz music data through a VKG.
+
+# ── 基准 ────────────────────────────────────────────────────
+
+- id: npd-benchmark
+  group: benchmarks
+  repo: ontop/npd-benchmark
+  summary: NPD 基准的数据、本体、映射与查询。
+  summary_en: Data, ontology, mappings and queries of the NPD benchmark.
+  paper: npd
+
+- id: vig
+  group: benchmarks
+  repo: ontop/vig
+  summary: VIG 数据生成器，按比例扩展源数据库。
+  summary_en: The VIG data generator, which scales up a source database.
+  paper: vig
+
+- id: rodi
+  group: benchmarks
+  repo: chrpin/rodi
+  summary: RODI 映射质量基准的场景与评测工具。
+  summary_en: Scenarios and evaluation tools of the RODI mapping quality benchmark.
+  paper: rodi
+
+- id: gtfs-bench
+  group: benchmarks
+  repo: oeg-upm/gtfs-bench
+  summary: GTFS-Madrid-Bench 的数据生成器、映射与查询。
+  summary_en: Data generator, mappings and queries of GTFS-Madrid-Bench.
+  paper: gtfs-bench
+
+- id: krown
+  group: benchmarks
+  repo: kg-construct/KROWN
+  summary: KROWN 基准的数据生成器与评测流程。
+  summary_en: Data generator and evaluation pipeline of the KROWN benchmark.
+  paper: krown
+
+- id: burr
+  group: benchmarks
+  repo: HPI-Information-Systems/burr
+  summary: Burr 本体学习基准的数据与评测代码。
+  summary_en: Data and evaluation code of the Burr ontology learning benchmark.
+  paper: burr
+
+- id: spider4sparql
+  group: benchmarks
+  repo: ckosten/Spider4SPARQL
+  summary: Spider4SPARQL 基准的数据与查询。
+  summary_en: Data and queries of the Spider4SPARQL benchmark.
+  paper: spider4sparql
+
+- id: cwd-benchmark
+  group: benchmarks
+  repo: datadotworld/cwd-benchmark-data
+  summary: data.world 企业 SQL 问答基准（Chat With Your Data）的数据。
+  summary_en: Data of the data.world enterprise SQL question answering benchmark (Chat With Your Data).
+  paper: kg-llm-benchmark
+
+# ── 论文代码 ────────────────────────────────────────────────
+
+- id: llm4vkg
+  group: research
+  repo: HomuraT/LLM4VKG
+  summary: LLM4VKG 的实现与实验代码。
+  summary_en: Implementation and experiments of LLM4VKG.
+  paper: llm4vkg
+
+- id: geoqa
+  group: research
+  repo: nitpicker55555/Geo-QA-Paper
+  summary: GeoQA 门户的实现代码。
+  summary_en: Implementation of the GeoQA portal.
+  paper: geoqa

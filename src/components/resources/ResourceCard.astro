@@ -38,14 +38,6 @@ const text = resourceText(resource, lang);
   {data.venue && <p class="card-venue">{data.venue}</p>}
   <p class="card-summary">{text.summary}</p>
   {
-    text.note && (
-      <p class="card-note">
-        <Icon name="info" size={15} />
-        <span>{text.note}</span>
-      </p>
-    )
-  }
-  {
     text.links.length > 0 && (
       <ul class="card-links" role="list">
         {text.links.map((link) => (
@@ -154,24 +146,6 @@ const text = resourceText(resource, lang);
     font-size: 15px;
     line-height: 1.7;
     color: var(--ink-2);
-  }
-
-  .card-note {
-    display: flex;
-    gap: 8px;
-    padding: 9px 12px;
-    border-radius: 9px;
-    background: color-mix(in srgb, var(--warn) 9%, transparent);
-    border: 1px solid color-mix(in srgb, var(--warn) 18%, transparent);
-    font-size: 13.5px;
-    line-height: 1.65;
-    color: var(--ink-2);
-  }
-
-  .card-note :global(svg) {
-    flex: none;
-    margin-top: 3px;
-    color: var(--warn);
   }
 
   .card-links {

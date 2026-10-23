@@ -3,10 +3,12 @@ import Icon from './ui/Icon.astro';
 import { categoriesOf, categoryOf } from '../data/categories';
 import { langOf, localize } from '../i18n';
 import { getResources, resourceText } from '../lib/resources';
+import { getPapers, paperSummary } from '../lib/papers';
 import type { PaletteItem } from '../scripts/palette';
 
 const lang = langOf(Astro.url.pathname);
 const resources = await getResources();
+const papers = await getPapers();
 
 const t = {
   zh: {
@@ -14,6 +16,11 @@ const t = {
       { title: '首页', href: '/' },
       { title: '工作原理', href: '/#how', keywords: 'SPARQL SQL 映射 本体 示例' },
       { title: '资源索引', href: '/resources/', keywords: '标准 工具 教程 基准 论文' },
+      {
+        title: '论文与代码仓库',
+        href: '/papers/',
+        keywords: '文献 论文 综述 讲义 GitHub 仓库 代码',
+      },
       { title: '学习路径', href: '/learn/', keywords: '入门 教程 术语 辨析' },
       {
         title: 'VKG × 地理信息示例',
@@ -44,6 +51,11 @@ const t = {
         title: 'Resources',
         href: '/resources/',
         keywords: 'standards tools tutorials benchmarks papers',
+      },
+      {
+        title: 'Papers and repositories',
+        href: '/papers/',
+        keywords: 'literature papers surveys lectures GitHub repositories code',
       },
       { title: 'Learning path', href: '/learn/', keywords: 'getting started tutorial glossary' },
       {
@@ -89,9 +101,16 @@ const items: PaletteItem[] = [
       title: text.title,
       subtitle: [categoryOf(data.category, lang).label, data.venue].filter(Boolean).join(' · '),
       href: localize(`/resources/#${id}`, lang),
-      keywords: [text.summary, text.note].filter(Boolean).join(' '),
+      keywords: text.summary,
     };
   }),
+  ...papers.map((paper): PaletteItem => ({
+    type: 'paper',
+    title: paper.data.title,
+    subtitle: `${paper.data.venue} ${paper.data.year}`,
+    href: localize(`/papers/#${paper.id}`, lang),
+    keywords: `${paper.data.authors} ${paperSummary(paper, lang)}`,
+  })),
 ];
 
 // 防止数据中的 “<” 提前闭合 <script>。

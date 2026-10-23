@@ -1,7 +1,7 @@
 ---
 import ResourceCard from './ResourceCard.astro';
 import Icon from '../ui/Icon.astro';
-import { langOf } from '../../i18n';
+import { langOf, localize } from '../../i18n';
 import { getResourceGroups } from '../../lib/resources';
 
 const lang = langOf(Astro.url.pathname);
@@ -16,6 +16,7 @@ const t = {
     count: `共 ${total} 项`,
     empty: '无匹配结果。请尝试更短的关键词，或清除筛选条件。',
     reset: '清除筛选',
+    morePapers: '查看全部论文与代码仓库',
   },
   en: {
     search: 'Search resources',
@@ -25,6 +26,7 @@ const t = {
     count: `${total} resources`,
     empty: 'No matching resources. Try a shorter keyword or clear the filters.',
     reset: 'Clear filters',
+    morePapers: 'All papers and repositories',
   },
 }[lang];
 ---
@@ -73,7 +75,14 @@ const t = {
             {category.label}
             <span>{items.length}</span>
           </h2>
-          <p>{category.description}</p>
+          <p>
+            {category.description}
+            {category.id === 'papers' && (
+              <a class="more" href={localize('/papers/', lang)}>
+                {t.morePapers} →
+              </a>
+            )}
+          </p>
         </header>
         <div class="grid">
           {items.map((resource) => (
@@ -221,6 +230,16 @@ const t = {
   .group-head h2 span {
     font: 500 14px var(--font-mono);
     color: var(--faint);
+  }
+
+  .group-head .more {
+    margin-left: 8px;
+    color: var(--accent-ink);
+    white-space: nowrap;
+  }
+
+  .group-head .more:hover {
+    text-decoration: underline;
   }
 
   .group-head p {

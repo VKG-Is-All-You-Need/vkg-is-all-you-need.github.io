@@ -156,6 +156,7 @@ const langSwitch = {
   }
 
   .brand {
+    flex: none;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -178,7 +179,8 @@ const langSwitch = {
 
   .nav a {
     position: relative;
-    padding: 6px 12px;
+    padding: 6px 11px;
+    white-space: nowrap;
     border-radius: 999px;
     font-size: 14px;
     color: var(--muted);
@@ -319,6 +321,33 @@ const langSwitch = {
 
   .mobile-nav a[aria-current='page'] {
     color: var(--accent-ink);
+  }
+
+  /* 导航项较多（英文尤其长）时，搜索框收起为图标 */
+  @media (max-width: 1180px) {
+    .header-inner {
+      gap: 24px;
+    }
+
+    .search-label,
+    .search-keys {
+      display: none;
+    }
+
+    .search-trigger {
+      width: 36px;
+      padding: 0;
+      justify-content: center;
+      margin-right: 0;
+      border-color: transparent;
+      background: none;
+    }
+  }
+
+  @media (max-width: 960px) and (min-width: 861px) {
+    .brand em {
+      display: none;
+    }
   }
 
   @media (max-width: 860px) {

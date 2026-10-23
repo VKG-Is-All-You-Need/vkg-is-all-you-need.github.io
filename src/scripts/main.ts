@@ -8,6 +8,7 @@ import './hero';
 import './projection';
 import './demo';
 import './explorer';
+import './papers';
 import './timeline';
 import './geo';
 import './city';

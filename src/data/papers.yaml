@@ -1,0 +1,1006 @@
+# 论文数据，显示在 /papers/ 页面。字段定义见 src/content.config.ts，构建时会按 schema 校验。
+# topic 取值：intro | foundations | systems | construction | evolution | temporal | qa | benchmarks | applications
+# 讲义与综述按阅读顺序排列，其余主题按年份排列。url 优先使用 DOI 或可公开访问的 PDF。
+
+# ── 讲义与综述 ──────────────────────────────────────────────
+
+- id: xiao-intro-lecture
+  topic: intro
+  title: Introduction to Virtual Knowledge Graphs
+  authors: G. Xiao
+  year: 2024
+  venue: Lecture, University of Bergen
+  url: https://blog.homura.work/papers/vkg/Xiao%20-%20Introduction%20to%20Virtual%20Knowledge%20Graphs.pdf
+  summary: VKG 入门讲义，介绍虚拟知识图谱的基本概念、组成部分与典型应用。
+  summary_en: Introductory lecture on the basic concepts, components and typical applications of virtual knowledge graphs.
+
+- id: xiao-query-lecture
+  topic: intro
+  title: Virtual Knowledge Graphs Query Processing
+  authors: G. Xiao
+  year: 2024
+  venue: Lecture, University of Bergen
+  url: https://blog.homura.work/papers/vkg/Xiao%20-%20Virtual%20Knowledge%20Graphs%20Query%20Processing.pdf
+  summary: 入门讲义的第二部分，讲解 SPARQL 查询在 VKG 系统中的改写、展开与优化。
+  summary_en: The second lecture, on how SPARQL queries are rewritten, unfolded and optimized in a VKG system.
+
+- id: caise-tutorial
+  topic: intro
+  title: Designing Virtual Knowledge Graphs
+  authors: D. Calvanese, D. Lanti
+  year: 2024
+  venue: CAiSE Tutorial
+  url: https://blog.homura.work/papers/vkg/tutorial-design-vkg.pdf
+  summary: CAiSE 2024 教程，讲解 VKG 的设计流程：本体建模、映射编写与映射模式。
+  summary_en: 'CAiSE 2024 tutorial on designing VKGs: ontology modeling, writing mappings and mapping patterns.'
+
+- id: vkg-overview
+  topic: intro
+  title: 'Virtual Knowledge Graphs: An Overview of Systems and Use Cases'
+  authors: G. Xiao, L. Ding, B. Cogrel, D. Calvanese
+  year: 2019
+  venue: Data Intelligence
+  url: https://doi.org/10.1162/dint_a_00011
+  summary: VKG 综述，涵盖基本概念、代表性系统与应用案例。
+  summary_en: A survey of VKG covering the core concepts, representative systems and use cases.
+
+- id: obda-survey
+  topic: intro
+  title: 'Ontology-Based Data Access: A Survey'
+  authors: G. Xiao, D. Calvanese, R. Kontchakov, D. Lembo, A. Poggi, R. Rosati, et al.
+  year: 2018
+  venue: IJCAI
+  url: https://www.ijcai.org/proceedings/2018/777
+  summary: OBDA 综述，涵盖整体框架、查询回答、映射管理与开放研究问题。
+  summary_en: A survey of OBDA covering the overall framework, query answering, mapping management and open research problems.
+
+# ── 理论基础 ────────────────────────────────────────────────
+
+- id: data-integration
+  topic: foundations
+  title: 'Data Integration: A Theoretical Perspective'
+  authors: M. Lenzerini
+  year: 2002
+  venue: PODS
+  url: https://doi.org/10.1145/543613.543644
+  summary: 数据集成的理论综述：由全局模式、数据源与映射构成的集成系统，以及 GAV、LAV 映射下的查询处理，是 OBDA 映射的理论来源。
+  summary_en: 'A theoretical survey of data integration: integration systems made of a global schema, sources and mappings, and query processing under GAV and LAV mappings; the theoretical origin of OBDA mappings.'
+
+- id: dl-lite
+  topic: foundations
+  title: 'Tractable Reasoning and Efficient Query Answering in Description Logics: The DL-Lite Family'
+  authors: D. Calvanese, G. De Giacomo, D. Lembo, M. Lenzerini, R. Rosati
+  year: 2007
+  venue: Journal of Automated Reasoning
+  url: https://doi.org/10.1007/s10817-007-9078-x
+  summary: 提出 DL-Lite 描述逻辑家族，其查询回答可以改写为一阶查询，是 OWL 2 QL 的理论基础。
+  summary_en: Introduces the DL-Lite family of description logics, whose query answering can be rewritten into first-order queries; the theoretical basis of OWL 2 QL.
+
+- id: linking-data
+  topic: foundations
+  title: Linking Data to Ontologies
+  authors: A. Poggi, D. Lembo, D. Calvanese, G. De Giacomo, M. Lenzerini, R. Rosati
+  year: 2008
+  venue: Journal on Data Semantics
+  url: https://doi.org/10.1007/978-3-540-77688-8_5
+  summary: OBDA 的奠基性论文，用映射把关系数据库与 DL-Lite 本体连接起来，并给出查询回答的方法。
+  summary_en: A foundational OBDA paper that links relational databases to DL-Lite ontologies through mappings and gives a method for query answering.
+
+- id: dl-lite-relations
+  topic: foundations
+  title: The DL-Lite Family and Relations
+  authors: A. Artale, D. Calvanese, R. Kontchakov, M. Zakharyaschev
+  year: 2009
+  venue: Journal of Artificial Intelligence Research
+  url: https://doi.org/10.1613/jair.2820
+  summary: 系统梳理 DL-Lite 家族及相关逻辑的表达能力与推理复杂度。
+  summary_en: A systematic account of the expressive power and reasoning complexity of the DL-Lite family and related logics.
+
+- id: obdm
+  topic: foundations
+  title: Ontology-Based Data Management
+  authors: M. Lenzerini
+  year: 2011
+  venue: CIKM
+  url: https://doi.org/10.1145/2063576.2063582
+  summary: 提出基于本体的数据管理（OBDM）：以本体作为企业数据的统一概念视图，通过映射连接各个数据源。
+  summary_en: Introduces ontology-based data management (OBDM), in which an ontology is the unified conceptual view of enterprise data and is connected to the sources through mappings.
+
+- id: t-mappings
+  topic: foundations
+  title: High Performance Query Answering over DL-Lite Ontologies
+  authors: M. Rodríguez-Muro, D. Calvanese
+  year: 2012
+  venue: KR
+  url: https://cdn.aaai.org/ocs/4547/4547-21819-1-PB.pdf
+  summary: 提出 T-mappings，把本体公理编译进映射，使改写后的查询保持紧凑；Ontop 的查询优化以此为基础。
+  summary_en: Introduces T-mappings, which compile ontology axioms into the mappings so that rewritten queries stay compact; the basis of query optimization in Ontop.
+
+- id: perfectmap
+  topic: foundations
+  title: Optimizing Query Rewriting in Ontology-Based Data Access
+  authors: F. Di Pinto, D. Lembo, M. Lenzerini, R. Mancini, A. Poggi, R. Rosati, et al.
+  year: 2013
+  venue: EDBT
+  url: https://doi.org/10.1145/2452376.2452441
+  summary: 在 Mastro 中利用映射视图之间的包含关系优化查询的改写与展开。
+  summary_en: Optimizes query rewriting and unfolding in Mastro by exploiting containment between mapping views.
+
+- id: sparql-owl2ql
+  topic: foundations
+  title: Answering SPARQL Queries over Databases under OWL 2 QL Entailment Regime
+  authors: R. Kontchakov, M. Rezk, M. Rodríguez-Muro, G. Xiao, M. Zakharyaschev
+  year: 2014
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-319-11964-9_35
+  summary: 给出 OWL 2 QL 蕴涵语义下 SPARQL 查询到 SQL 的转换方法，Ontop 的查询改写以此为基础。
+  summary_en: Gives a translation of SPARQL queries under the OWL 2 QL entailment regime into SQL, the basis of query rewriting in Ontop.
+
+- id: rewriting-or-materialization
+  topic: foundations
+  title: 'OBDA: Query Rewriting or Materialization? In Practice, Both!'
+  authors: J. F. Sequeda, M. Arenas, D. P. Miranker
+  year: 2014
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-319-11964-9_34
+  summary: 结合查询改写与物化：在关系数据库中以 SQL 视图实现本体推理，交由数据库优化器执行。
+  summary_en: Combines query rewriting and materialization by implementing ontology reasoning as SQL views inside the relational database, leaving execution to its optimizer.
+
+- id: cross-linked
+  topic: foundations
+  title: Ontology-Based Integration of Cross-Linked Datasets
+  authors: D. Calvanese, M. Giese, D. Hovland, M. Rezk
+  year: 2015
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-319-25007-6_12
+  summary: 把数据源中的关联表经映射暴露为 owl:sameAs，在保持 SPARQL 可改写为 SQL 的前提下集成相互关联的数据集。
+  summary_en: Exposes linking tables in the sources as owl:sameAs through mappings, integrating cross-linked datasets while keeping SPARQL rewritable into SQL.
+
+- id: canonical-iris
+  topic: foundations
+  title: Efficient Ontology-Based Data Integration with Canonical IRIs
+  authors: G. Xiao, D. Hovland, D. Bilidas, M. Rezk, M. Giese, D. Calvanese
+  year: 2018
+  venue: ESWC
+  url: https://doi.org/10.1007/978-3-319-93417-4_45
+  summary: 用规范 IRI 表示跨数据源的同一实体，避免 owl:sameAs 带来的答案膨胀。
+  summary_en: Represents the same entity across sources with canonical IRIs, avoiding the blow-up of answers caused by owl:sameAs.
+
+- id: obdm-abstraction
+  topic: foundations
+  title: The Notion of Abstraction in Ontology-Based Data Management
+  authors: G. Cima, A. Poggi, M. Lenzerini
+  year: 2023
+  venue: Artificial Intelligence
+  url: https://doi.org/10.1016/j.artint.2023.103976
+  summary: 研究 OBDM 中的抽象：给定数据源上的查询，求本体上最能刻画它的查询，用于在概念层解释数据服务。
+  summary_en: 'Studies abstraction in OBDM: given a query over the sources, find the ontology query that best characterizes it, to explain data services at the conceptual level.'
+
+# ── 系统与平台 ──────────────────────────────────────────────
+
+- id: mastro
+  topic: systems
+  title: The MASTRO System for Ontology-Based Data Access
+  authors: D. Calvanese, G. De Giacomo, D. Lembo, M. Lenzerini, A. Poggi, M. Rodriguez-Muro, et al.
+  year: 2011
+  venue: Semantic Web
+  url: https://doi.org/10.3233/SW-2011-0029
+  summary: Mastro 的系统论文：基于 DL-Lite 的 OBDA 系统，采用查询改写、展开与求值的经典流程。
+  summary_en: The system paper on Mastro, a DL-Lite-based OBDA system that follows the classical pipeline of query rewriting, unfolding and evaluation.
+
+- id: ontop-of-databases
+  topic: systems
+  title: 'Ontology-Based Data Access: Ontop of Databases'
+  authors: M. Rodríguez-Muro, R. Kontchakov, M. Zakharyaschev
+  year: 2013
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-642-41335-3_35
+  summary: Ontop 的早期系统论文，结合 T-mappings 与语义查询优化，在关系数据库上高效回答查询。
+  summary_en: An early system paper on Ontop, combining T-mappings with semantic query optimization to answer queries efficiently over relational databases.
+
+- id: ultrawrap
+  topic: systems
+  title: 'Ultrawrap: SPARQL Execution on Relational Data'
+  authors: J. F. Sequeda, D. P. Miranker
+  year: 2013
+  venue: Journal of Web Semantics
+  url: https://doi.org/10.1016/j.websem.2013.08.002
+  summary: 以 SQL 视图定义三元组，把 SPARQL 转换为 SQL，交由关系数据库的优化器执行。
+  summary_en: Defines triples as SQL views and translates SPARQL into SQL, relying on the optimizer of the relational database.
+
+- id: optique
+  topic: systems
+  title: 'Optique: Zooming in on Big Data'
+  authors: M. Giese, A. Soylu, G. Vega-Gorgojo, A. Waaler, P. Haase, E. Jiménez-Ruiz, et al.
+  year: 2015
+  venue: IEEE Computer
+  url: https://doi.org/10.1109/MC.2015.82
+  summary: Optique 平台的总体介绍：面向工业大数据的端到端 OBDA 平台，涵盖映射引导、查询构建与流数据处理。
+  summary_en: An overview of the Optique platform, an end-to-end OBDA platform for industrial big data covering mapping bootstrapping, query formulation and stream processing.
+
+- id: ontop-spatial
+  topic: systems
+  title: Ontop of Geospatial Databases
+  authors: K. Bereta, M. Koubarakis
+  year: 2016
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-319-46523-4_3
+  code: https://github.com/ConstantB/ontop-spatial
+  summary: Ontop-spatial：为 Ontop 加入 GeoSPARQL 支持，把空间查询改写为空间数据库上的 SQL。
+  summary_en: Ontop-spatial adds GeoSPARQL support to Ontop, rewriting spatial queries into SQL over spatial databases.
+
+- id: obda-mongodb
+  topic: systems
+  title: 'OBDA Beyond Relational DBs: A Study for MongoDB'
+  authors: E. Botoeva, D. Calvanese, B. Cogrel, M. Rezk, G. Xiao
+  year: 2016
+  venue: DL Workshop
+  url: https://ceur-ws.org/Vol-1577/paper_40.pdf
+  summary: 把 OBDA 扩展到 MongoDB 文档数据库，研究 SPARQL 到 MongoDB 查询的转换。
+  summary_en: Extends OBDA to the MongoDB document database and studies the translation of SPARQL into MongoDB queries.
+
+- id: ontop-swj
+  topic: systems
+  title: 'Ontop: Answering SPARQL Queries over Relational Databases'
+  authors: D. Calvanese, B. Cogrel, S. Komla-Ebri, R. Kontchakov, D. Lanti, M. Rezk, et al.
+  year: 2017
+  venue: Semantic Web
+  url: https://doi.org/10.3233/SW-160217
+  summary: Ontop 的系统论文，介绍其架构、查询改写与 SQL 优化。
+  summary_en: The system paper on Ontop, covering its architecture, query rewriting and SQL optimization.
+
+- id: beyond-relational
+  topic: systems
+  title: Ontology-Based Data Access – Beyond Relational Sources
+  authors: E. Botoeva, D. Calvanese, B. Cogrel, J. Corman, G. Xiao
+  year: 2019
+  venue: Intelligenza Artificiale
+  url: https://doi.org/10.3233/IA-190023
+  summary: 总结 OBDA 向文档数据库等非关系数据源的扩展。
+  summary_en: Summarizes the extension of OBDA to non-relational sources such as document databases.
+
+- id: squerall
+  topic: systems
+  title: 'Squerall: Virtual Ontology-Based Access to Heterogeneous and Large Data Sources'
+  authors: M. N. Mami, D. Graux, S. Scerri, H. Jabeen, S. Auer, J. Lehmann
+  year: 2019
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-030-30796-7_15
+  summary: 语义数据湖上的虚拟 OBDA，查询异构的大规模数据源。
+  summary_en: Virtual OBDA over a semantic data lake, querying heterogeneous large-scale sources.
+
+- id: ontop-iswc
+  topic: systems
+  title: The Virtual Knowledge Graph System Ontop
+  authors: G. Xiao, D. Lanti, R. Kontchakov, S. Komla-Ebri, E. Güzel-Kalaycı, L. Ding, et al.
+  year: 2020
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-030-62466-8_17
+  summary: 介绍 Ontop 作为 VKG 系统的整体设计、查询转换流程、标准支持与应用情况。
+  summary_en: Describes the overall design of Ontop as a VKG system, its query transformation pipeline, standards support and adoption.
+
+- id: morph-csv
+  topic: systems
+  title: Enhancing Virtual Ontology Based Access over Tabular Data with Morph-CSV
+  authors: D. Chaves-Fraga, E. Ruckhaus, F. Priyatna, M.-E. Vidal, O. Corcho
+  year: 2021
+  venue: Semantic Web
+  url: https://doi.org/10.3233/SW-210432
+  code: https://github.com/oeg-upm/morph-csv
+  summary: 用 CSVW 与 RML 声明表格数据的隐式约束，提高 CSV 上虚拟访问的效率与答案完整性。
+  summary_en: Declares implicit constraints of tabular data with CSVW and RML, improving the efficiency and completeness of virtual access over CSV.
+
+- id: chimera
+  topic: systems
+  title: 'Chimera: A Bridge Between Big Data Analytics and Semantic Technologies'
+  authors: M. Belcao, E. Falzone, E. Bionda, E. Della Valle
+  year: 2021
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-030-88361-4_27
+  code: https://github.com/chimera-suite/OntopSpark
+  summary: 结合 Ontop 与 Spark 的数据湖分析平台（OntopSpark），并以 OntopStream 在 Flink 上处理流数据。
+  summary_en: A data lake analytics platform combining Ontop with Spark (OntopSpark), with OntopStream handling streams on Flink.
+
+- id: obdf
+  topic: systems
+  title: Ontology-based Data Federation
+  authors: Z. Gu, D. Lanti, A. Mosca, G. Xiao, J. Xiong, D. Calvanese
+  year: 2022
+  venue: IJCKG
+  url: https://doi.org/10.1145/3579051.3579070
+  summary: 在 OBDA 之下加入联邦层，跨多个数据源回答查询，并利用离线计算的跨源提示优化执行。
+  summary_en: Adds a federation layer below OBDA to answer queries across several sources, using cross-source hints computed offline to optimize execution.
+
+- id: obdf-kbs
+  topic: systems
+  title: Ontology-Based Data Federation and Query Optimization
+  authors: Z. Gu, D. Lanti, F. Corcoglioniti, M. Di Panfilo, A. Mosca, D. Calvanese, et al.
+  year: 2025
+  venue: Knowledge-Based Systems
+  url: https://doi.org/10.1016/j.knosys.2025.114216
+  summary: OBDF 的期刊扩展版，系统阐述联邦场景下的查询优化。
+  summary_en: The journal extension of OBDF, presenting query optimization in the federated setting.
+
+- id: vkg-eo
+  topic: systems
+  title: Virtual Knowledge Graphs over Earth Observation Data
+  authors: A. Pano, D. Lanti, D. Calvanese
+  year: 2025
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-032-09530-5_9
+  code: https://github.com/apano-on/ontopEO
+  summary: ontopEO：把 openEO 地球观测数据立方体作为虚拟知识图谱查询。
+  summary_en: ontopEO queries openEO Earth observation datacubes as a virtual knowledge graph.
+
+# ── 构建与映射 ──────────────────────────────────────────────
+
+- id: semantic-mappings
+  topic: construction
+  title: Inferring Complex Semantic Mappings Between Relational Tables and Ontologies from Simple Correspondences
+  authors: Y. An, A. Borgida, J. Mylopoulos
+  year: 2005
+  venue: ODBASE
+  url: https://doi.org/10.1007/11575801_15
+  summary: 从列与本体属性之间的简单对应关系推导出复杂的映射公式。
+  summary_en: Infers complex mapping formulas from simple correspondences between columns and ontology attributes.
+
+- id: ontology-extraction
+  topic: construction
+  title: Automatic Extraction of Ontologies Wrapping Relational Data Sources
+  authors: L. Lubyte, S. Tessaris
+  year: 2009
+  venue: DEXA
+  url: https://doi.org/10.1007/978-3-642-03573-9_10
+  summary: 从关系模式中同时抽取本体及其映射。
+  summary_en: Extracts an ontology together with its mappings from a relational schema.
+
+- id: bootox
+  topic: construction
+  title: 'BootOX: Practical Mapping of RDBs to OWL 2'
+  authors: E. Jiménez-Ruiz, E. Kharlamov, D. Zheleznyakov, I. Horrocks, C. Pinkel, M. G. Skjæveland, et al.
+  year: 2015
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-319-25010-6_7
+  summary: Optique 中的映射引导工具，从关系数据库生成 OWL 2 本体与映射，并支持与已有本体对齐。
+  summary_en: The bootstrapping tool of Optique, which generates OWL 2 ontologies and mappings from relational databases and aligns them with existing ontologies.
+
+- id: mapping-analysis
+  topic: construction
+  title: 'Mapping Analysis in Ontology-Based Data Access: Algorithms and Complexity'
+  authors: D. Lembo, J. Mora, R. Rosati, D. F. Savo, E. Thorstensen
+  year: 2015
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-319-25007-6_13
+  summary: 检测映射中不一致与冗余的断言，并给出相应的算法与复杂度结果。
+  summary_en: Detects inconsistent and redundant mapping assertions, with algorithms and complexity results.
+
+- id: rodi
+  topic: construction
+  title: 'RODI: Benchmarking Relational-to-Ontology Mapping Generation Quality'
+  authors: C. Pinkel, C. Binnig, E. Jiménez-Ruiz, E. Kharlamov, W. May, et al.
+  year: 2017
+  venue: Semantic Web
+  url: https://doi.org/10.3233/SW-170268
+  code: https://github.com/chrpin/rodi
+  summary: 评测关系数据库到本体映射的自动生成质量，覆盖学术会议、地理与油气勘探三个场景，比较了七个映射生成系统。
+  summary_en: Evaluates the quality of automatically generated relational-to-ontology mappings in three scenarios (conferences, geography, oil and gas exploration), comparing seven mapping generation systems.
+
+- id: axioms-through-mappings
+  topic: construction
+  title: Acquiring Ontology Axioms through Mappings to Data Sources
+  authors: F. Di Pinto, G. De Giacomo, D. Lembo, M. Lenzerini, R. Rosati
+  year: 2019
+  venue: Future Internet
+  url: https://doi.org/10.3390/fi11120260
+  summary: 通过映射从数据中产生本体公理，借助高阶 DL-Lite 的元建模，同时保持查询可改写为 SQL。
+  summary_en: Acquires ontology axioms from the data through mappings, using the meta-modeling of higher-order DL-Lite while keeping queries rewritable into SQL.
+
+- id: mapping-patterns
+  topic: construction
+  title: Conceptually-Grounded Mapping Patterns for Virtual Knowledge Graphs
+  authors: D. Calvanese, A. Gal, D. Lanti, M. Montali, A. Mosca, R. Shraga
+  year: 2023
+  venue: Data & Knowledge Engineering
+  url: https://doi.org/10.1016/j.datak.2023.102157
+  code: https://github.com/ontop/ontop-examples/tree/master/dke-2022-mapping-patterns
+  summary: 以概念模型为依据整理 VKG 的映射模式，并给出形式化定义。
+  summary_en: Catalogs mapping patterns for VKGs grounded in conceptual models and defines them formally.
+
+- id: llm4vkg
+  topic: construction
+  title: 'LLM4VKG: Leveraging Large Language Models for Virtual Knowledge Graph Construction'
+  authors: G. Xiao, L. Ren, G. Qi, H. Xue, M. Di Panfilo, D. Lanti
+  year: 2025
+  venue: IJCAI
+  url: https://www.ijcai.org/proceedings/2025/0525.pdf
+  code: https://github.com/HomuraT/LLM4VKG
+  summary: 利用大语言模型完成本体构建、模式分析与映射生成，处理命名歧义与匹配问题。
+  summary_en: Uses large language models for ontology development, schema analysis and mapping generation, addressing naming ambiguity and matching.
+
+- id: text2sql-kgqa
+  topic: construction
+  title: Bootstrapping Text-to-SQL Resources for Knowledge Graph Question Answering
+  authors: C. Kosten, D. Lanti, P. Cudré-Mauroux, K. Stockinger
+  year: 2025
+  venue: IEEE SDS
+  url: https://doi.org/10.1109/SDS66131.2025.00009
+  summary: 扩展 Ontop 的 bootstrap 功能生成 R2RML 映射，把已有的 Text-to-SQL 资源转换为知识图谱问答基准，并应用于 ScienceBenchmark。
+  summary_en: Extends the Ontop bootstrapper to generate R2RML mappings and turns existing Text-to-SQL resources into knowledge graph question answering benchmarks, applied to ScienceBenchmark.
+
+- id: rigor
+  topic: construction
+  title: Retrieval-Augmented Generation of Ontologies from Relational Databases
+  authors: N. Fathallah, M. Nayyeri, A. A. Yogi, R. B. Thapa, H.-M. Tautenhahn, A. Schnurpel, et al.
+  year: 2025
+  venue: arXiv
+  url: https://arxiv.org/abs/2506.01232
+  summary: RIGOR：结合检索增强生成，由大语言模型从关系数据库生成 OWL 本体。
+  summary_en: RIGOR generates OWL ontologies from relational databases with large language models and retrieval-augmented generation.
+
+- id: manufacturing-mappings
+  topic: construction
+  title: LLM-Supported Manufacturing Mapping Generation
+  authors: W. J. Schmidt, I. Grangel-González, A. Paschke, E. Kharlamov
+  year: 2025
+  venue: Transactions on Graph Data and Knowledge
+  url: https://doi.org/10.4230/TGDK.3.3.5
+  summary: 在制造业场景中用大语言模型生成 YARRRML/RML 映射。
+  summary_en: Generates YARRRML/RML mappings with large language models in a manufacturing setting.
+
+- id: self-demonstrations
+  topic: construction
+  title: Surprising Effectiveness of Self-Demonstrations in Enhancing Schema-Ontology Mapping with LLMs
+  authors: S. Thombre, M. Patwardhan, S. Sarawagi
+  year: 2026
+  venue: SEMANTiCS
+  url: https://doi.org/10.3233/SSW260008
+  summary: 让大语言模型自行生成示例，提升模式到本体映射的质量。
+  summary_en: Improves schema-to-ontology mapping by letting the language model generate its own demonstrations.
+
+- id: in-vkge
+  topic: construction
+  title: Information-Needs-Guided Virtual Knowledge Graph Enrichment via Large Language Models
+  authors: L. Ren, G. Xiao, G. Qi, W. Du, Y. Geng, H. Xue, et al.
+  year: 2026
+  venue: IJCAI
+  url: https://doi.org/10.24963/ijcai.2026/448
+  summary: IN-VKGE：部署后由新的信息需求驱动本体与映射的增补，并通过 SPARQL 执行反馈检验需求是否得到支持。
+  summary_en: IN-VKGE enriches the ontology and mappings of a deployed VKG for new information needs, checking through SPARQL execution feedback whether a need is supported.
+
+- id: aerospace-lens
+  topic: construction
+  title: LLM-Enhanced Semantic Data Integration of Electronic Component Qualifications in the Aerospace Domain
+  authors: A. De Santis, M. Balduini, M. Belcao, A. Proia, M. Brambilla, E. Della Valle
+  year: 2026
+  venue: The Semantic Web (LNCS)
+  url: https://doi.org/10.1007/978-3-032-25159-6_21
+  summary: 用大语言模型为航空航天电子元件资质数据生成清洗规则，经 Ontop 的 join lens 接入，不修改源数据。
+  summary_en: Generates cleaning rules for aerospace electronic component qualification data with a language model and applies them through an Ontop join lens, without changing the sources.
+
+# ── 演化与更新 ──────────────────────────────────────────────
+
+- id: ontoaccess
+  topic: evolution
+  title: Updating Relational Data via SPARQL/Update
+  authors: M. Hert, G. Reif, H. C. Gall
+  year: 2010
+  venue: EDBT/ICDT Workshops
+  url: https://doi.org/10.1145/1754239.1754266
+  summary: OntoAccess：以支持更新的映射语言 R3M，把 SPARQL/Update 翻译为关系数据库上的更新。
+  summary_en: OntoAccess translates SPARQL/Update into updates of a relational database through R3M, an update-aware mapping language.
+
+- id: dl-lite-evolution
+  topic: evolution
+  title: Evolution of DL-Lite Knowledge Bases
+  authors: D. Calvanese, E. Kharlamov, W. Nutt, D. Zheleznyakov
+  year: 2010
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-642-17746-0_8
+  summary: 研究 DL-Lite 知识库演化的语义，给出 bold 与 careful 两种可在多项式时间内计算的语义。
+  summary_en: Studies the semantics of evolution for DL-Lite knowledge bases and gives two semantics, bold and careful, both computable in polynomial time.
+
+- id: dynamic-tboxes
+  topic: evolution
+  title: Ontology-Based Data Access with Dynamic TBoxes in DL-Lite
+  authors: F. Di Pinto, G. De Giacomo, M. Lenzerini, R. Rosati
+  year: 2012
+  venue: AAAI
+  url: https://doi.org/10.1609/aaai.v26i1.8223
+  summary: 映射同时从数据中产生概念及其关系（动态 TBox），借助高阶 DL-Lite 的元建模，查询回答仍可改写为 SQL。
+  summary_en: Mappings also produce concepts and their relations from the data (dynamic TBoxes), using higher-order DL-Lite meta-modeling while query answering stays rewritable into SQL.
+
+- id: d2rq-update
+  topic: evolution
+  title: 'D2RQ/Update: Updating Relational Data via Virtual RDF'
+  authors: V. Eisenberg, Y. Kanza
+  year: 2012
+  venue: WWW Companion
+  url: https://doi.org/10.1145/2187980.2188095
+  summary: 在 D2RQ 之上支持 SPARQL Update，经由虚拟 RDF 更新关系数据。
+  summary_en: Adds SPARQL Update to D2RQ, updating relational data through virtual RDF.
+
+- id: data-aware-processes
+  topic: evolution
+  title: Ontology-Based Governance of Data-Aware Processes
+  authors: D. Calvanese, G. De Giacomo, D. Lembo, M. Montali, A. Santoso
+  year: 2012
+  venue: RR
+  url: https://doi.org/10.1007/978-3-642-33203-6_4
+  summary: 通过 OBDA 系统管控与验证会修改数据库的业务流程。
+  summary_en: Governs and verifies business processes that update the database through an OBDA system.
+
+- id: instance-level-evolution
+  topic: evolution
+  title: 'Capturing Model-Based Ontology Evolution at the Instance Level: The Case of DL-Lite'
+  authors: E. Kharlamov, D. Zheleznyakov, D. Calvanese
+  year: 2013
+  venue: Journal of Computer and System Sciences
+  url: https://doi.org/10.1016/j.jcss.2013.01.006
+  summary: 研究基于模型的演化语义在 DL-Lite 实例层的可表达性，并找出在演化下封闭的片段。
+  summary_en: Studies whether model-based evolution semantics can be captured at the instance level in DL-Lite and identifies fragments closed under evolution.
+
+- id: mapping-repair
+  topic: evolution
+  title: Mapping Repair in Ontology-based Data Access Evolving Systems
+  authors: D. Lembo, R. Rosati, V. Santarelli, D. F. Savo, E. Thorstensen
+  year: 2017
+  venue: IJCAI
+  url: https://doi.org/10.24963/ijcai.2017/161
+  summary: 本体或源模式变化后，按最小改变原则修复映射。
+  summary_en: Repairs the mappings under the principle of minimal change after the ontology or the source schema changes.
+
+- id: write-also-obda
+  topic: evolution
+  title: Practical Update Management in Ontology-Based Data Access
+  authors: G. De Giacomo, D. Lembo, X. Oriol, D. F. Savo, E. Teniente
+  year: 2017
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-319-68288-4_14
+  summary: write-also OBDA：把经本体提出的插入与删除记录在辅助表中并改写映射，不直接修改源数据，更新仍可一阶改写。
+  summary_en: Write-also OBDA records insertions and deletions posed on the ontology in auxiliary tables and rewrites the mappings instead of modifying the sources; updates remain first-order rewritable.
+
+- id: sparqlmap-update
+  topic: evolution
+  title: SPARQL Update Queries over R2RML Mapped Data Sources
+  authors: J. Unbehauen, M. Martin
+  year: 2017
+  venue: INFORMATIK
+  url: https://doi.org/10.18420/in2017_189
+  summary: 在 SparqlMap 中把 SPARQL Update 翻译为 R2RML 映射数据源上的 SQL 更新。
+  summary_en: Translates SPARQL Update into SQL updates of R2RML-mapped sources in SparqlMap.
+
+- id: schema-transformation
+  topic: evolution
+  title: Conceptual Schema Transformation in Ontology-Based Data Access
+  authors: D. Calvanese, T. E. Kalayci, M. Montali, A. Santoso, W. van der Aalst
+  year: 2018
+  venue: EKAW
+  url: https://doi.org/10.1007/978-3-030-03667-6_4
+  summary: 以变换规则在已有本体之上定义新的概念模式，并编译为标准的 OBDA 规约，用新的视角访问同一批数据源。
+  summary_en: Defines a new conceptual schema by transformation rules over an existing ontology and compiles it into a standard OBDA specification, giving a new view of the same sources.
+
+- id: big-data-evolution
+  topic: evolution
+  title: An Integration-Oriented Ontology to Govern Evolution in Big Data Ecosystems
+  authors: S. Nadal, O. Romero, A. Abelló, P. Vassiliadis, S. Vansummeren
+  year: 2019
+  venue: Information Systems
+  url: https://doi.org/10.1016/j.is.2018.01.006
+  summary: 以面向集成的本体管理大数据生态中数据源的演化，在源模式变化时保持查询可用。
+  summary_en: Uses an integration-oriented ontology to govern the evolution of sources in big data ecosystems, keeping queries working as source schemas change.
+
+- id: fo-update
+  topic: evolution
+  title: Instance-Level Update in DL-Lite Ontologies through First-Order Rewriting
+  authors: G. De Giacomo, X. Oriol, R. Rosati, D. F. Savo
+  year: 2021
+  venue: Journal of Artificial Intelligence Research
+  url: https://doi.org/10.1613/jair.1.12414
+  summary: 把 DL-Lite 的实例级更新一阶改写为 SQL，并在以数据库存储 ABox 的原型上实现。
+  summary_en: Rewrites instance-level updates of DL-Lite ontologies into SQL, with a prototype over an ABox stored in a database.
+
+- id: sparql-edit
+  topic: evolution
+  title: 'SPARQL_edit: Editing RDF Literals in Knowledge Graphs via View-Update Translations'
+  authors: S. Meckler, A. Harth
+  year: 2023
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-031-47243-5_10
+  summary: 以视图更新翻译编辑知识图谱中的 RDF 字面量，并写回底层数据源。
+  summary_en: Edits RDF literals in knowledge graphs through view-update translation, writing the changes back to the underlying sources.
+
+- id: ocp2kg
+  topic: evolution
+  title: Propagating Ontology Changes to Declarative Mappings in Construction of Knowledge Graphs
+  authors: D. Conde-Herreros, L. Stork, R. Pernisch, M. Poveda-Villalón, O. Corcho, D. Chaves-Fraga
+  year: 2024
+  venue: KGCW
+  url: https://ceur-ws.org/Vol-3718/paper1.pdf
+  code: https://github.com/oeg-upm/OntoRipple
+  summary: 根据本体的变化日志，用 SPARQL Update 模板自动修改 RML 映射。
+  summary_en: Revises RML mappings automatically from an ontology change log using SPARQL Update templates.
+
+- id: mapping-recovery-update
+  topic: evolution
+  title: Ontology-Based Update in Virtual Knowledge Graphs via Schema Mapping Recovery
+  authors: R. E. Wandji, D. Calvanese
+  year: 2024
+  venue: RuleML+RR
+  url: https://doi.org/10.1007/978-3-031-72407-7_6
+  summary: 借助最大恢复（maximum recovery）与数据血缘，把 VKG 上的更新翻译为数据源上的更新。
+  summary_en: Translates updates on a VKG into updates of the sources using maximum recovery and data lineage.
+
+- id: vkg-update-side-effects
+  topic: evolution
+  title: Minimizing Side-Effects in Virtual Knowledge Graph Updates
+  authors: R. E. Wandji, D. Calvanese
+  year: 2025
+  venue: RuleML+RR
+  url: https://doi.org/10.1007/978-3-032-08887-1_8
+  summary: 定义 VKG 更新的副作用，并通过补偿把副作用降到最小。
+  summary_en: Defines the side effects of VKG updates and minimizes them through compensation.
+
+- id: bidirectional-vkg
+  topic: evolution
+  title: Realizing Bidirectional Virtual Knowledge Graphs Using Ontop
+  authors: R. E. Wandji, D. Calvanese
+  year: 2025
+  venue: IJCKG
+  url: https://doi.org/10.1007/978-981-95-5009-8_15
+  summary: 在 Ontop 中实现 SPARQL Update 到 SQL 的翻译，构建可读写的双向 VKG。
+  summary_en: Implements the translation of SPARQL Update into SQL in Ontop, giving a bidirectional VKG that can be both read and written.
+
+# ── 时态与流数据 ────────────────────────────────────────────
+
+- id: sparqlstream
+  topic: temporal
+  title: Enabling Ontology-Based Access to Streaming Data Sources
+  authors: J.-P. Calbimonte, O. Corcho, A. J. G. Gray
+  year: 2010
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-642-17746-0_7
+  summary: 提出 SPARQLStream 与流到本体的映射 S2O，在流数据源上构造虚拟 RDF 流。
+  summary_en: Introduces SPARQLStream and the stream-to-ontology mapping language S2O, which build virtual RDF streams over streaming sources.
+
+- id: temporal-dl-obda
+  topic: temporal
+  title: Temporal Description Logic for Ontology-Based Data Access
+  authors: A. Artale, R. Kontchakov, F. Wolter, M. Zakharyaschev
+  year: 2013
+  venue: IJCAI
+  url: https://www.ijcai.org/Proceedings/13/Papers/112.pdf
+  summary: 为 OBDA 引入时态描述逻辑，在 OWL 2 QL 的时态扩展下保持查询的一阶可改写性。
+  summary_en: Brings temporal description logic to OBDA, keeping queries first-order rewritable under a temporal extension of OWL 2 QL.
+
+- id: starql
+  topic: temporal
+  title: A Stream-Temporal Query Language for Ontology Based Data Access
+  authors: Ö. L. Özçep, R. Möller, C. Neuenstadt
+  year: 2014
+  venue: KI
+  url: https://doi.org/10.1007/978-3-319-11206-0_18
+  summary: STARQL：面向 OBDA 的流与时态查询语言，在 Optique 中用于 Siemens 的设备诊断。
+  summary_en: STARQL, a stream-temporal query language for OBDA, used in Optique for equipment diagnostics at Siemens.
+
+- id: datalogmtl-obda
+  topic: temporal
+  title: Ontology-Based Data Access with a Horn Fragment of Metric Temporal Logic
+  authors: S. Brandt, E. Güzel Kalaycı, R. Kontchakov, V. Ryzhikov, G. Xiao, M. Zakharyaschev
+  year: 2017
+  venue: AAAI
+  url: https://doi.org/10.1609/aaai.v31i1.10696
+  summary: 以度量时态逻辑的 Horn 片段（DatalogMTL）在带时间戳的日志数据上回答时态查询。
+  summary_en: Answers temporal queries over timestamped log data with a Horn fragment of metric temporal logic (DatalogMTL).
+
+- id: ontop-temporal
+  topic: temporal
+  title: 'Ontop-temporal: A Tool for Ontology-Based Query Answering over Temporal Data'
+  authors: E. Güzel Kalayci, G. Xiao, V. Ryzhikov, T. E. Kalayci, D. Calvanese
+  year: 2018
+  venue: CIKM
+  url: https://doi.org/10.1145/3269206.3269230
+  code: https://github.com/ontop/ontop-examples/tree/master/cikm-2018-temporal-obda
+  summary: 面向带时间戳日志数据的时态扩展，在 MIMIC-III 重症监护数据上用于临床试验的患者筛选。
+  summary_en: A temporal extension for timestamped log data, applied to patient selection for clinical trials on the MIMIC-III intensive care data.
+
+- id: ontop-temporal-framework
+  topic: temporal
+  title: 'Ontology-Based Access to Temporal Data with Ontop: A Framework Proposal'
+  authors: E. Güzel Kalayci, S. Brandt, D. Calvanese, V. Ryzhikov, G. Xiao, M. Zakharyaschev
+  year: 2019
+  venue: International Journal of Applied Mathematics and Computer Science
+  url: https://doi.org/10.2478/amcs-2019-0002
+  summary: Ontop-temporal 的框架设计：在 Ontop 中支持基于 DatalogMTL 的时态规则与查询。
+  summary_en: The framework of Ontop-temporal, which supports temporal rules and queries based on DatalogMTL in Ontop.
+
+- id: ltl-rewritability
+  topic: temporal
+  title: First-Order Rewritability of Ontology-Mediated Queries in Linear Temporal Logic
+  authors: A. Artale, R. Kontchakov, A. Kovtunova, V. Ryzhikov, F. Wolter, M. Zakharyaschev
+  year: 2021
+  venue: Artificial Intelligence
+  url: https://doi.org/10.1016/j.artint.2021.103536
+  summary: 刻画线性时态逻辑下本体中介查询的一阶可改写性。
+  summary_en: Characterizes the first-order rewritability of ontology-mediated queries in linear temporal logic.
+
+- id: meteor
+  topic: temporal
+  title: 'MeTeoR: Practical Reasoning in Datalog with Metric Temporal Operators'
+  authors: D. Wang, P. Hu, P. A. Wałęga, B. Cuenca Grau
+  year: 2022
+  venue: AAAI
+  url: https://doi.org/10.1609/aaai.v36i5.20535
+  code: https://github.com/wdimmy/MeTeoR
+  summary: 基于物化的 DatalogMTL 推理系统。
+  summary_en: A materialization-based reasoner for DatalogMTL.
+
+- id: chrontext
+  topic: temporal
+  title: 'Chrontext: Portable SPARQL Queries over Contextualised Time Series Data in Industrial Settings'
+  authors: M. Bakken, A. Soylu
+  year: 2023
+  venue: Expert Systems with Applications
+  url: https://doi.org/10.1016/j.eswa.2023.120149
+  code: https://github.com/magbak/chrontext
+  summary: 混合方案：上下文数据存为图，时间序列留在时序数据库中虚拟访问，SPARQL 查询在两者之间拆分执行。
+  summary_en: A hybrid approach that stores context data as a graph and accesses time series virtually in a time series database, splitting SPARQL queries between the two.
+
+# ── 问答 ────────────────────────────────────────────────────
+
+- id: kg-llm-benchmark
+  topic: qa
+  title: A Benchmark to Understand the Role of Knowledge Graphs on Large Language Model's Accuracy for Question Answering on Enterprise SQL Databases
+  authors: J. Sequeda, D. Allemang, B. Jacob
+  year: 2023
+  venue: arXiv
+  url: https://arxiv.org/abs/2311.07509
+  code: https://github.com/datadotworld/cwd-benchmark-data
+  summary: 企业 SQL 数据库上的问答基准：GPT-4 直接生成 SQL 的准确率为 16%，经由本体与映射构成的知识图谱提问时为 54%。
+  summary_en: 'A question answering benchmark on enterprise SQL databases: GPT-4 reaches 16% accuracy generating SQL directly and 54% when questions are posed over a knowledge graph built from an ontology and mappings.'
+
+- id: spider4sparql
+  topic: qa
+  title: 'Spider4SPARQL: A Complex Benchmark for Evaluating Knowledge Graph Question Answering Systems'
+  authors: C. Kosten, P. Cudré-Mauroux, K. Stockinger
+  year: 2023
+  venue: arXiv
+  url: https://arxiv.org/abs/2309.16248
+  code: https://github.com/ckosten/Spider4SPARQL
+  summary: 基于 Spider 构建的复杂 Text-to-SPARQL 基准，用于评测知识图谱问答系统。
+  summary_en: A complex Text-to-SPARQL benchmark derived from Spider for evaluating knowledge graph question answering systems.
+
+- id: ontologies-to-the-rescue
+  topic: qa
+  title: 'Increasing the LLM Accuracy for Question Answering: Ontologies to the Rescue!'
+  authors: D. Allemang, J. Sequeda
+  year: 2024
+  venue: arXiv
+  url: https://arxiv.org/abs/2405.11706
+  summary: 依据本体检查生成的查询并由大语言模型修复，把上述基准的准确率提升到 72.55%。
+  summary_en: Checks generated queries against the ontology and repairs them with the language model, raising accuracy on the benchmark above to 72.55%.
+
+- id: geoqa
+  topic: qa
+  title: 'Towards a Barrier-free GeoQA Portal: Natural Language Interaction with Geospatial Data Using Multi-Agent LLMs and Semantic Search'
+  authors: Y. Feng, P. Zhang, G. Xiao, L. Ding, L. Meng
+  year: 2025
+  venue: International Journal of Applied Earth Observation and Geoinformation
+  url: https://doi.org/10.1016/j.jag.2025.104825
+  code: https://github.com/nitpicker55555/Geo-QA-Paper
+  summary: 地理空间问答门户：多智能体 LLM 把复杂问题拆分为子任务，语义检索提高对不精确提问的容错，便于非专业用户使用。
+  summary_en: A geospatial question answering portal in which multi-agent LLMs split complex questions into subtasks and semantic search tolerates imprecise questions, making the data accessible to non-experts.
+
+- id: navqa
+  topic: qa
+  title: 'NaVQA: Mitigating Silent Failures in Question Answering over Virtual Knowledge Graph'
+  authors: G. Xiao, H. Xue, L. Ren, Y. Geng, G. Qi, S. Zhang, et al.
+  year: 2026
+  venue: IJCAI
+  url: https://doi.org/10.24963/ijcai.2026/455
+  summary: 把生成的查询限制在映射实际填充的本体元素之内，减少 VKG 问答中查询能执行却得不到正确答案的静默失败。
+  summary_en: Restricts generated queries to the ontology elements that the mappings actually populate, reducing silent failures in which a query runs but does not return the right answer.
+
+# ── 基准测试 ────────────────────────────────────────────────
+
+- id: bsbm
+  topic: benchmarks
+  title: The Berlin SPARQL Benchmark
+  authors: C. Bizer, A. Schultz
+  year: 2009
+  venue: International Journal on Semantic Web and Information Systems
+  url: https://doi.org/10.4018/jswis.2009040101
+  summary: 基于电商场景的 SPARQL 基准，比较原生 RDF 存储与关系数据库封装层的查询性能。
+  summary_en: A SPARQL benchmark based on an e-commerce scenario that compares the query performance of native RDF stores and relational database wrappers.
+
+- id: watdiv
+  topic: benchmarks
+  title: Diversified Stress Testing of RDF Data Management Systems
+  authors: G. Aluç, O. Hartig, M. T. Özsu, K. Daudjee
+  year: 2014
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-319-11964-9_13
+  code: https://github.com/dsg-uwaterloo/watdiv
+  summary: WatDiv 基准的论文，按查询结构与数据分布生成多样化负载，对 RDF 数据管理系统进行压力测试。
+  summary_en: The WatDiv paper, which generates diverse workloads by query shape and data distribution to stress-test RDF data management systems.
+
+- id: npd
+  topic: benchmarks
+  title: 'The NPD Benchmark: Reality Check for OBDA Systems'
+  authors: D. Lanti, M. Rezk, G. Xiao, D. Calvanese
+  year: 2015
+  venue: EDBT
+  url: https://openproceedings.org/2015/conf/edbt/paper-350.pdf
+  code: https://github.com/ontop/npd-benchmark
+  summary: 基于挪威石油管理局 FactPages 数据的 OBDA 基准，包含真实的本体、映射与查询，数据规模可按需扩展。
+  summary_en: An OBDA benchmark built on the Norwegian Petroleum Directorate FactPages, with a real ontology, mappings and queries, and data that can be scaled up.
+
+- id: vig
+  topic: benchmarks
+  title: 'VIG: Data Scaling for OBDA Benchmarks'
+  authors: D. Lanti, G. Xiao, D. Calvanese
+  year: 2019
+  venue: Semantic Web
+  url: https://doi.org/10.3233/SW-180336
+  code: https://github.com/ontop/vig
+  summary: 依据源数据库的统计特征按比例生成更大规模的数据，用于 OBDA 基准的扩展性评测。
+  summary_en: Generates larger data sets that follow the statistical characteristics of a source database, for scalability evaluation of OBDA benchmarks.
+
+- id: gtfs-bench
+  topic: benchmarks
+  title: 'GTFS-Madrid-Bench: A Benchmark for Virtual Knowledge Graph Access in the Transport Domain'
+  authors: D. Chaves-Fraga, F. Priyatna, A. Cimmino, J. Toledo, E. Ruckhaus, O. Corcho
+  year: 2020
+  venue: Journal of Web Semantics
+  url: https://doi.org/10.1016/j.websem.2020.100596
+  code: https://github.com/oeg-upm/gtfs-bench
+  summary: 基于马德里地铁 GTFS 数据的基准，数据源涵盖 CSV、JSON、SQL 与 XML，用于评测虚拟知识图谱访问引擎。
+  summary_en: A benchmark built on Madrid metro GTFS data with CSV, JSON, SQL and XML sources, for evaluating engines that access virtual knowledge graphs.
+
+- id: krown
+  topic: benchmarks
+  title: 'KROWN: A Benchmark for RDF Graph Materialisation'
+  authors: D. Van Assche, D. Chaves-Fraga, A. Dimou
+  year: 2024
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-031-77847-6_2
+  code: https://github.com/kg-construct/KROWN
+  summary: 评测 RDF 图物化（知识图谱构建）引擎性能的基准。
+  summary_en: A benchmark for the performance of RDF graph materialization (knowledge graph construction) engines.
+
+- id: burr
+  topic: benchmarks
+  title: 'Burr: A Benchmark for Ontology Learning from Relational Databases'
+  authors: L. Laskowski, M. Hladik, J. Portisch, F. Panse, F. Naumann
+  year: 2025
+  venue: SIGMOD (PACMMOD)
+  url: https://doi.org/10.1145/3769770
+  code: https://github.com/HPI-Information-Systems/burr
+  summary: 从关系数据库学习本体的基准。
+  summary_en: A benchmark for learning ontologies from relational databases.
+
+# ── 应用案例 ────────────────────────────────────────────────
+
+- id: maritime
+  topic: applications
+  title: Ontology-Based Data Access for Maritime Security
+  authors: S. Brüggemann, K. Bereta, G. Xiao, M. Koubarakis
+  year: 2016
+  venue: ESWC
+  url: https://doi.org/10.1007/978-3-319-34129-3_45
+  summary: 整合船舶的实时数据与静态数据，用于异常检测与可疑船只追踪。
+  summary_en: Integrates real-time and static vessel data for anomaly detection and tracking of suspicious vessels.
+
+- id: epnet
+  topic: applications
+  title: 'Ontology-Based Data Integration in EPNet: Production and Distribution of Food during the Roman Empire'
+  authors: D. Calvanese, P. Liuzzo, A. Mosca, J. Remesal, M. Rezk, G. Rull
+  year: 2016
+  venue: Engineering Applications of Artificial Intelligence
+  url: https://doi.org/10.1016/j.engappai.2016.01.005
+  summary: 将分散的罗马帝国食品生产与贸易数据整合到统一的概念视图中，供历史学者查询。
+  summary_en: Unifies scattered data on food production and trade in the Roman Empire under a single conceptual view for historians.
+
+- id: statoil
+  topic: applications
+  title: Ontology Based Data Access in Statoil
+  authors: E. Kharlamov, D. Hovland, M. G. Skjæveland, D. Bilidas, E. Jiménez-Ruiz, G. Xiao, et al.
+  year: 2017
+  venue: Journal of Web Semantics
+  url: https://doi.org/10.1016/j.websem.2017.05.005
+  summary: Statoil 的 OBDA 部署：半自动生成本体与映射、查询优化，以及面向工程师的可视化查询界面。
+  summary_en: 'The OBDA deployment at Statoil: semi-automatic ontology and mapping generation, query optimization and a visual query interface for engineers.'
+
+- id: siemens
+  topic: applications
+  title: Semantic Access to Streaming and Static Data at Siemens
+  authors: E. Kharlamov, T. Mailis, G. Mehdi, C. Neuenstadt, Ö. Özçep, M. Roshchin, et al.
+  year: 2017
+  venue: Journal of Web Semantics
+  url: https://doi.org/10.1016/j.websem.2017.02.001
+  summary: Optique 平台为 Siemens 提供流数据与静态数据的统一访问，组件包括 BootOX、STARQL、ExaStream 与 OptiqueVQS。
+  summary_en: The Optique platform gives Siemens unified access to streaming and static data; its components include BootOX, STARQL, ExaStream and OptiqueVQS.
+
+- id: sdrl
+  topic: applications
+  title: 'Semantically-Enhanced Rule-Based Diagnostics for Industrial Internet of Things: The SDRL Language and Case Study for Siemens Trains and Turbines'
+  authors: E. Kharlamov, G. Mehdi, O. Savković, G. Xiao, E. Güzel Kalaycı, M. Roshchin
+  year: 2019
+  venue: Journal of Web Semantics
+  url: https://doi.org/10.1016/j.websem.2018.10.004
+  summary: SDRL 诊断规则语言借助本体抽象传感器信号，简化 Siemens 列车与涡轮机诊断规则的编写与维护。
+  summary_en: The SDRL diagnostic rule language uses an ontology to abstract over sensor signals, simplifying the writing and maintenance of diagnostic rules for Siemens trains and turbines.
+
+- id: bosch
+  topic: applications
+  title: Semantic Integration of Bosch Manufacturing Data Using Virtual Knowledge Graphs
+  authors: E. Güzel Kalaycı, I. Grangel González, F. Lösch, G. Xiao, A. ul-Mehdi, E. Kharlamov, et al.
+  year: 2020
+  venue: ISWC
+  url: https://doi.org/10.1007/978-3-030-62466-8_29
+  summary: 以 SMT 本体与映射整合 Bosch 表面贴装生产线的异构数据，支持产品质量查询。
+  summary_en: Integrates heterogeneous data from Bosch surface-mount production lines with an SMT ontology and mappings to support product quality queries.
+
+- id: ontop-patterns
+  topic: applications
+  title: Accessing Scientific Data through Knowledge Graphs with Ontop
+  authors: D. Calvanese, D. Lanti, T. Mendes De Farias, A. Mosca, G. Xiao
+  year: 2021
+  venue: Patterns
+  url: https://doi.org/10.1016/j.patter.2021.100346
+  code: https://github.com/ontop/ontop-patterns-tutorial
+  summary: 以 Bgee 基因表达数据为例，介绍如何用 Ontop 通过本体发布遗留的关系型科学数据，并与其他生物医学资源集成。
+  summary_en: Shows, with the Bgee gene expression data, how to publish legacy relational scientific data through an ontology with Ontop and integrate it with other biomedical resources.
+
+- id: linkedgeodata
+  topic: applications
+  title: Towards the Next Generation of the LinkedGeoData Project Using Virtual Knowledge Graphs
+  authors: L. Ding, G. Xiao, A. Pano, C. Stadler, D. Calvanese
+  year: 2021
+  venue: Journal of Web Semantics
+  url: https://doi.org/10.1016/j.websem.2021.100662
+  code: https://github.com/ontop/ontop-examples/tree/master/jows-2021-linkedgeodata
+  summary: 用 VKG 重建 LinkedGeoData：通过 Ontop 在 PostGIS 中的 OpenStreetMap 数据上直接提供 GeoSPARQL 查询。
+  summary_en: Rebuilds LinkedGeoData as a VKG, serving GeoSPARQL queries with Ontop directly over OpenStreetMap data in PostGIS.
+
+- id: fhir-ontop-omop
+  topic: applications
+  title: 'FHIR-Ontop-OMOP: Building Clinical Knowledge Graphs in FHIR RDF with the OMOP Common Data Model'
+  authors: G. Xiao, E. Pfaff, E. Prud'hommeaux, D. Booth, D. K. Sharma, N. Huo, et al.
+  year: 2022
+  venue: Journal of Biomedical Informatics
+  url: https://doi.org/10.1016/j.jbi.2022.104201
+  code: https://github.com/fhircat/FHIROntopOMOP
+  summary: 将 OMOP CDM 关系数据库发布为 FHIR RDF 虚拟知识图谱，提高临床数据的互操作性。
+  summary_en: Exposes relational OMOP CDM databases as virtual knowledge graphs in FHIR RDF to improve the interoperability of clinical data.
+
+- id: ocel
+  topic: applications
+  title: A Virtual Knowledge Graph Based Approach for Object-Centric Event Logs Extraction
+  authors: J. Xiong, G. Xiao, T. E. Kalayci, M. Montali, Z. Gu, D. Calvanese
+  year: 2022
+  venue: ICPM Workshops
+  url: https://doi.org/10.1007/978-3-031-27815-0_34
+  code: https://github.com/onprom/onprom
+  summary: 基于 OnProm 从关系数据库中提取以对象为中心的事件日志（OCEL），一个事件可以关联多个对象。
+  summary_en: Extracts object-centric event logs (OCEL) from relational databases with OnProm, so that one event can relate to several objects.
+
+- id: citygml-kg
+  topic: applications
+  title: Integrating 3D City Data through Knowledge Graphs
+  authors: L. Ding, G. Xiao, A. Pano, M. Fumagalli, D. Chen, Y. Feng, et al.
+  year: 2025
+  venue: Geo-spatial Information Science
+  url: https://doi.org/10.1080/10095020.2024.2337360
+  summary: CityGML-KG 框架把 3DCityDB 中的 CityGML 数据发布为知识图谱，并可与 OpenStreetMap 等数据源集成。
+  summary_en: The CityGML-KG framework exposes CityGML data stored in 3DCityDB as a knowledge graph and integrates it with sources such as OpenStreetMap.
+
+- id: atkis-dlm-kg
+  topic: applications
+  title: 'ATKIS-DLM-KG: A Unified Knowledge Graph Framework for Integrating and Querying Fragmented Topographic-Cartographic Data in the German Digital Landscape Model'
+  authors: G. Xiao, D. Sathalingam, A. Pano, Y. Feng, L. Ding
+  year: 2025
+  venue: International Journal of Digital Earth
+  url: https://doi.org/10.1080/17538947.2025.2528703
+  code: https://github.com/apano-on/atkis
+  summary: 把分散的 ATKIS Shapefile 数据整合为统一的知识图谱，支持跨主题的语义查询。
+  summary_en: Integrates fragmented ATKIS Shapefile data into a single knowledge graph that supports cross-theme semantic queries.

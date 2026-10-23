@@ -14,7 +14,6 @@ export interface ResourceGroup {
 export interface ResourceText {
   title: string;
   summary: string;
-  note?: string;
   links: { label: string; url: string }[];
 }
 
@@ -51,7 +50,6 @@ export function resourceText({ data }: Resource, lang: Lang): ResourceText {
   return {
     title: data.title_en ?? data.title,
     summary: data.summary_en,
-    note: data.note_en,
     links: data.links.map((link) => ({ label: link.label_en ?? link.label, url: link.url })),
   };
 }
