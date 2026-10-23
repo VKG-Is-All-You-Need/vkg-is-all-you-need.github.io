@@ -536,6 +536,9 @@ const t = {
   .tip {
     position: absolute;
     z-index: 3;
+    max-height: calc(100% - 12px);
+    overflow-y: auto;
+    pointer-events: none;
     width: min(300px, calc(100% - 16px));
     padding: 12px 14px;
     border-radius: 12px;
@@ -544,8 +547,11 @@ const t = {
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     box-shadow: var(--shadow);
-    pointer-events: auto;
     animation: tip-in 0.22s var(--ease);
+  }
+
+  .tip.is-pinned {
+    pointer-events: auto;
   }
 
   @keyframes tip-in {

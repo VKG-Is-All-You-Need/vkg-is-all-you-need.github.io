@@ -1,4 +1,5 @@
 import { onPageLoad, prefersReducedMotion, watchVisibility } from './lifecycle';
+import { placeTip } from './tip';
 
 // 发展历程页：页首缩写轮换、全景图的扫描动画与传承高亮、名称定位，以及时期导航。
 
@@ -185,6 +186,8 @@ function initPanorama(root: HTMLElement, signal: AbortSignal) {
       }
     }
     showTip(id);
+    // 只有点击固定后，卡片才接收指针（悬停时卡片若接收指针，会抢走节点的悬停状态）
+    tip.classList.toggle('is-pinned', pinned === id);
   };
   const showTip = (id: string) => {
     const item = info[id];
@@ -196,16 +199,7 @@ function initPanorama(root: HTMLElement, signal: AbortSignal) {
     const target = item.external ? ' target="_blank" rel="noopener"' : '';
     tip.innerHTML = `<p class="tip-year">${item.year}</p><p class="tip-title">${escapeHtml(item.label)}</p><p class="tip-text">${escapeHtml(item.text)}</p><a class="tip-cite" href="${escapeHtml(item.href)}"${target}>${escapeHtml(item.cite)} ${item.external ? '↗' : en ? '→ Papers' : '→ 文献页'}</a>`;
     tip.hidden = false;
-    tip.style.width = `${Math.min(300, scroller.clientWidth - 16)}px`;
-    const tipWidth = tip.offsetWidth;
-    const tipHeight = tip.offsetHeight;
-    // 卡片保持在可见区域内（画布可能比视口宽）
-    const minLeft = scroller.scrollLeft + 8;
-    const maxLeft = Math.min(width, scroller.scrollLeft + scroller.clientWidth) - tipWidth - 8;
-    const left = Math.min(Math.max(minLeft, x - 24), maxLeft);
-    const below = y + 22 + tipHeight < svg.viewBox.baseVal.height;
-    tip.style.left = `${left}px`;
-    tip.style.top = `${below ? y + 22 : Math.max(8, y - tipHeight - 18)}px`;
+    placeTip(tip, scroller, x, y, 300);
   };
 
   for (const [id, el] of nodes) {
