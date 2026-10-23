@@ -4,6 +4,7 @@ import PageHeader from '../../components/ui/PageHeader.astro';
 import Icon from '../../components/ui/Icon.astro';
 import Constellation from '../../components/papers/Constellation.astro';
 import { paperTopics, repoGroups } from '../../data/papers';
+import { buildContext, LAYOUTS } from '../../lib/constellation';
 import { langOf, langPaths } from '../../i18n';
 import { getPapers, getRepos, paperSummary, shortTitle } from '../../lib/papers';
 
@@ -22,6 +23,7 @@ const groups = repoGroups(lang).map((group) => ({
   items: repos.filter((repo) => repo.data.group === group.id),
 }));
 const paperById = new Map(papers.map((paper) => [paper.id, paper]));
+const relationCount = buildContext(papers, repos, lang).links.length;
 
 const t = {
   zh: {
@@ -42,6 +44,10 @@ const t = {
     view: '显示模式',
     standard: '标准',
     fx: '炫酷',
+    hintTitle: '文献星图',
+    hintText: `炫酷模式以星图展示 ${papers.length} 篇论文的年份、主题与 ${relationCount} 条传承和引用关系，提供 ${LAYOUTS.length} 种布局。`,
+    hintOpen: '查看',
+    hintClose: '不再提示',
     empty: '无匹配结果。请尝试更短的关键词，或关闭“只看有代码”。',
   },
   en: {
@@ -63,6 +69,10 @@ const t = {
     view: 'Display mode',
     standard: 'Standard',
     fx: 'Fancy',
+    hintTitle: 'Paper constellation',
+    hintText: `The fancy view draws the ${papers.length} papers as a star map of years, topics and ${relationCount} lineage and citation links, with ${LAYOUTS.length} layouts.`,
+    hintOpen: 'Show me',
+    hintClose: 'Dismiss',
     empty: 'No matches. Try a shorter keyword or turn off "With code only".',
   },
 }[lang];
@@ -104,14 +114,38 @@ const t = {
         <p class="count" role="status" aria-live="polite" data-papers-count>
           {t.count(papers.length)}
         </p>
-        <div class="view-switch" role="group" aria-label={t.view}>
-          <button type="button" data-papers-view="standard" aria-pressed="true">
-            {t.standard}
-          </button>
-          <button type="button" data-papers-view="fx" aria-pressed="false">
-            <Icon name="sparkles" size={14} />
-            {t.fx}
-          </button>
+        <div class="view-wrap">
+          <div class="view-switch" role="group" aria-label={t.view}>
+            <button type="button" data-papers-view="standard" aria-pressed="true">
+              {t.standard}
+            </button>
+            <button type="button" data-papers-view="fx" aria-pressed="false">
+              <Icon name="sparkles" size={14} />
+              {t.fx}
+            </button>
+          </div>
+          <!-- 首次访问时介绍动效模式，只出现一次 -->
+          <div class="fx-hint" role="note" data-fx-hint hidden>
+            <svg class="fx-hint-art" viewBox="0 0 64 40" aria-hidden="true">
+              <path d="M8 30 22 12 36 22 50 8 58 26" />
+              <circle cx="8" cy="30" r="2.2" />
+              <circle cx="22" cy="12" r="3" />
+              <circle cx="36" cy="22" r="2.4" />
+              <circle cx="50" cy="8" r="2.8" />
+              <circle cx="58" cy="26" r="2" />
+            </svg>
+            <p class="fx-hint-title">{t.hintTitle}</p>
+            <p class="fx-hint-text">{t.hintText}</p>
+            <div class="fx-hint-actions">
+              <button type="button" class="fx-hint-open" data-fx-hint-open>
+                <Icon name="sparkles" size={13} />
+                {t.hintOpen}
+              </button>
+              <button type="button" class="fx-hint-close" data-fx-hint-close>
+                {t.hintClose}
+              </button>
+            </div>
+          </div>
         </div>
         <nav class="jump" aria-label={t.sections}>
           {topics.map((topic) => (
@@ -236,6 +270,10 @@ const t = {
     margin-bottom: 28px;
   }
 
+  .fx-only :global([data-constellation]) {
+    scroll-margin-top: calc(var(--header-h) + 16px);
+  }
+
   .papers-page[data-fx] :global(.page-header) {
     padding-bottom: clamp(28px, 4vw, 40px);
   }
@@ -256,6 +294,217 @@ const t = {
     100% {
       transform: translate3d(-36%, 0, 0) scale(0.95);
       opacity: 0.4;
+    }
+  }
+
+  /* 首次访问的引导：炫酷按钮的流光边框与下方的介绍卡片 */
+  .view-wrap {
+    position: relative;
+  }
+
+  .view-switch button[data-papers-view='fx'] {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .view-switch button.is-inviting {
+    color: var(--ink);
+  }
+
+  .view-switch button.is-inviting::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    padding: 1.5px;
+    border-radius: inherit;
+    background: conic-gradient(from var(--spin, 0deg), #2a6fdb, #49bbdd, #8f6bff, #f29fb8, #2a6fdb);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: invite-spin 3s linear infinite;
+  }
+
+  .view-switch button.is-inviting::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    border-radius: inherit;
+    box-shadow: 0 0 0 0 rgb(73 187 221 / 0.55);
+    animation: invite-pulse 2.4s ease-out infinite;
+  }
+
+  @property --spin {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+  }
+
+  @keyframes invite-spin {
+    to {
+      --spin: 360deg;
+    }
+  }
+
+  @keyframes invite-pulse {
+    0% {
+      box-shadow: 0 0 0 0 rgb(73 187 221 / 0.55);
+    }
+    70%,
+    100% {
+      box-shadow: 0 0 0 10px rgb(73 187 221 / 0);
+    }
+  }
+
+  .fx-hint {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    z-index: 30;
+    width: min(300px, calc(100vw - 32px));
+    padding: 14px 16px 14px;
+    border-radius: 14px;
+    border: 1px solid rgb(120 170 230 / 0.3);
+    background:
+      radial-gradient(120% 90% at 100% 0%, rgb(73 140 221 / 0.28), transparent 60%),
+      radial-gradient(90% 80% at 0% 100%, rgb(170 110 240 / 0.2), transparent 60%), #070b14;
+    color: #e9eef5;
+    box-shadow:
+      0 24px 60px -24px rgb(10 30 60 / 0.7),
+      0 0 40px -12px rgb(73 187 221 / 0.5);
+    animation: hint-in 0.45s var(--ease);
+  }
+
+  .fx-hint[hidden] {
+    display: none;
+  }
+
+  /* 指向炫酷按钮的小三角 */
+  .fx-hint::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    right: 34px;
+    width: 10px;
+    height: 10px;
+    border-top: 1px solid rgb(120 170 230 / 0.3);
+    border-left: 1px solid rgb(120 170 230 / 0.3);
+    background: #0b1424;
+    transform: rotate(45deg);
+  }
+
+  @keyframes hint-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.97);
+    }
+  }
+
+  .fx-hint-art {
+    display: block;
+    width: 64px;
+    height: 40px;
+    margin-bottom: 6px;
+  }
+
+  .fx-hint-art path {
+    fill: none;
+    stroke: rgb(191 234 255 / 0.5);
+    stroke-width: 1;
+    stroke-dasharray: 90;
+    stroke-dashoffset: 90;
+    animation: hint-draw 1.4s var(--ease) 0.2s forwards;
+  }
+
+  .fx-hint-art circle {
+    fill: #7fd3ec;
+    filter: drop-shadow(0 0 3px #7fd3ec);
+    animation: hint-twinkle 2.2s ease-in-out infinite alternate;
+  }
+
+  .fx-hint-art circle:nth-of-type(2) {
+    fill: #f5d77a;
+    animation-delay: 0.4s;
+  }
+
+  .fx-hint-art circle:nth-of-type(4) {
+    fill: #c99bff;
+    animation-delay: 0.8s;
+  }
+
+  @keyframes hint-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes hint-twinkle {
+    to {
+      opacity: 0.45;
+    }
+  }
+
+  .fx-hint-title {
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .fx-hint-text {
+    margin-top: 4px;
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: #b9c2cd;
+  }
+
+  .fx-hint-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .fx-hint-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: linear-gradient(120deg, #2a6fdb, #49bbdd 55%, #8f6bff);
+    font-size: 12.5px;
+    color: #fff;
+    box-shadow: 0 0 16px -4px rgb(73 187 221 / 0.8);
+    transition: filter 0.2s;
+  }
+
+  .fx-hint-open:hover {
+    filter: brightness(1.12);
+  }
+
+  .fx-hint-close {
+    font-size: 12px;
+    color: #7f8a97;
+    transition: color 0.2s;
+  }
+
+  .fx-hint-close:hover {
+    color: #e9eef5;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .view-switch button.is-inviting::before,
+    .view-switch button.is-inviting::after,
+    .fx-hint,
+    .fx-hint-art path,
+    .fx-hint-art circle {
+      animation: none;
+    }
+
+    .fx-hint-art path {
+      stroke-dashoffset: 0;
     }
   }
 

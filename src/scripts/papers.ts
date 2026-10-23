@@ -4,6 +4,7 @@ import { decodeTitle, initConstellation } from './papers-fx';
 const normalize = (value: string) => value.normalize('NFKC').toLocaleLowerCase();
 
 const VIEW_KEY = 'papers-view';
+const HINT_KEY = 'papers-fx-hint';
 
 // 文献页：按关键词与“只看有代码”筛选论文和仓库；标准与动效两种显示模式。
 onPageLoad((signal) => {
@@ -106,6 +107,46 @@ onPageLoad((signal) => {
     );
   }
   if (initialFx && title) decodeTitle(title, signal);
+
+  // 首次访问的引导：没用过动效模式的读者，炫酷按钮带流光边框，稍后弹出介绍卡片
+  const hint = root.querySelector<HTMLElement>('[data-fx-hint]');
+  const fxButton = viewButtons.find((button) => button.dataset.papersView === 'fx');
+  let hintSeen = initialFx;
+  try {
+    hintSeen ||= Boolean(localStorage.getItem(HINT_KEY));
+  } catch {}
+  if (hint && fxButton && !hintSeen) {
+    fxButton.classList.add('is-inviting');
+    const timer = window.setTimeout(() => (hint.hidden = false), 1200);
+    const dismiss = () => {
+      window.clearTimeout(timer);
+      hint.hidden = true;
+      fxButton.classList.remove('is-inviting');
+      try {
+        localStorage.setItem(HINT_KEY, '1');
+      } catch {}
+    };
+    signal.addEventListener('abort', () => window.clearTimeout(timer));
+    fxButton.addEventListener('click', dismiss, { signal });
+    hint.querySelector('[data-fx-hint-close]')!.addEventListener('click', dismiss, { signal });
+    hint.querySelector('[data-fx-hint-open]')!.addEventListener(
+      'click',
+      () => {
+        dismiss();
+        fxButton.click();
+        // 星图在工具栏上方，切换后滚动过去
+        requestAnimationFrame(() =>
+          page.querySelector('[data-constellation]')?.scrollIntoView({
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+              ? 'auto'
+              : 'smooth',
+            block: 'start',
+          }),
+        );
+      },
+      { signal },
+    );
+  }
 
   input.addEventListener('input', apply, { signal });
   toggle.addEventListener(
