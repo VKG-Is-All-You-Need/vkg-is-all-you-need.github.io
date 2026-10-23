@@ -36,6 +36,13 @@ const texts: Record<Lang, { title: string; description: string; entries: Entry[]
         cta: '打开示例',
       },
       {
+        icon: 'rotate',
+        title: '发展历程',
+        text: '从数据集成理论到 OBDA、OBDM、VKG 与 OBDF，五个时期的里程碑与传承关系。',
+        href: '/history/',
+        cta: '查看时间线',
+      },
+      {
         icon: 'file',
         title: '论文与代码',
         text: '讲义、综述、理论基础与应用案例论文，以及相关的开源仓库。',
@@ -69,6 +76,13 @@ const texts: Record<Lang, { title: string; description: string; entries: Entry[]
         text: 'Run GeoSPARQL queries over a 3D city district, or switch eight data sources on and off to compare fused and separate results.',
         href: '/examples/',
         cta: 'Open the examples',
+      },
+      {
+        icon: 'rotate',
+        title: 'History',
+        text: 'From data integration theory to OBDA, OBDM, VKG and OBDF: milestones and lineages across five eras.',
+        href: '/history/',
+        cta: 'View the timeline',
       },
       {
         icon: 'file',
@@ -109,7 +123,7 @@ const t = texts[lang];
 <style>
   .entries {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 16px;
   }
 
@@ -117,7 +131,7 @@ const t = texts[lang];
     display: flex;
     flex-direction: column;
     height: 100%;
-    padding: 32px 28px 28px;
+    padding: 30px 24px 26px;
   }
 
   .entry:hover {
@@ -166,7 +180,13 @@ const t = texts[lang];
     transform: translateX(4px);
   }
 
-  @media (max-width: 1080px) {
+  @media (max-width: 1180px) {
+    .entries {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 860px) {
     .entries {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }

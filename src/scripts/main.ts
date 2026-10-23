@@ -9,6 +9,7 @@ import './projection';
 import './demo';
 import './explorer';
 import './papers';
+import './history';
 import './timeline';
 import './geo';
 import './city';

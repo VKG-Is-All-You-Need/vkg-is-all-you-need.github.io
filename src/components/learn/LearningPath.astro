@@ -43,7 +43,12 @@ const STAGES: Record<Lang, () => { title: string; goal: string; materials: Mater
     {
       title: '建立概念',
       goal: '明确数据源、映射、本体与查询各自的职责，理解查询改写的基本过程。',
-      materials: [concepts, page('工作原理演示', '/#how', '本站'), ref('vkg-overview', '综述')],
+      materials: [
+        concepts,
+        page('工作原理演示', '/#how', '本站'),
+        page('发展历程', '/history/', '本站'),
+        ref('vkg-overview', '综述'),
+      ],
     },
     {
       title: '完成官方教程',
@@ -75,6 +80,7 @@ const STAGES: Record<Lang, () => { title: string; goal: string; materials: Mater
       materials: [
         concepts,
         page('How it works', '/#how', 'This site'),
+        page('History', '/history/', 'This site'),
         ref('vkg-overview', 'Survey'),
       ],
     },

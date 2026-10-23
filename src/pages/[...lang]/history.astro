@@ -1,0 +1,746 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Icon from '../../components/ui/Icon.astro';
+import Panorama from '../../components/history/Panorama.astro';
+import EraFigure from '../../components/history/EraFigure.astro';
+import { ERAS, LANES, MILESTONES, NAMES } from '../../data/history';
+import { langOf, langPaths, localize } from '../../i18n';
+
+export const getStaticPaths = langPaths;
+
+const lang = langOf(Astro.url.pathname);
+const ACRONYMS = ['OBDA', 'OBDI', 'OBDM', 'OMQA', 'VKG', 'OBDF'];
+const NUMERALS = ['①', '②', '③', '④', '⑤'];
+const laneIndex = (id: string) => LANES.findIndex((lane) => lane.id === id);
+
+const eras = ERAS.map((era) => ({
+  ...era,
+  items: MILESTONES.filter((m) => m.year >= era.from && m.year <= era.to).sort(
+    (a, b) => a.year - b.year || laneIndex(a.lane) - laneIndex(b.lane),
+  ),
+}));
+
+const counts = { milestones: MILESTONES.length, eras: ERAS.length, names: NAMES.length };
+
+const t = {
+  zh: {
+    title: '发展历程',
+    meta: `虚拟知识图谱一系的发展历程：从数据集成理论到 OBDA、OBDM、VKG 与 OBDF，按五个时期梳理 ${counts.milestones} 个里程碑。`,
+    label: '发展历程',
+    heading: '同一个想法的二十余年',
+    lede: `数据保留在原处，由本体与映射提供统一的视图。这个想法在 2000 年代初成形，先后被称为 OBDA、OBDI、OBDM、VKG 与 OBDF。本页以全景图概览 2002 年以来的 ${counts.milestones} 个里程碑，再按五个时期逐一介绍。`,
+    stats: [
+      [counts.milestones, '个里程碑'],
+      [counts.eras, '个时期'],
+      [counts.names, '种名称'],
+    ],
+    panoramaTitle: '全景',
+    panoramaText:
+      '五条泳道并行展开：范式与名称、系统与产业、理论标准与基准、多源与时空数据、演化更新与大模型。连线表示传承关系。',
+    namesTitle: '名称的演变',
+    namesText:
+      '不同时期、不同社区为同一类方法取了不同的名字，各自的侧重点有所不同。点击名称可在全景图中定位对应的里程碑。',
+    erasTitle: '五个时期',
+    erasNav: '时期导航',
+    source: '出处',
+    paperLink: '文献页',
+    footnote:
+      '里程碑与传承关系依据综述写作中整理的时间线，书目信息经 Crossref、出版方、CEUR 与 W3C 页面核对。2025 年以后的条目反映的是当前进展。',
+    papers: '查看全部论文与代码仓库',
+  },
+  en: {
+    title: 'History',
+    meta: `The history of virtual knowledge graphs, from data integration theory to OBDA, OBDM, VKG and OBDF: ${counts.milestones} milestones in five eras.`,
+    label: 'History',
+    heading: 'Two decades of one idea',
+    lede: `Data stays where it is, and an ontology with mappings provides a unified view of it. The idea took shape in the early 2000s and has since been called OBDA, OBDI, OBDM, VKG and OBDF. This page gives a panorama of ${counts.milestones} milestones since 2002 and then walks through them in five eras.`,
+    stats: [
+      [counts.milestones, 'milestones'],
+      [counts.eras, 'eras'],
+      [counts.names, 'names'],
+    ],
+    panoramaTitle: 'Panorama',
+    panoramaText:
+      'Five lanes run in parallel: paradigms, systems and industry, theory and standards, sources in time and space, and evolution, updates and LLMs. Lines show how work builds on earlier work.',
+    namesTitle: 'How the name changed',
+    namesText:
+      'Different periods and communities gave the same family of methods different names, each with its own emphasis. Select a name to locate its milestone in the panorama.',
+    erasTitle: 'Five eras',
+    erasNav: 'Eras',
+    source: 'Source',
+    paperLink: 'Papers page',
+    footnote:
+      'Milestones and lineages follow a timeline compiled for a survey in preparation; bibliographic data was checked against Crossref, publishers, CEUR and W3C. Entries from 2025 on reflect current work.',
+    papers: 'All papers and repositories',
+  },
+}[lang];
+---
+
+<BaseLayout title={t.title} description={t.meta}>
+  <section class="hero" data-history-hero>
+    <div class="hero-bg dot-grid" aria-hidden="true"></div>
+    <div class="container hero-inner">
+      <p class="hero-label">{t.label}</p>
+      <h1>
+        <span class="acronym" data-acronym={JSON.stringify(ACRONYMS)} aria-hidden="true">
+          OBDA
+        </span>
+        <span class="heading">{t.heading}</span>
+      </h1>
+      <p class="lede">{t.lede}</p>
+      <dl class="stats">
+        {t.stats.map(([n, label]) => (
+          <div>
+            <dt>{label}</dt>
+            <dd>{n}</dd>
+          </div>
+        ))}
+      </dl>
+      <span class="years" aria-hidden="true">
+        2002 — 2026
+      </span>
+    </div>
+  </section>
+
+  <section class="section-block container" aria-labelledby="panorama-title">
+    <header class="block-head" data-reveal>
+      <h2 id="panorama-title">{t.panoramaTitle}</h2>
+      <p>{t.panoramaText}</p>
+    </header>
+    <Panorama />
+  </section>
+
+  <section class="section-block container" aria-labelledby="names-title">
+    <header class="block-head" data-reveal>
+      <h2 id="names-title">{t.namesTitle}</h2>
+      <p>{t.namesText}</p>
+    </header>
+    <ol class="names" role="list">
+      {NAMES.map((name, i) => (
+        <li data-reveal style={`--reveal-delay:${i * 60}ms`}>
+          <button type="button" class="name" data-locate={name.milestone}>
+            <span class="name-year">{name.year}</span>
+            <span class="name-term">{name.term[lang]}</span>
+            <span class="name-focus">{name.focus[lang]}</span>
+          </button>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <section class="section-block container" aria-labelledby="eras-title">
+    <header class="block-head" data-reveal>
+      <h2 id="eras-title">{t.erasTitle}</h2>
+    </header>
+    <div class="eras" data-eras>
+      <nav class="era-nav" aria-label={t.erasNav}>
+        <span class="era-year" data-era-year aria-hidden="true">
+          {ERAS[0].from}
+        </span>
+        <ol role="list">
+          {eras.map((era, i) => (
+            <li>
+              <a href={`#era-${era.id}`} data-era-link={era.id}>
+                <span class="era-num">{NUMERALS[i]}</span>
+                <span class="era-name">{era.title[lang]}</span>
+                <span class="era-span">
+                  {era.from}–{era.to}
+                </span>
+              </a>
+            </li>
+          ))}
+        </ol>
+        <span class="era-progress" aria-hidden="true">
+          <span data-era-progress></span>
+        </span>
+      </nav>
+
+      <div class="era-list">
+        {eras.map((era, i) => (
+          <article class="era" id={`era-${era.id}`} data-era-section={era.id} data-from={era.from}>
+            <span class="era-ghost" aria-hidden="true">
+              {era.from}–{String(era.to).slice(2)}
+            </span>
+            <header class="era-head" data-reveal>
+              <p class="era-kicker">
+                {NUMERALS[i]} {era.from}–{era.to}
+              </p>
+              <h3>{era.title[lang]}</h3>
+              <p class="era-lead">{era.lead[lang]}</p>
+            </header>
+            <EraFigure era={era.id as 'origins' | 'systems' | 'industry' | 'federation' | 'now'} />
+            <ol class="milestones" role="list">
+              {era.items.map((m, j) => (
+                <li
+                  class="milestone"
+                  id={`m-${m.id}`}
+                  data-milestone={m.id}
+                  data-reveal
+                  style={`--reveal-delay:${Math.min(j, 6) * 50}ms;--lane:var(--lane-${laneIndex(m.lane)})`}
+                >
+                  <span class="m-year">{m.year}</span>
+                  <div class="m-body">
+                    <h4>
+                      {m.label[lang]}
+                      <span class="m-lane">{LANES[laneIndex(m.lane)].label[lang]}</span>
+                    </h4>
+                    <p>{m.text[lang]}</p>
+                    <p class="m-cite">
+                      <a href={m.url} target="_blank" rel="noopener">
+                        {m.cite}
+                        <Icon name="arrow-up-right" size={12} />
+                      </a>
+                      {m.paper && (
+                        <a class="m-paper" href={localize(`/papers/#${m.paper}`, lang)}>
+                          {t.paperLink}
+                        </a>
+                      )}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </article>
+        ))}
+      </div>
+    </div>
+    <p class="footnote">
+      {t.footnote}
+      <a href={localize('/papers/', lang)}>{t.papers} →</a>
+    </p>
+  </section>
+</BaseLayout>
+
+<style>
+  /* 页首 */
+  .hero {
+    position: relative;
+    margin-top: calc(var(--header-h) * -1);
+    padding-top: calc(var(--header-h) + clamp(56px, 8vw, 104px));
+    padding-bottom: clamp(32px, 5vw, 56px);
+    overflow: hidden;
+  }
+
+  .hero-bg {
+    position: absolute;
+    inset: 0;
+    mask-image: radial-gradient(ellipse 70% 90% at 70% 10%, #000 20%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 70% 90% at 70% 10%, #000 20%, transparent 75%);
+  }
+
+  .hero-bg::after {
+    content: '';
+    position: absolute;
+    top: -30%;
+    right: 0;
+    width: 70%;
+    height: 120%;
+    background:
+      radial-gradient(closest-side at 60% 40%, var(--glow), transparent),
+      radial-gradient(
+        closest-side at 30% 70%,
+        color-mix(in srgb, var(--code-var) 22%, transparent),
+        transparent
+      );
+    filter: blur(60px);
+    opacity: 0.45;
+    animation: drift 18s ease-in-out infinite alternate;
+  }
+
+  @keyframes drift {
+    to {
+      transform: translate(-6%, 8%) rotate(8deg) scale(1.08);
+    }
+  }
+
+  .hero-inner {
+    position: relative;
+  }
+
+  .hero-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--accent-ink);
+  }
+
+  .hero-label::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--glow);
+  }
+
+  h1 {
+    display: grid;
+    gap: 8px;
+    margin-top: 20px;
+  }
+
+  .acronym {
+    font: 800 clamp(72px, 12vw, 150px) / 0.95 var(--font-sans);
+    letter-spacing: -0.05em;
+    background: linear-gradient(
+      100deg,
+      var(--ink) 25%,
+      color-mix(in srgb, var(--accent) 75%, var(--ink)) 50%,
+      var(--ink) 75%
+    );
+    background-size: 250% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: sheen 6s ease-in-out infinite;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @keyframes sheen {
+    0%,
+    20% {
+      background-position: 100% 0;
+    }
+    60%,
+    100% {
+      background-position: 0% 0;
+    }
+  }
+
+  .heading {
+    font-size: clamp(30px, 4.4vw, 52px);
+    font-weight: 750;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+  }
+
+  .lede {
+    max-width: 40em;
+    margin-top: 20px;
+    font-size: clamp(16px, 1.5vw, 18px);
+    color: var(--muted);
+  }
+
+  .stats {
+    display: flex;
+    gap: 12px 40px;
+    margin-top: 32px;
+  }
+
+  .stats dt {
+    order: 2;
+    font-size: 13px;
+    color: var(--faint);
+  }
+
+  .stats div {
+    display: flex;
+    flex-direction: column-reverse;
+  }
+
+  .stats dd {
+    font: 600 26px var(--font-mono);
+    color: var(--ink);
+  }
+
+  .years {
+    position: absolute;
+    right: 0;
+    bottom: -8px;
+    font: 800 clamp(48px, 9vw, 120px) / 1 var(--font-sans);
+    letter-spacing: -0.05em;
+    color: transparent;
+    -webkit-text-stroke: 1px var(--line-strong);
+    pointer-events: none;
+  }
+
+  /* 分区 */
+  .section-block {
+    padding-top: clamp(56px, 8vw, 96px);
+  }
+
+  .block-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 8px 40px;
+    align-items: baseline;
+    margin-bottom: 24px;
+  }
+
+  .block-head h2 {
+    font-size: clamp(26px, 3.4vw, 36px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .block-head p {
+    color: var(--muted);
+  }
+
+  /* 名称 */
+  .names {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .name {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    height: 100%;
+    padding: 14px 16px 16px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    text-align: left;
+    transition:
+      border-color 0.25s,
+      transform 0.3s var(--ease),
+      background-color 0.25s;
+  }
+
+  .name:hover {
+    border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+    background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+    transform: translateY(-2px);
+  }
+
+  .name-year {
+    font: 500 12px var(--font-mono);
+    color: var(--accent-ink);
+  }
+
+  .name-term {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .name-focus {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--muted);
+  }
+
+  /* 时期 */
+  .eras {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 48px;
+  }
+
+  .era-nav {
+    position: sticky;
+    top: calc(var(--header-h) + 32px);
+    align-self: start;
+    display: grid;
+    grid-template-columns: 2px minmax(0, 1fr);
+    column-gap: 18px;
+  }
+
+  .era-year {
+    grid-column: 1 / -1;
+    margin-bottom: 18px;
+    font: 800 56px / 1 var(--font-mono);
+    letter-spacing: -0.04em;
+    color: transparent;
+    -webkit-text-stroke: 1.2px var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .era-progress {
+    grid-column: 1;
+    grid-row: 2;
+    position: relative;
+    border-radius: 2px;
+    background: var(--line);
+    overflow: hidden;
+  }
+
+  .era-progress span {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 0;
+    background: linear-gradient(var(--accent), color-mix(in srgb, var(--accent) 30%, transparent));
+    box-shadow: 0 0 12px var(--glow);
+    transition: height 0.2s linear;
+  }
+
+  .era-nav ol {
+    grid-column: 2;
+    grid-row: 2;
+    display: grid;
+    gap: 4px;
+  }
+
+  .era-nav a {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 0 6px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    color: var(--muted);
+    transition:
+      color 0.2s,
+      background-color 0.2s;
+  }
+
+  .era-nav a:hover {
+    color: var(--ink);
+  }
+
+  .era-nav a.is-active {
+    color: var(--ink);
+    background: var(--accent-soft);
+  }
+
+  .era-num {
+    grid-row: span 2;
+    color: var(--accent-ink);
+  }
+
+  .era-name {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .era-span {
+    font: 12px var(--font-mono);
+    color: var(--faint);
+  }
+
+  .era {
+    position: relative;
+    padding-bottom: 56px;
+    scroll-margin-top: calc(var(--header-h) + 24px);
+  }
+
+  .era + .era {
+    padding-top: 40px;
+    border-top: 1px solid var(--line);
+  }
+
+  .era-ghost {
+    position: absolute;
+    top: 10px;
+    right: 0;
+    font: 800 clamp(56px, 8vw, 104px) / 1 var(--font-sans);
+    letter-spacing: -0.05em;
+    color: transparent;
+    -webkit-text-stroke: 1px var(--line-strong);
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .era-kicker {
+    font: 500 13px var(--font-mono);
+    color: var(--accent-ink);
+  }
+
+  .era-head h3 {
+    margin-top: 6px;
+    font-size: clamp(24px, 3vw, 32px);
+    font-weight: 750;
+    letter-spacing: -0.02em;
+  }
+
+  .era-lead {
+    max-width: 42em;
+    margin-top: 12px;
+    color: var(--ink-2);
+  }
+
+  .milestones {
+    position: relative;
+    margin-top: 24px;
+  }
+
+  .milestones::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    left: 58px;
+    width: 1px;
+    background: linear-gradient(var(--line-strong), var(--line) 80%, transparent);
+  }
+
+  .milestone {
+    position: relative;
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr);
+    gap: 0 34px;
+    padding: 12px 0;
+    border-radius: 12px;
+    scroll-margin-top: calc(var(--header-h) + 80px);
+    transition: background-color 0.4s;
+  }
+
+  .milestone::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 54px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 2px solid var(--lane);
+    background: var(--bg);
+    box-shadow: 0 0 0 4px var(--bg);
+  }
+
+  .milestone.is-flash {
+    background: linear-gradient(90deg, var(--accent-soft), transparent 70%);
+  }
+
+  .m-year {
+    padding-top: 2px;
+    font: 600 13px var(--font-mono);
+    color: var(--faint);
+    text-align: right;
+  }
+
+  .m-body h4 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .m-lane {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--lane);
+  }
+
+  .m-body p {
+    margin-top: 4px;
+    font-size: 14.5px;
+    line-height: 1.7;
+    color: var(--muted);
+  }
+
+  .m-body .m-cite {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin-top: 4px;
+    font-size: 12.5px;
+  }
+
+  .m-cite a {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    color: var(--faint);
+    transition: color 0.2s;
+  }
+
+  .m-cite a:hover {
+    color: var(--accent-ink);
+  }
+
+  .m-cite .m-paper {
+    color: var(--accent-ink);
+  }
+
+  .footnote {
+    margin: 8px 0 clamp(72px, 10vw, 128px);
+    font-size: 13px;
+    color: var(--faint);
+  }
+
+  .footnote a {
+    margin-left: 6px;
+    color: var(--accent-ink);
+  }
+
+  .eras {
+    --lane-0: #49bbdd;
+    --lane-1: #e6c07b;
+    --lane-2: #9aa8ff;
+    --lane-3: #7fd38a;
+    --lane-4: #f29fb8;
+  }
+
+  :global([data-theme='light']) .eras {
+    --lane-0: #1689ad;
+    --lane-1: #b5862c;
+    --lane-2: #5560d6;
+    --lane-3: #2f9a46;
+    --lane-4: #c54a72;
+  }
+
+  @media (max-width: 1080px) {
+    .names {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 860px) {
+    .block-head {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .eras {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 24px;
+    }
+
+    .era-nav {
+      position: static;
+      display: block;
+    }
+
+    .era-year,
+    .era-progress {
+      display: none;
+    }
+
+    .era-nav ol {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .era-nav a {
+      white-space: nowrap;
+      border: 1px solid var(--line);
+    }
+
+    .era-ghost {
+      font-size: 44px;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .names {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .years {
+      display: none;
+    }
+
+    .milestones::before {
+      left: 50px;
+    }
+
+    .milestone {
+      grid-template-columns: 38px minmax(0, 1fr);
+      gap: 0 28px;
+    }
+
+    .milestone::before {
+      left: 46px;
+    }
+  }
+</style>
