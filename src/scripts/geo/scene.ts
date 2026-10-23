@@ -11,6 +11,8 @@ import type { Line2 } from 'three/addons/lines/Line2.js';
 import { CITY, FACILITY_CLASS, type Building, type City } from '../../lib/geo/city';
 import { rectCenter, type Point } from '../../lib/geo/spatial';
 import type { Focus, LayerPlan } from '../../lib/geo/queries';
+import { term } from '../../lib/geo/names';
+import { tr } from '../../i18n/runtime';
 import { createStage, type Pin } from '../three/stage';
 import {
   ACCENT,
@@ -126,13 +128,13 @@ export function createGeoScene(
 
   for (const station of city.stations) {
     stage.addPin(
-      `<b>M</b>${escapeHtml(station.name)}`,
+      `<b>M</b>${escapeHtml(term(station.name))}`,
       toWorld(station.location, 34),
       'pin-station',
       'city',
     );
   }
-  stage.addPin(escapeHtml(park.name), toWorld({ x: 800, y: 470 }, 14), 'pin-park', 'city');
+  stage.addPin(escapeHtml(term(park.name)), toWorld({ x: 800, y: 470 }, 14), 'pin-park', 'city');
 
   // ── 分层结构（静态部分） ──
   // 所有分层元素放在 layerRoot 中，以“完全展开”的坐标建模；切换视图时缩放其高度。
@@ -248,25 +250,31 @@ export function createGeoScene(
   // 各层标签
   const layerLabel = (title: string, note: string) => `<b>${title}</b><span>${note}</span>`;
   stage.addPin(
-    layerLabel('本体', 'TBox：类与类之间的关系'),
+    layerLabel(
+      tr('本体', 'Ontology'),
+      tr('TBox：类与类之间的关系', 'TBox: relations between classes'),
+    ),
     new THREE.Vector3(-ONTOLOGY_HALF.w, LAYER.ontology, ONTOLOGY_HALF.d),
     'pin-layer pin-layer-onto',
     'layers',
   );
   stage.addPin(
-    layerLabel('虚拟知识图谱', '实体按需生成，不做物化'),
+    layerLabel(
+      tr('虚拟知识图谱', 'Virtual knowledge graph'),
+      tr('实体按需生成，不做物化', 'Entities generated on demand, not materialized'),
+    ),
     new THREE.Vector3(-HALF_W, LAYER.graph, HALF_D),
     'pin-layer pin-layer-graph',
     'layers',
   );
   stage.addPin(
-    layerLabel('映射', 'SQL 结果 → RDF 三元组'),
+    layerLabel(tr('映射', 'Mappings'), tr('SQL 结果 → RDF 三元组', 'SQL results → RDF triples')),
     new THREE.Vector3(-HALF_W, LAYER.mapping, HALF_D),
     'pin-layer pin-layer-map',
     'layers',
   );
   stage.addPin(
-    layerLabel('数据源 · PostGIS', 'buildings / stations / parks'),
+    layerLabel(tr('数据源 · PostGIS', 'Data source · PostGIS'), 'buildings / stations / parks'),
     new THREE.Vector3(-HALF_W, 0, HALF_D),
     'pin-layer pin-layer-data',
     'layers',
@@ -529,7 +537,10 @@ export function createGeoScene(
       if (!gates.has(entity.mapping)) {
         gates.add(entity.mapping);
         const pin = stage.addPin(
-          `<code>${escapeHtml(entity.mapping)}</code> 映射`,
+          tr(
+            `<code>${escapeHtml(entity.mapping)}</code> 映射`,
+            `<code>${escapeHtml(entity.mapping)}</code> mapping`,
+          ),
           gatePosition.clone().setY(LAYER.mapping + 10),
           'pin-gate pin-chain',
           'layers',
@@ -640,7 +651,7 @@ export function createGeoScene(
     const ink = PALETTE[mode].ink;
     if (!hits.has(id)) {
       stage.addPin(
-        escapeHtml(building.name),
+        escapeHtml(term(building.name)),
         toWorld(rectCenter(building.footprint), BLOCK_HEIGHT + heightOf(building) + 10),
         'pin-selected',
         'city',
@@ -661,7 +672,7 @@ export function createGeoScene(
       );
     }
     stage.addPin(
-      label ?? escapeHtml(building.name),
+      label ?? escapeHtml(term(building.name)),
       anchor.graph.clone().setY(LAYER.graph + 16),
       'pin-selected pin-selected-graph',
       'layers',

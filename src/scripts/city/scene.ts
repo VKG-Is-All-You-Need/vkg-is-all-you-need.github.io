@@ -8,6 +8,8 @@
  * - 分层：底部是八个独立的数据源，向上依次为映射、虚拟知识图谱与本体。查询结果中的每个实体都连到
  *   描述它的数据源；连到多个数据源的实体，就是融合的结果。
  */
+import { tr } from '../../i18n/runtime';
+import { term } from '../../lib/geo/names';
 import * as THREE from 'three';
 import type { Line2 } from 'three/addons/lines/Line2.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -186,7 +188,7 @@ const sourceDots = (ids: SourceId[]) =>
   `<span class="dots">${ids.map((id) => `<i style="--c:${sourceById.get(id)!.color}"></i>`).join('')}</span>`;
 /** 数据源标签显示联邦查询引擎中的 catalog 名，与查询改写中的表名前缀一致。 */
 const sourcePin = (source: DataSource, on: boolean) =>
-  `<b>${escapeHtml(source.catalog)}</b>${on ? '' : '<span>未接入</span>'}`;
+  `<b>${escapeHtml(source.catalog)}</b>${on ? '' : `<span>${tr('未接入', 'not connected')}</span>`}`;
 
 function flatRing(inner: number, outer: number, color: THREE.ColorRepresentation, opacity: number) {
   const mesh = new THREE.Mesh(
@@ -282,13 +284,13 @@ export function createCityScene(
   const basePins = [
     ...city.stations.map((station) =>
       stage.addPin(
-        `<b>M</b>${escapeHtml(station.name)}`,
+        `<b>M</b>${escapeHtml(term(station.name))}`,
         toWorld(station.location, 34),
         'pin-station',
         'city',
       ),
     ),
-    stage.addPin(escapeHtml(park.name), toWorld({ x: 800, y: 470 }, 14), 'pin-park', 'city'),
+    stage.addPin(escapeHtml(term(park.name)), toWorld({ x: 800, y: 470 }, 14), 'pin-park', 'city'),
   ];
 
   // 路灯：沿路段两侧
@@ -438,7 +440,7 @@ export function createCityScene(
     scene.add(ring);
     const roof = atPark ? BLOCK_HEIGHT : roofOf(buildingOf(event.venue.id));
     const pin = stage.addPin(
-      `<b>${escapeHtml(event.title)}</b><span>${event.attendees.length} 人报名</span>`,
+      `<b>${escapeHtml(term(event.title))}</b><span>${tr(`${event.attendees.length} 人报名`, `${event.attendees.length} signed up`)}</span>`,
       toWorld(at, roof + 16),
       'pin-event',
       'city',
@@ -497,7 +499,7 @@ export function createCityScene(
   mast.castShadow = shelter.castShadow = true;
   scene.add(stationGroup);
   const stationPin = stage.addPin(
-    `<b>气象站</b><span>${escapeHtml(STATION.id)}</span>`,
+    `<b>${tr('气象站', 'Weather station')}</b><span>${escapeHtml(STATION.id)}</span>`,
     toWorld(STATION.at, BLOCK_HEIGHT + 34),
     'pin-weather',
     'city',
@@ -1166,25 +1168,37 @@ export function createCityScene(
 
   const layerLabel = (title: string, note: string) => `<b>${title}</b><span>${note}</span>`;
   stage.addPin(
-    layerLabel('本体', 'TBox：类与类之间的关系'),
+    layerLabel(
+      tr('本体', 'Ontology'),
+      tr('TBox：类与类之间的关系', 'TBox: relations between classes'),
+    ),
     new THREE.Vector3(-ONTOLOGY_HALF.w, LAYER.ontology, ONTOLOGY_HALF.d),
     'pin-layer pin-layer-onto',
     'layers',
   );
   stage.addPin(
-    layerLabel('虚拟知识图谱', '同一 IRI 的记录汇合为一个实体'),
+    layerLabel(
+      tr('虚拟知识图谱', 'Virtual knowledge graph'),
+      tr('同一 IRI 的记录汇合为一个实体', 'Records with the same IRI merge into one entity'),
+    ),
     new THREE.Vector3(-HALF_W, LAYER.graph, HALF_D),
     'pin-layer pin-layer-graph',
     'layers',
   );
   stage.addPin(
-    layerLabel('映射', '每个数据源各有一组映射'),
+    layerLabel(
+      tr('映射', 'Mappings'),
+      tr('每个数据源各有一组映射', 'One set of mappings per source'),
+    ),
     new THREE.Vector3(-HALF_W, LAYER.mapping, HALF_D),
     'pin-layer pin-layer-map',
     'layers',
   );
   stage.addPin(
-    layerLabel('数据源', '八个独立系统，查询时访问'),
+    layerLabel(
+      tr('数据源', 'Data sources'),
+      tr('八个独立系统，查询时访问', 'Eight independent systems, accessed at query time'),
+    ),
     new THREE.Vector3(-HALF_W, 0, HALF_D),
     'pin-layer pin-layer-data',
     'layers',
@@ -2154,12 +2168,15 @@ export function createCityScene(
       const leg = personAt(lead.person.id, simT)!.leg;
       const plate =
         leg.vehicle && isRide(leg.mode) && fade.traffic > 0.5
-          ? `（${vehicleViewById.get(leg.vehicle)!.vehicle.plate}）`
+          ? tr(
+              `（${vehicleViewById.get(leg.vehicle)!.vehicle.plate}）`,
+              ` (${term(vehicleViewById.get(leg.vehicle)!.vehicle.plate)})`,
+            )
           : '';
       const activity = `${leg.label}${plate}`;
       const label = `${members.map((m) => `<i style="--c:${m.person.color}"></i>`).join('')}<b>${members
-        .map((m) => escapeHtml(m.person.name!))
-        .join('、')}</b><span>${escapeHtml(activity)}</span>`;
+        .map((m) => escapeHtml(term(m.person.name!)))
+        .join(tr('、', ', '))}</b><span>${escapeHtml(activity)}</span>`;
       if (label !== lead.label) {
         lead.label = label;
         lead.pin.element.innerHTML = label;
@@ -2174,7 +2191,8 @@ export function createCityScene(
       entry.pin.shown = show && view.active;
       if (!entry.pin.shown) continue;
       entry.pin.anchor.copy(view.position).setY(14);
-      const text = `<b>${escapeHtml(entry.vehicle.plate)}</b><span>${busLoad(entry.vehicle.id, simT)} 人</span>`;
+      const load = busLoad(entry.vehicle.id, simT);
+      const text = `<b>${escapeHtml(term(entry.vehicle.plate))}</b><span>${tr(`${load} 人`, `${load} on board`)}</span>`;
       if (text !== entry.text) {
         entry.text = text;
         entry.pin.element.innerHTML = text;

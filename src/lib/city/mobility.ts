@@ -4,7 +4,9 @@
  * 步行沿人行道，在路口等灯；乘车时人的位置就是车的位置，自驾、打车与公交的时刻都取自交通模拟（traffic.ts），
  * 人与所乘车辆因此始终一致。各数据源的记录（records.ts）都从这里派生。
  */
+import { tr } from '../../i18n/runtime';
 import { city, type Building } from '../geo/city';
+import { term } from '../geo/names';
 import { pointInPolygon, rectCenter, type Point } from '../geo/spatial';
 import { shopById, shops, type Shop } from './commerce';
 import {
@@ -243,7 +245,12 @@ function realize(person: Person, steps: Step[], day: number): Leg[] {
     if (!trip) return false;
     const curb = pos ? boardingCurb(trip) : null;
     if (pos && curb) {
-      walkTo(curb, mode === 'taxi' ? '步行至上车点' : '步行至车旁');
+      walkTo(
+        curb,
+        mode === 'taxi'
+          ? tr('步行至上车点', 'Walk to the pickup point')
+          : tr('步行至车旁', 'Walk to the car'),
+      );
       if (t > trip.pickup + 1) {
         realizeIssues.push(`${person.id} 晚到 ${Math.round(t - trip.pickup)} 秒：${trip.id}`);
       }
@@ -324,7 +331,7 @@ function realize(person: Person, steps: Step[], day: number): Leg[] {
       }
       case 'bus': {
         const platform = platformOf(step.from);
-        walkTo(platform, '步行至公交站');
+        walkTo(platform, tr('步行至公交站', 'Walk to the bus stop'));
         const ride = catchBus(day, step.from, step.to, t + 15);
         if (!ride) {
           // 末班车已过：步行
@@ -336,7 +343,7 @@ function realize(person: Person, steps: Step[], day: number): Leg[] {
           end: ride.board.depart,
           mode: 'wait',
           path: [platform],
-          label: '等公交',
+          label: tr('等公交', 'Wait for the bus'),
         });
         legs.push({
           start: ride.board.depart,
@@ -354,13 +361,14 @@ function realize(person: Person, steps: Step[], day: number): Leg[] {
       case 'drive':
       case 'ride': {
         const trip = indexOf(day).trips.get(step.trip);
-        const label = step.type === 'drive' ? step.label : '同车';
-        board(trip, step.type, label, '上车');
+        const label = step.type === 'drive' ? step.label : tr('同车', 'Riding along');
+        board(trip, step.type, label, tr('上车', 'Getting in'));
         break;
       }
       case 'taxi': {
         const trip = indexOf(day).trips.get(step.trip);
-        if (board(trip, 'taxi', step.label, '等候网约车')) break;
+        if (board(trip, 'taxi', step.label, tr('等候网约车', 'Wait for the ride-hailing car')))
+          break;
         // 没有叫到车：留在街区内的步行前往目的地，要离开的走去最近的地铁站
         const next = steps[i + 1];
         if (pos && next?.type === 'leave') {
@@ -368,7 +376,7 @@ function realize(person: Person, steps: Step[], day: number): Leg[] {
           const from = pos;
           walkTo(
             exits.reduce((a, b) => (distance(a, from) < distance(b, from) ? a : b)),
-            '改乘地铁',
+            tr('改乘地铁', 'Walk to the metro instead'),
           );
         }
         break;
@@ -395,7 +403,7 @@ function crewLegs(person: Person, stints: Stint[], day: number): Leg[] {
       end: t,
       mode: 'home',
       path: [home],
-      label: '在家',
+      label: tr('在家', 'At home'),
       building: buildingAt(home)!.id,
     });
   const walk = (target: Point, start: number, label: string) => {
@@ -417,16 +425,28 @@ function crewLegs(person: Person, stints: Stint[], day: number): Leg[] {
       );
       pos = exit;
       const lead = walkSeconds(walkRoute(exit, platform), person.pace);
-      t = walk(platform, stint.start - lead - 120, '步行至公交站');
-      legs.push({ start: t, end: stint.start, mode: 'wait', path: [platform], label: '等候接班' });
+      t = walk(platform, stint.start - lead - 120, tr('步行至公交站', 'Walk to the bus stop'));
+      legs.push({
+        start: t,
+        end: stint.start,
+        mode: 'wait',
+        path: [platform],
+        label: tr('等候接班', 'Wait to take over the bus'),
+      });
     } else if (pos && home) {
       // 王磊：从家走到车旁
       const curb = curbOf(vehicle.id, stint.start + 0.5)!;
       const lead = walkSeconds(walkRoute(pos, curb), person.pace);
       legs[legs.length - 1].end = stint.start - lead;
-      t = walk(curb, stint.start - lead, '步行至车旁');
+      t = walk(curb, stint.start - lead, tr('步行至车旁', 'Walk to the car'));
       if (stint.start > t) {
-        legs.push({ start: t, end: stint.start, mode: 'wait', path: [curb], label: '上车' });
+        legs.push({
+          start: t,
+          end: stint.start,
+          mode: 'wait',
+          path: [curb],
+          label: tr('上车', 'Getting in'),
+        });
       }
     }
     // 配送：停车后把货送进店里再回到车上
@@ -437,20 +457,24 @@ function crewLegs(person: Person, stints: Stint[], day: number): Leg[] {
     const mode: LegMode = driving ? 'drive' : 'ride';
     const label = driving
       ? vehicle.kind === 'bus'
-        ? `驾驶${vehicle.plate}`
+        ? tr(`驾驶${vehicle.plate}`, `Driving ${term(vehicle.plate)}`)
         : vehicle.kind === 'van'
-          ? '驾驶配送车'
+          ? tr('驾驶配送车', 'Driving the delivery van')
           : vehicle.kind === 'taxi'
-            ? '开网约车'
-            : '驾车路过'
-      : '同车路过';
+            ? tr('开网约车', 'Driving a ride-hailing car')
+            : tr('驾车路过', 'Driving through the district')
+      : tr('同车路过', 'Passing through as a passenger');
     for (const drop of drops) {
       legs.push({ start: t, end: drop.start, mode, path: [], label, vehicle: vehicle.id });
       const shop = shopById.get(drop.shop)!;
       const door = doorOf(buildingById.get(shop.buildingId)!);
       const curb = curbAt(drop.at);
       pos = curb;
-      const arrive = walk(door, drop.start, `送货到${shop.name}`);
+      const arrive = walk(
+        door,
+        drop.start,
+        tr(`送货到${shop.name}`, `Deliver to ${term(shop.name)}`),
+      );
       const back = walkSeconds(walkRoute(door, curb), person.pace);
       const leave = Math.max(arrive, drop.end - back);
       legs.push({
@@ -458,18 +482,18 @@ function crewLegs(person: Person, stints: Stint[], day: number): Leg[] {
         end: leave,
         mode: 'deliver',
         path: [shopCenter(shop)],
-        label: `在${shop.name}卸货`,
+        label: tr(`在${shop.name}卸货`, `Unloading at ${term(shop.name)}`),
         building: shop.buildingId,
         shop: shop.id,
       });
-      const returned = walk(curb, leave, '回到车上');
+      const returned = walk(curb, leave, tr('回到车上', 'Back to the van'));
       if (drop.end > returned) {
         legs.push({
           start: returned,
           end: drop.end,
           mode: 'wait',
           path: [curb],
-          label: '回到车上',
+          label: tr('回到车上', 'Back to the van'),
         });
       }
       t = drop.end;
@@ -485,18 +509,18 @@ function crewLegs(person: Person, stints: Stint[], day: number): Leg[] {
         distance(q, platform) < distance(best, platform) ? q : best,
       );
       pos = platform;
-      walk(exit, t, '步行至湖滨站');
+      walk(exit, t, tr('步行至湖滨站', 'Walk to Lakeside Station'));
       pos = null;
     }
     if (home && stint === stints.at(-1)) {
       pos = curbOf(vehicle.id, stint.end - 0.5)!;
-      t = walk(doorOf(buildingAt(home)!), t, '步行回家');
+      t = walk(doorOf(buildingAt(home)!), t, tr('步行回家', 'Walk home'));
       legs.push({
         start: t,
         end: (day + 1) * DAY,
         mode: 'home',
         path: [home],
-        label: '在家',
+        label: tr('在家', 'At home'),
         building: buildingAt(home)!.id,
       });
     }
@@ -545,7 +569,7 @@ function schedule(id: string, day: number) {
     walk: (minutes: number, to: Point, label: string) =>
       add(scriptedWalk(pos, to, cursor + minutes * 60, label)),
     /** 待到当天结束。 */
-    rest: (place: Point, label = '在家') =>
+    rest: (place: Point, label = tr('在家', 'At home')) =>
       add({ end: time(24), mode: 'home', path: [place], label, building: inside(place) }),
     /** 计划中的出发（自驾）或下单（打车）时刻。 */
     departure: (tripId: string) => personaTrips(day).find((t) => t.id === tripId)!.depart,
@@ -553,26 +577,42 @@ function schedule(id: string, day: number) {
     drive: (tripId: string, label: string, to: Point) => {
       const t = trip(tripId);
       if (!t) return;
-      reach(boardingCurb(t)!, t.pickup, '步行至车旁');
-      if (t.pickup > cursor) add({ end: t.pickup, mode: 'wait', path: [pos], label: '上车' });
+      reach(boardingCurb(t)!, t.pickup, tr('步行至车旁', 'Walk to the car'));
+      if (t.pickup > cursor)
+        add({ end: t.pickup, mode: 'wait', path: [pos], label: tr('上车', 'Getting in') });
       add({ end: t.arrive, mode: 'drive', path: [t.from, t.to], label, vehicle: t.vehicle });
       pos = curbOf(t.vehicle, t.arrive - 0.5)!;
-      add(scriptedWalk(pos, to, cursor + 120, '停车后步行'));
+      add(scriptedWalk(pos, to, cursor + 120, tr('停车后步行', 'Walk from the parked car')));
     },
     /** 打车：在路边等车，上车后随车行驶，下车后步行进入目的地。 */
     taxi: (tripId: string, label: string) => {
       const t = trip(tripId)!;
       const pickup = boardingCurb(t)!;
-      add({ end: cursor + 90, mode: 'walk', path: walkPoints(pos, pickup), label: '步行至路边' });
-      add({ end: t.pickup, mode: 'wait', path: [pickup], label: '等候网约车' });
+      add({
+        end: cursor + 90,
+        mode: 'walk',
+        path: walkPoints(pos, pickup),
+        label: tr('步行至路边', 'Walk to the curb'),
+      });
+      add({
+        end: t.pickup,
+        mode: 'wait',
+        path: [pickup],
+        label: tr('等候网约车', 'Wait for the ride-hailing car'),
+      });
       add({ end: t.arrive, mode: 'taxi', path: [t.from, t.to], label, vehicle: t.vehicle });
       pos = curbOf(t.vehicle, t.arrive - 0.5)!;
-      add(scriptedWalk(pos, t.to, cursor + 60, '下车后步行'));
+      add(scriptedWalk(pos, t.to, cursor + 60, tr('下车后步行', 'Walk from the drop-off')));
     },
     /** 公交：在站台等第一班车，到站下车。 */
     bus: (from: number, to: number, label: string) => {
       const ride = catchBus(day, from, to, cursor + 20)!;
-      add({ end: ride.board.depart, mode: 'wait', path: [platformOf(from)], label: '等公交' });
+      add({
+        end: ride.board.depart,
+        mode: 'wait',
+        path: [platformOf(from)],
+        label: tr('等公交', 'Wait for the bus'),
+      });
       add({
         end: alightTime(ride.alight),
         mode: 'bus',
@@ -583,7 +623,12 @@ function schedule(id: string, day: number) {
       });
     },
     /** 在店里购物若干分钟。 */
-    shop: (shop: Shop, minutes: number, amount: number, label = `在${shop.name}购物`) =>
+    shop: (
+      shop: Shop,
+      minutes: number,
+      amount: number,
+      label = tr(`在${shop.name}购物`, `Shopping at ${term(shop.name)}`),
+    ) =>
       add({
         end: cursor + minutes * 60,
         mode: 'shop',
@@ -617,39 +662,60 @@ const PLANS: Record<string, Plan> = {
       return p.legs;
     }
     if (day === 5) {
-      p.stay('home', p.time(9, 30), home, '在家');
-      p.walk(12, S('北站'), '步行至北站');
-      p.move('metro', 26, [S('北站'), S('中心站'), S('湖滨站')], '地铁 1 号线换 2 号线');
-      p.walk(8, PLACES.market, '步行至周末市集');
-      p.stay('event', p.time(12), PLACES.market, '周末市集');
-      p.walk(8, S('湖滨站'), '步行至湖滨站');
-      p.move('metro', 26, [S('湖滨站'), S('中心站'), S('北站')], '地铁 2 号线换 1 号线');
-      p.walk(12, home, '步行回家');
+      p.stay('home', p.time(9, 30), home, tr('在家', 'At home'));
+      p.walk(12, S('北站'), tr('步行至北站', 'Walk to North Station'));
+      p.move(
+        'metro',
+        26,
+        [S('北站'), S('中心站'), S('湖滨站')],
+        tr('地铁 1 号线换 2 号线', 'Metro Line 1, change to Line 2'),
+      );
+      p.walk(8, PLACES.market, tr('步行至周末市集', 'Walk to the weekend market'));
+      p.stay('event', p.time(12), PLACES.market, term('周末市集'));
+      p.walk(8, S('湖滨站'), tr('步行至湖滨站', 'Walk to Lakeside Station'));
+      p.move(
+        'metro',
+        26,
+        [S('湖滨站'), S('中心站'), S('北站')],
+        tr('地铁 2 号线换 1 号线', 'Metro Line 2, change to Line 1'),
+      );
+      p.walk(12, home, tr('步行回家', 'Walk home'));
       p.rest(home);
       return p.legs;
     }
     const [, off] = personaShift('P01', day)!;
-    p.stay('home', p.time(7, 50), home, '在家');
-    p.walk(12, S('北站'), '步行至北站');
-    p.move('metro', 18, [S('北站'), S('中心站')], '地铁 1 号线');
-    p.walk(8, PLACES.office, '步行至中央大厦');
-    p.stay('work', off, PLACES.office, day === 3 ? '在星河科技工作（加班）' : '在星河科技工作');
+    p.stay('home', p.time(7, 50), home, tr('在家', 'At home'));
+    p.walk(12, S('北站'), tr('步行至北站', 'Walk to North Station'));
+    p.move('metro', 18, [S('北站'), S('中心站')], tr('地铁 1 号线', 'Metro Line 1'));
+    p.walk(8, PLACES.office, tr('步行至中央大厦', 'Walk to Central Tower'));
+    p.stay(
+      'work',
+      off,
+      PLACES.office,
+      day === 3
+        ? tr('在星河科技工作（加班）', 'Working at Galaxy Tech (overtime)')
+        : tr('在星河科技工作', 'Working at Galaxy Tech'),
+    );
     if (day === 1) {
-      p.walk(10, PLACES.cafe, '步行至拾光咖啡');
-      p.stay('event', p.time(20, 10), PLACES.cafe, '读书会');
-      p.walk(6, S('中心站'), '步行至中心站');
+      p.walk(10, PLACES.cafe, tr('步行至拾光咖啡', 'Walk to Glimmer Cafe'));
+      p.stay('event', p.time(20, 10), PLACES.cafe, term('读书会'));
+      p.walk(6, S('中心站'), tr('步行至中心站', 'Walk to Central Station'));
     } else if (day === 2) {
       const mall = shopNamed('星河商场');
-      p.walk(4, platformOf(STOP_WEST), '步行至公交站');
-      p.bus(STOP_WEST, STOP_MALL, '乘公交至中央大道 × 文华街');
-      p.walk(3, PLACES.mall, '步行至星河商场');
+      p.walk(4, platformOf(STOP_WEST), tr('步行至公交站', 'Walk to the bus stop'));
+      p.bus(
+        STOP_WEST,
+        STOP_MALL,
+        tr('乘公交至中央大道 × 文华街', 'Bus to Central Avenue × Culture Street'),
+      );
+      p.walk(3, PLACES.mall, tr('步行至星河商场', 'Walk to Galaxy Mall'));
       p.shop(mall, 35, 268);
-      p.walk(6, S('中心站'), '步行至中心站');
+      p.walk(6, S('中心站'), tr('步行至中心站', 'Walk to Central Station'));
     } else {
-      p.walk(8, S('中心站'), '步行至中心站');
+      p.walk(8, S('中心站'), tr('步行至中心站', 'Walk to Central Station'));
     }
-    p.move('metro', 18, [S('中心站'), S('北站')], '地铁 1 号线');
-    p.walk(12, home, '步行回家');
+    p.move('metro', 18, [S('中心站'), S('北站')], tr('地铁 1 号线', 'Metro Line 1'));
+    p.walk(12, home, tr('步行回家', 'Walk home'));
     p.rest(home);
     return p.legs;
   },
@@ -658,38 +724,38 @@ const PLANS: Record<string, Plan> = {
     const p = schedule('P02', day);
     const home = homeOf('P02');
     if (day === 5) {
-      p.stay('home', p.time(10, 40), home, '在家');
-      p.walk(12, PLACES.market, '步行至周末市集');
-      p.stay('event', p.time(13), PLACES.market, '周末市集');
-      p.walk(12, home, '步行回家');
+      p.stay('home', p.time(10, 40), home, tr('在家', 'At home'));
+      p.walk(12, PLACES.market, tr('步行至周末市集', 'Walk to the weekend market'));
+      p.stay('event', p.time(13), PLACES.market, term('周末市集'));
+      p.walk(12, home, tr('步行回家', 'Walk home'));
       p.rest(home);
       return p.legs;
     }
     if (day === 6) {
-      p.stay('home', p.departure('P02-6-out'), home, '在家');
-      p.drive('P02-6-out', '开车去星河商场', PLACES.mall);
+      p.stay('home', p.departure('P02-6-out'), home, tr('在家', 'At home'));
+      p.drive('P02-6-out', tr('开车去星河商场', 'Drive to Galaxy Mall'), PLACES.mall);
       p.shop(
         shopNamed('星河商场'),
         Math.max(10, (p.departure('P02-6-back') - p.cursor) / 60 - 5),
         412,
       );
-      p.drive('P02-6-back', '开车回家', home);
+      p.drive('P02-6-back', tr('开车回家', 'Drive home'), home);
       p.rest(home);
       return p.legs;
     }
-    p.stay('home', p.departure(`P02-${day}-am`), home, '在家');
-    p.drive(`P02-${day}-am`, '开车上班', PLACES.office);
-    p.stay('work', p.time(18, 35), PLACES.office, '在星河科技工作');
+    p.stay('home', p.departure(`P02-${day}-am`), home, tr('在家', 'At home'));
+    p.drive(`P02-${day}-am`, tr('开车上班', 'Drive to work'), PLACES.office);
+    p.stay('work', p.time(18, 35), PLACES.office, tr('在星河科技工作', 'Working at Galaxy Tech'));
     if (day === 1) {
-      p.walk(10, PLACES.cafe, '步行至拾光咖啡');
-      p.stay('event', p.time(20, 10), PLACES.cafe, '读书会');
+      p.walk(10, PLACES.cafe, tr('步行至拾光咖啡', 'Walk to Glimmer Cafe'));
+      p.stay('event', p.time(20, 10), PLACES.cafe, term('读书会'));
     }
-    p.drive(`P02-${day}-pm`, '开车回家', home);
+    p.drive(`P02-${day}-pm`, tr('开车回家', 'Drive home'), home);
     if (day === 1 || day === 3) {
-      p.stay('home', p.time(20, 50), home, '在家');
-      p.walk(10, PLACES.parkGate, '步行至湖滨公园');
-      p.move('run', 40, loopFrom(PLACES.parkGate), '夜跑');
-      p.walk(12, home, '步行回家');
+      p.stay('home', p.time(20, 50), home, tr('在家', 'At home'));
+      p.walk(10, PLACES.parkGate, tr('步行至湖滨公园', 'Walk to Lakeside Park'));
+      p.move('run', 40, loopFrom(PLACES.parkGate), term('夜跑'));
+      p.walk(12, home, tr('步行回家', 'Walk home'));
     }
     p.rest(home);
     return p.legs;
@@ -699,12 +765,12 @@ const PLANS: Record<string, Plan> = {
     const p = schedule('P03', day);
     const home = homeOf('P03');
     if (day === 6) {
-      p.stay('home', p.departure('P03-6-taxi') - 90, home, '在家');
-      p.taxi('P03-6-taxi', '乘网约车去星河商场');
+      p.stay('home', p.departure('P03-6-taxi') - 90, home, tr('在家', 'At home'));
+      p.taxi('P03-6-taxi', tr('乘网约车去星河商场', 'Ride-hailing car to Galaxy Mall'));
       p.shop(shopNamed('星河商场'), 70, 189);
-      p.walk(3, platformOf(STOP_MALL), '步行至公交站');
-      p.bus(STOP_MALL, STOP_SOUTH, '乘公交回家');
-      p.walk(6, home, '步行回家');
+      p.walk(3, platformOf(STOP_MALL), tr('步行至公交站', 'Walk to the bus stop'));
+      p.bus(STOP_MALL, STOP_SOUTH, tr('乘公交回家', 'Bus home'));
+      p.walk(6, home, tr('步行回家', 'Walk home'));
       p.rest(home);
       return p.legs;
     }
@@ -712,22 +778,27 @@ const PLANS: Record<string, Plan> = {
       p.rest(home);
       return p.legs;
     }
-    p.stay('home', p.time(8, 50), home, '在家');
-    p.walk(20, PLACES.office, '步行上班');
-    p.stay('work', p.time(20, 40), PLACES.office, '在星河科技工作（加班）');
+    p.stay('home', p.time(8, 50), home, tr('在家', 'At home'));
+    p.walk(20, PLACES.office, tr('步行上班', 'Walk to work'));
+    p.stay(
+      'work',
+      p.time(20, 40),
+      PLACES.office,
+      tr('在星河科技工作（加班）', 'Working at Galaxy Tech (overtime)'),
+    );
     if (day === 1 || day === 3) {
-      p.walk(20, PLACES.parkGate, '步行至湖滨公园');
-      p.move('run', 40, loopFrom(PLACES.parkGate), '夜跑');
+      p.walk(20, PLACES.parkGate, tr('步行至湖滨公园', 'Walk to Lakeside Park'));
+      p.move('run', 40, loopFrom(PLACES.parkGate), term('夜跑'));
       if (day === 3) {
         const store = nearestShop(home, '便利店');
-        p.walk(12, shopCenter(store), `步行至${store.name}`);
+        p.walk(12, shopCenter(store), tr(`步行至${store.name}`, `Walk to ${term(store.name)}`));
         p.shop(store, 8, 36);
-        p.walk(6, home, '步行回家');
+        p.walk(6, home, tr('步行回家', 'Walk home'));
       } else {
-        p.walk(15, home, '步行回家');
+        p.walk(15, home, tr('步行回家', 'Walk home'));
       }
     } else {
-      p.walk(20, home, '步行回家');
+      p.walk(20, home, tr('步行回家', 'Walk home'));
     }
     p.rest(home);
     return p.legs;
@@ -737,23 +808,33 @@ const PLANS: Record<string, Plan> = {
     const p = schedule('P04', day);
     const home = homeOf('P04');
     if (day === 5) {
-      p.stay('home', p.time(10, 45), home, '在家');
-      p.walk(25, PLACES.market, '步行至周末市集');
-      p.stay('event', p.time(12, 30), PLACES.market, '周末市集');
-      p.walk(25, home, '步行回家');
+      p.stay('home', p.time(10, 45), home, tr('在家', 'At home'));
+      p.walk(25, PLACES.market, tr('步行至周末市集', 'Walk to the weekend market'));
+      p.stay('event', p.time(12, 30), PLACES.market, term('周末市集'));
+      p.walk(25, home, tr('步行回家', 'Walk home'));
       p.rest(home);
       return p.legs;
     }
-    p.stay('home', p.time(7, 12), home, '在家');
-    p.walk(13, PLACES.clinic, '步行上班');
+    p.stay('home', p.time(7, 12), home, tr('在家', 'At home'));
+    p.walk(13, PLACES.clinic, tr('步行上班', 'Walk to work'));
     if (day === 1) {
-      p.stay('work', p.departure('P04-1-taxi') - 90, PLACES.clinic, '在市立医院值班');
-      p.taxi('P04-1-taxi', '乘网约车去拾光咖啡');
-      p.stay('event', p.time(20, 10), PLACES.cafe, '读书会');
-      p.walk(14, home, '步行回家');
+      p.stay(
+        'work',
+        p.departure('P04-1-taxi') - 90,
+        PLACES.clinic,
+        tr('在市立医院值班', 'On shift at City Hospital'),
+      );
+      p.taxi('P04-1-taxi', tr('乘网约车去拾光咖啡', 'Ride-hailing car to Glimmer Cafe'));
+      p.stay('event', p.time(20, 10), PLACES.cafe, term('读书会'));
+      p.walk(14, home, tr('步行回家', 'Walk home'));
     } else {
-      p.stay('work', p.time(18, 5), PLACES.clinic, '在市立医院值班');
-      p.walk(13, home, '步行回家');
+      p.stay(
+        'work',
+        p.time(18, 5),
+        PLACES.clinic,
+        tr('在市立医院值班', 'On shift at City Hospital'),
+      );
+      p.walk(13, home, tr('步行回家', 'Walk home'));
     }
     p.rest(home);
     return p.legs;
@@ -762,20 +843,25 @@ const PLANS: Record<string, Plan> = {
   P06: (day) => {
     const p = schedule('P06', day);
     const home = homeOf('P06');
-    p.stay('home', day === 5 ? p.time(8, 15) : p.time(6, 40), home, '在家');
+    p.stay('home', day === 5 ? p.time(8, 15) : p.time(6, 40), home, tr('在家', 'At home'));
     if (day === 5) {
-      p.walk(25, PLACES.market, '步行至周末市集');
-      p.stay('event', p.time(16, 30), PLACES.market, '周末市集（摆摊）');
-      p.walk(20, PLACES.corner, '步行回店里');
+      p.walk(25, PLACES.market, tr('步行至周末市集', 'Walk to the weekend market'));
+      p.stay(
+        'event',
+        p.time(16, 30),
+        PLACES.market,
+        tr('周末市集（摆摊）', 'Weekend market (running a stall)'),
+      );
+      p.walk(20, PLACES.corner, tr('步行回店里', 'Walk back to the cafe'));
     } else {
-      p.walk(15, PLACES.corner, '步行至店里');
+      p.walk(15, PLACES.corner, tr('步行至店里', 'Walk to the cafe'));
     }
     if (day === 2) {
-      p.stay('work', p.time(15), PLACES.corner, '经营街角咖啡');
-      p.stay('event', p.time(16), PLACES.corner, '周末市集筹备会');
+      p.stay('work', p.time(15), PLACES.corner, tr('经营街角咖啡', 'Running Corner Cafe'));
+      p.stay('event', p.time(16), PLACES.corner, term('周末市集筹备会'));
     }
-    p.stay('work', p.time(21, 10), PLACES.corner, '经营街角咖啡');
-    p.walk(15, home, '步行回家');
+    p.stay('work', p.time(21, 10), PLACES.corner, tr('经营街角咖啡', 'Running Corner Cafe'));
+    p.walk(15, home, tr('步行回家', 'Walk home'));
     p.rest(home);
     return p.legs;
   },
@@ -955,7 +1041,7 @@ export function placeName(p: Point): string {
     ({ footprint: f }) =>
       p.x >= f.x - 2 && p.x <= f.x + f.w + 2 && p.y >= f.y - 2 && p.y <= f.y + f.h + 2,
   );
-  if (building) return building.name;
-  if (pointInPolygon(p, city.parks[0].area)) return city.parks[0].name;
-  return nearestNode(p).name;
+  if (building) return term(building.name);
+  if (pointInPolygon(p, city.parks[0].area)) return term(city.parks[0].name);
+  return term(nearestNode(p).name);
 }

@@ -2,16 +2,20 @@
  * “VKG × 地理信息”示例的页面控制：查询切换、结果列表、建筑详情、平面图与三维场景的按需加载。
  */
 import { city, CITY, FACILITY_CLASS, FLOOR_HEIGHT, type Building } from '../../lib/geo/city';
-import { queries, type GeoQuery, type QueryResult } from '../../lib/geo/queries';
+import { geoQueries, type GeoQuery, type QueryResult } from '../../lib/geo/queries';
+import { capitalize, term } from '../../lib/geo/names';
+import { tr } from '../../i18n/runtime';
 import { rectToWkt, type Point } from '../../lib/geo/spatial';
 import { highlight } from '../../lib/highlight';
 import { prefersReducedMotion } from '../lifecycle';
 import type { GeoScene, Mode, PlanView, View } from './scene';
 
 const byId = new Map(city.buildings.map((building) => [building.id, building]));
+const queries = geoQueries();
 const results = new Map<GeoQuery['id'], QueryResult>(
   queries.map((query) => [query.id, query.run(city)]),
 );
+const nameOf = (id: number) => term(byId.get(id)!.name);
 
 const escapeHtml = (text: string) =>
   text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -20,14 +24,18 @@ function triples(building: Building): string {
   const s = `:building/${building.id}`;
   const lines = [
     `${s} a :Building ;`,
-    `    :name "${building.name}" ;`,
-    `    :kind "${building.kind}" ;`,
+    `    :name "${term(building.name)}" ;`,
+    `    :kind "${term(building.kind)}" ;`,
     `    geo:hasGeometry ${s}/geom .`,
     `${s}/geom`,
     `    geo:asWKT "${rectToWkt(building.footprint)}"^^geo:wktLiteral .`,
   ];
   const facility = FACILITY_CLASS[building.kind];
-  if (facility) lines.push(`${s} a ${facility} .`, `# 经本体推出：${s} a :PublicFacility`);
+  if (facility)
+    lines.push(
+      `${s} a ${facility} .`,
+      `${tr('# 经本体推出：', '# inferred from the ontology: ')}${s} a :PublicFacility`,
+    );
   return lines.join('\n');
 }
 
@@ -188,11 +196,11 @@ export function initGeo(root: HTMLElement, signal: AbortSignal): void {
     const query = queries.find((q) => q.id === active)!;
     const result = results.get(active)!;
     const item = (hit: { id: number; detail: string }, miss = false) =>
-      `<li><button type="button" class="result${miss ? ' is-miss' : ''}${hit.id === selected ? ' is-selected' : ''}" data-select="${hit.id}"><span class="result-name">${escapeHtml(byId.get(hit.id)!.name)}</span><span class="result-detail">${escapeHtml(hit.detail)}</span></button></li>`;
+      `<li><button type="button" class="result${miss ? ' is-miss' : ''}${hit.id === selected ? ' is-selected' : ''}" data-select="${hit.id}"><span class="result-name">${escapeHtml(nameOf(hit.id))}</span><span class="result-detail">${escapeHtml(hit.detail)}</span></button></li>`;
     resultsBox.innerHTML = `
-      <p class="results-head">结果 <span>${result.hits.length} 项</span><code>${escapeHtml(query.feature)}</code></p>
+      <p class="results-head">${tr('结果', 'Results')} <span>${tr(`${result.hits.length} 项`, String(result.hits.length))}</span><code>${escapeHtml(query.feature)}</code></p>
       <ul role="list">${result.hits.map((hit) => item(hit)).join('')}</ul>
-      ${result.misses.length ? `<p class="results-sub">未满足条件</p><ul role="list">${result.misses.map((hit) => item(hit, true)).join('')}</ul>` : ''}`;
+      ${result.misses.length ? `<p class="results-sub">${tr('未满足条件', 'Not matching')}</p><ul role="list">${result.misses.map((hit) => item(hit, true)).join('')}</ul>` : ''}`;
   };
 
   const renderInfo = () => {
@@ -205,30 +213,31 @@ export function initGeo(root: HTMLElement, signal: AbortSignal): void {
     const result = results.get(active)!;
     const relation = [...result.hits, ...result.misses].find((hit) => hit.id === building.id);
     info.innerHTML = `
-      <p class="info-kind">${escapeHtml(building.kind)}${facility ? ` · ${facility} ⊑ :PublicFacility` : ''}</p>
-      <h3 class="info-title">${escapeHtml(building.name)}</h3>
-      <p class="info-meta">${building.floors} 层 · 约 ${Math.round(building.floors * FLOOR_HEIGHT)} 米${relation ? ` · ${escapeHtml(relation.detail)}` : ''}</p>
-      <p class="info-label">buildings 表中的记录</p>
+      <p class="info-kind">${escapeHtml(capitalize(term(building.kind)))}${facility ? ` · ${facility} ⊑ :PublicFacility` : ''}</p>
+      <h3 class="info-title">${escapeHtml(nameOf(building.id))}</h3>
+      <p class="info-meta">${tr(`${building.floors} 层 · 约 ${Math.round(building.floors * FLOOR_HEIGHT)} 米`, `${building.floors} floors · about ${Math.round(building.floors * FLOOR_HEIGHT)} m`)}${relation ? ` · ${escapeHtml(relation.detail)}` : ''}</p>
+      <p class="info-label">${tr('buildings 表中的记录', 'Row in the buildings table')}</p>
       <dl class="info-row">
         <div><dt>id</dt><dd>${building.id}</dd></div>
-        <div><dt>name</dt><dd>${escapeHtml(building.name)}</dd></div>
-        <div><dt>kind</dt><dd>${escapeHtml(building.kind)}</dd></div>
+        <div><dt>name</dt><dd>${escapeHtml(nameOf(building.id))}</dd></div>
+        <div><dt>kind</dt><dd>${escapeHtml(term(building.kind))}</dd></div>
         <div><dt>floors</dt><dd>${building.floors}</dd></div>
         <div><dt>footprint</dt><dd>${rectToWkt(building.footprint)}</dd></div>
       </dl>
-      <p class="info-label">映射生成的虚拟三元组</p>
+      <p class="info-label">${tr('映射生成的虚拟三元组', 'Virtual triples produced by the mappings')}</p>
       <pre class="code"><code>${highlight(triples(building))}</code></pre>
-      <button type="button" class="info-close" data-select="">返回说明</button>`;
+      <button type="button" class="info-close" data-select="">${tr('返回说明', 'Back to overview')}</button>`;
   };
 
   /** 分层视图中实体节点的标签：名称与 IRI。 */
   const entityLabel = (key: string) => {
     const [type, raw] = key.split(':');
     const id = Number(raw);
-    if (type === 'b') return `<b>${escapeHtml(byId.get(id)!.name)}</b><span>:building/${id}</span>`;
+    if (type === 'b') return `<b>${escapeHtml(nameOf(id))}</b><span>:building/${id}</span>`;
     // 地铁站与公园是查询的锚点，只显示名称以减少标签重叠
-    if (type === 's') return `<b>${escapeHtml(city.stations.find((s) => s.id === id)!.name)}</b>`;
-    return `<b>${escapeHtml(city.parks.find((p) => p.id === id)!.name)}</b>`;
+    if (type === 's')
+      return `<b>${escapeHtml(term(city.stations.find((s) => s.id === id)!.name))}</b>`;
+    return `<b>${escapeHtml(term(city.parks.find((p) => p.id === id)!.name))}</b>`;
   };
 
   const setPhase = (phase: number) => {
@@ -257,7 +266,7 @@ export function initGeo(root: HTMLElement, signal: AbortSignal): void {
     scene?.showQuery({
       hits: result.hits.map((hit) => ({
         id: hit.id,
-        label: `<b>${escapeHtml(byId.get(hit.id)!.name)}</b><span>${escapeHtml(hit.detail)}</span>`,
+        label: `<b>${escapeHtml(nameOf(hit.id))}</b><span>${escapeHtml(hit.detail)}</span>`,
       })),
       focus: result.focus,
       plan: result.plan,
@@ -275,7 +284,8 @@ export function initGeo(root: HTMLElement, signal: AbortSignal): void {
   const syncModeButton = () => {
     const current = mode();
     modeButton.setAttribute('aria-pressed', String(current === 'night'));
-    modeButton.querySelector('[data-label]')!.textContent = current === 'night' ? '夜晚' : '白天';
+    modeButton.querySelector('[data-label]')!.textContent =
+      current === 'night' ? tr('夜晚', 'Night') : tr('白天', 'Day');
   };
 
   // ── 事件 ──
@@ -336,7 +346,7 @@ export function initGeo(root: HTMLElement, signal: AbortSignal): void {
     root.dataset.view = sceneView;
     viewButton.setAttribute('aria-pressed', String(sceneView === 'layers'));
     viewButton.querySelector('[data-label]')!.textContent =
-      sceneView === 'layers' ? '分层' : '城市';
+      sceneView === 'layers' ? tr('分层', 'Layers') : tr('城市', 'City');
   };
   viewButton.addEventListener(
     'click',
@@ -366,8 +376,9 @@ export function initGeo(root: HTMLElement, signal: AbortSignal): void {
     stage.classList.toggle('is-pseudo-fullscreen', pseudoFullscreen);
     document.documentElement.classList.toggle('geo-locked', pseudoFullscreen);
     fullscreenButton.setAttribute('aria-pressed', String(active));
-    fullscreenButton.setAttribute('aria-label', active ? '退出全屏' : '全屏');
-    fullscreenButton.querySelector('[data-label]')!.textContent = active ? '退出全屏' : '全屏';
+    const label = active ? tr('退出全屏', 'Exit full screen') : tr('全屏', 'Full screen');
+    fullscreenButton.setAttribute('aria-label', label);
+    fullscreenButton.querySelector('[data-label]')!.textContent = label;
     drawPlan();
     // 画面比例变化较大：等下一帧完成布局与尺寸回调后再重新取景
     requestAnimationFrame(() => requestAnimationFrame(() => scene?.resetView()));
@@ -445,11 +456,14 @@ export function initGeo(root: HTMLElement, signal: AbortSignal): void {
   const loadScene = async () => {
     if (!webglAvailable()) {
       stage.classList.add('is-fallback');
-      status.textContent = '当前环境不支持 WebGL，已切换为平面图。';
+      status.textContent = tr(
+        '当前环境不支持 WebGL，已切换为平面图。',
+        'WebGL is not available; showing the plan view instead.',
+      );
       drawPlan();
       return;
     }
-    status.textContent = '正在加载三维场景…';
+    status.textContent = tr('正在加载三维场景…', 'Loading the 3D scene…');
     try {
       const { createGeoScene } = await import('./scene');
       if (signal.aborted) return;
@@ -474,7 +488,10 @@ export function initGeo(root: HTMLElement, signal: AbortSignal): void {
     } catch (error) {
       console.error(error);
       stage.classList.add('is-fallback');
-      status.textContent = '三维场景加载失败，已切换为平面图。';
+      status.textContent = tr(
+        '三维场景加载失败，已切换为平面图。',
+        'The 3D scene failed to load; showing the plan view instead.',
+      );
       drawPlan();
     }
   };

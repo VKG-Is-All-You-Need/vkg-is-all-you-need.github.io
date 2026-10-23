@@ -1,0 +1,541 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import PageHeader from '../../../components/ui/PageHeader.astro';
+import SectionHeading from '../../../components/ui/SectionHeading.astro';
+import Icon from '../../../components/ui/Icon.astro';
+import CityExplorer from '../../../components/city/CityExplorer.astro';
+import { CITY_MAPPING, CITY_ONTOLOGY, cityQueries } from '../../../lib/city/queries';
+import { SOURCES } from '../../../lib/city/sources';
+import { highlight } from '../../../lib/highlight';
+import { langOf, langPaths, localize } from '../../../i18n';
+import { setLang } from '../../../i18n/runtime';
+
+export const getStaticPaths = langPaths;
+
+const lang = langOf(Astro.url.pathname);
+setLang(lang);
+
+const variants = cityQueries().flatMap((query, i) => [
+  { query, index: i, variant: 'aggregate', text: query.text },
+  ...(query.detailText ? [{ query, index: i, variant: 'detail', text: query.detailText }] : []),
+]);
+
+const t = {
+  zh: {
+    title: 'VKG × 城市数据融合',
+    meta: '交互示例：八个独立数据源由一个本体统一描述，查询时实时访问。示例覆盖一周的交通、天气、传感器与人的出行和消费；开关数据源可比较融合与分离的结果。',
+    label: '示例',
+    description:
+      '城市基础数据、交通时序、出行服务、物联网平台、气象观测、商户系统、企业门禁与社区应用是八个独立的数据源。VKG 用一个本体统一描述它们，查询时直接访问各个数据源。示例覆盖一周七天，每天的天气不同，居民开车、坐公交、打车与购物都留下记录：切换日期、拖动时间轴查看动态数据，开关数据源比较融合与分离的结果。',
+    scene: '交互场景',
+    footnote:
+      '示例中的街区、车辆、客流、传感器读数、天气与人物均为虚构，由固定随机种子生成；查询结果由示例数据实时计算，SQL 为便于阅读的简化形式。',
+    rewriteTitle: '查询如何改写',
+    rewriteDescription:
+      '左侧为面向本体的 SPARQL 查询，右侧为改写后经联邦查询引擎（如 Trino）分发到各数据源的 SQL。表名前缀即数据源的 catalog。代码省略了前缀声明。',
+    detail: '明细',
+    aggregate: '聚合',
+    sqlLabel: '联邦 SQL（简化）',
+    sourcesTitle: '八个数据源',
+    sourcesDescription:
+      '每个数据源由不同的系统维护，结构与更新频率各不相同。联邦查询引擎为每个数据源提供一个 catalog，Ontop 通过它访问全部数据。',
+    refresh: '更新：',
+    mappingTitle: '映射与本体',
+    mappingDescription:
+      '融合的关键在映射：社区应用与企业系统中的居民记录使用同一个 IRI 模板 :person/{id}，在图谱中自动汇合为同一个实体；客流计数器与商户系统通过 building_id 汇合到同一家店；停车许可把车牌对应到员工，车牌又出现在交通时序中；温湿度读数与气象站观测都归入 sosa:Observation，可以在同一条查询中比较。',
+    mappingLabel: 'Ontop 映射（节选）',
+    ontologyLabel: '本体（Turtle，节选）',
+    pointsTitle: '要点',
+    points: [
+      [
+        'rotate',
+        '查询时访问最新数据',
+        'VKG 不做物化，每次查询都直接访问各数据源。信号相位与车辆位置每 5 秒更新，查询结果随之变化，不需要同步或重建图谱。',
+      ],
+      [
+        'layers',
+        '统一的 IRI 实现融合',
+        '不同系统中的记录只要映射到同一个 IRI，就是图谱中的同一个实体。单个数据源回答不了的问题，在融合后的图谱上可以直接查询。',
+      ],
+      [
+        'database',
+        '映射决定可见范围',
+        '映射可以只暴露门禁的小时汇总，而不暴露逐人记录。人物相关查询默认展示聚合结果，数据本身仍留在源系统中。',
+      ],
+    ],
+    readingTitle: '延伸阅读',
+    reading: [
+      ['Ontop + Trino + Iceberg', '联邦查询与数据湖上的虚拟访问', '/resources/#trino-iceberg'],
+      ['W3C SOSA/SSN', '传感器与观测本体', 'https://www.w3.org/TR/vocab-ssn/'],
+      ['W3C OWL-Time', '时间本体', 'https://www.w3.org/TR/owl-time/'],
+      ['OGC GeoSPARQL 1.1', '空间查询标准', 'https://docs.ogc.org/is/22-047r1/22-047r1.html'],
+      ['VKG × 地理信息', '本站示例：空间查询与分层视图', '/examples/geo/'],
+    ],
+  },
+  en: {
+    title: 'VKG × Urban data fusion',
+    meta: 'Interactive example: eight independent data sources are described by one ontology and accessed live at query time. The example covers a week of traffic, weather, sensors, and the trips and purchases of residents; switch sources on and off to compare fused and separate results.',
+    label: 'Examples',
+    description:
+      'Base city data, a traffic time series, a mobility service, an IoT platform, weather observations, a merchant system, companies and access control, and a community app are eight independent data sources. A VKG describes them with a single ontology and accesses each source directly at query time. The example covers seven days with different weather each day, and residents leave records as they drive, take the bus, order rides and shop: switch days and drag the timeline to view dynamic data, and switch sources on and off to compare fused and separate results.',
+    scene: 'Interactive scene',
+    footnote:
+      'The district, vehicles, footfall, sensor readings, weather and people are fictional and generated from a fixed random seed. Query results are computed from the sample data on the fly; the SQL is simplified for readability.',
+    rewriteTitle: 'How queries are rewritten',
+    rewriteDescription:
+      'On the left is the SPARQL query over the ontology; on the right is the SQL that a federated query engine (such as Trino) dispatches to the sources after rewriting. The table prefix is the catalog of each source. Prefix declarations are omitted.',
+    detail: 'Detail',
+    aggregate: 'Aggregate',
+    sqlLabel: 'Federated SQL (simplified)',
+    sourcesTitle: 'Eight data sources',
+    sourcesDescription:
+      'Each source is maintained by a different system, with its own structure and update frequency. The federated query engine exposes each source as a catalog, through which Ontop accesses all the data.',
+    refresh: 'Updated: ',
+    mappingTitle: 'Mappings and ontology',
+    mappingDescription:
+      'Fusion happens in the mappings: resident records in the community app and the company system use the same IRI template :person/{id} and merge into one entity in the graph; footfall counters and the merchant system meet at the same shop through building_id; parking permits link plates to employees, and the plates appear in the traffic time series; temperature and humidity readings and weather station observations are both sosa:Observation and can be compared in one query.',
+    mappingLabel: 'Ontop mappings (excerpt)',
+    ontologyLabel: 'Ontology (Turtle, excerpt)',
+    pointsTitle: 'Key points',
+    points: [
+      [
+        'rotate',
+        'Queries see the latest data',
+        'A VKG materializes nothing; every query accesses the sources directly. Signal phases and vehicle positions update every 5 seconds and query results follow, with no synchronization or graph rebuild.',
+      ],
+      [
+        'layers',
+        'Shared IRIs enable fusion',
+        'Records from different systems that map to the same IRI are the same entity in the graph. Questions no single source can answer can be queried directly on the fused graph.',
+      ],
+      [
+        'database',
+        'Mappings decide what is visible',
+        'A mapping can expose hourly access-control totals without exposing individual records. Queries about people show aggregates by default, and the data itself stays in the source systems.',
+      ],
+    ],
+    readingTitle: 'Further reading',
+    reading: [
+      [
+        'Ontop + Trino + Iceberg',
+        'Federated queries and virtual access on a data lake',
+        '/resources/#trino-iceberg',
+      ],
+      ['W3C SOSA/SSN', 'Sensor and observation ontology', 'https://www.w3.org/TR/vocab-ssn/'],
+      ['W3C OWL-Time', 'Time ontology', 'https://www.w3.org/TR/owl-time/'],
+      [
+        'OGC GeoSPARQL 1.1',
+        'Spatial query standard',
+        'https://docs.ogc.org/is/22-047r1/22-047r1.html',
+      ],
+      [
+        'VKG × Geospatial',
+        'Example on this site: spatial queries and the layered view',
+        '/examples/geo/',
+      ],
+    ],
+  },
+}[lang];
+
+const reading = t.reading.map(([title, meta, href]) => ({
+  title,
+  meta,
+  href: localize(href, lang),
+  external: href.startsWith('http'),
+}));
+---
+
+<BaseLayout title={t.title} description={t.meta}>
+  <PageHeader label={t.label} title={t.title} description={t.description} />
+
+  <section class="wide" aria-label={t.scene}>
+    <CityExplorer />
+    <p class="footnote">{t.footnote}</p>
+  </section>
+
+  <section class="section" aria-labelledby="rewrite-title">
+    <div class="container">
+      <SectionHeading
+        id="rewrite-title"
+        title={t.rewriteTitle}
+        description={t.rewriteDescription}
+      />
+      {variants.map(({ query, index, variant, text }) => (
+        <article
+          class="rewrite"
+          data-city-panel={query.id}
+          data-variant={variant}
+          hidden={index !== 0 || variant !== 'aggregate'}
+        >
+          <header class="rewrite-head">
+            <span class="rewrite-index">{String(index + 1).padStart(2, '0')}</span>
+            <div>
+              <h3>
+                {query.title}
+                {query.personal && (
+                  <span class="variant">{variant === 'detail' ? t.detail : t.aggregate}</span>
+                )}
+              </h3>
+              <p>{query.description}</p>
+            </div>
+          </header>
+          <div class="rewrite-grid">
+            <div class="codebox">
+              <p class="codebox-label">SPARQL</p>
+              <pre set:html={`<code>${highlight(text.sparql)}</code>`} />
+            </div>
+            <span class="rewrite-arrow" aria-hidden="true">
+              <Icon name="arrow-right" size={18} />
+            </span>
+            <div class="codebox">
+              <p class="codebox-label">{t.sqlLabel}</p>
+              <pre set:html={`<code>${highlight(text.sql)}</code>`} />
+            </div>
+          </div>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section section-rule" aria-labelledby="sources-title">
+    <div class="container">
+      <SectionHeading
+        id="sources-title"
+        title={t.sourcesTitle}
+        description={t.sourcesDescription}
+      />
+      <ul class="source-cards" role="list">
+        {SOURCES.map((source) => (
+          <li class="source-card spotlight" style={`--source:${source.color}`} data-reveal>
+            <p class="source-system">{source.system}</p>
+            <h3>{source.name}</h3>
+            <p class="source-desc">{source.description}</p>
+            <p class="source-tables">
+              {source.tables.map((table) => (
+                <code>
+                  {source.catalog}.{table}
+                </code>
+              ))}
+            </p>
+            <p class="source-refresh">
+              {t.refresh}
+              {source.refresh}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <section class="section section-rule" aria-labelledby="mapping-title">
+    <div class="container">
+      <SectionHeading
+        id="mapping-title"
+        title={t.mappingTitle}
+        description={t.mappingDescription}
+      />
+      <div class="mapping-grid" data-reveal>
+        <div class="codebox">
+          <p class="codebox-label">{t.mappingLabel}</p>
+          <pre set:html={`<code>${highlight(CITY_MAPPING)}</code>`} />
+        </div>
+        <div class="codebox">
+          <p class="codebox-label">{t.ontologyLabel}</p>
+          <pre set:html={`<code>${highlight(CITY_ONTOLOGY)}</code>`} />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-rule" aria-labelledby="points-title">
+    <div class="container">
+      <SectionHeading id="points-title" title={t.pointsTitle} />
+      <ul class="points" role="list">
+        {t.points.map(([icon, title, text], i) => (
+          <li
+            class="point spotlight"
+            data-reveal
+            style={i ? `--reveal-delay:${i * 90}ms` : undefined}
+          >
+            <span class="point-icon">
+              <Icon name={icon as 'rotate' | 'layers' | 'database'} size={20} />
+            </span>
+            <h3>{title}</h3>
+            <p>{text}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <section class="section section-rule" aria-labelledby="reading-title">
+    <div class="container">
+      <SectionHeading id="reading-title" title={t.readingTitle} />
+      <ul class="reading" role="list" data-reveal>
+        {reading.map((item) => (
+          <li>
+            <a
+              href={item.href}
+              target={item.external ? '_blank' : undefined}
+              rel={item.external ? 'noopener' : undefined}
+            >
+              <span class="reading-title">{item.title}</span>
+              <span class="reading-meta">{item.meta}</span>
+              <Icon name={item.external ? 'arrow-up-right' : 'arrow-right'} size={16} />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  /* 场景两侧各有一个面板，比正文略宽，给三维场景留出空间 */
+  .wide {
+    width: min(1560px, 100% - var(--gutter) * 2);
+    margin-inline: auto;
+  }
+
+  .footnote {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--faint);
+  }
+
+  .codebox {
+    min-width: 0;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--code-bg);
+    overflow: hidden;
+  }
+
+  .codebox-label {
+    padding: 9px 16px;
+    border-bottom: 1px solid rgb(255 255 255 / 0.07);
+    font: 12px var(--font-mono);
+    color: var(--code-faint);
+  }
+
+  .codebox pre {
+    margin: 0;
+    padding: 16px;
+    font: 13px/1.8 var(--font-mono);
+    color: var(--code-ink);
+    overflow-x: auto;
+  }
+
+  .codebox :global(.k) {
+    color: var(--code-kw);
+  }
+
+  .codebox :global(.v) {
+    color: var(--code-var);
+  }
+
+  .codebox :global(.s) {
+    color: var(--code-str);
+  }
+
+  .codebox :global(.f) {
+    color: #f29fb8;
+  }
+
+  .codebox :global(.c) {
+    color: var(--code-faint);
+  }
+
+  .rewrite-head {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .rewrite-index {
+    font: 500 14px/1.9 var(--font-mono);
+    color: var(--accent-ink);
+  }
+
+  .rewrite-head h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .variant {
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent-ink);
+  }
+
+  .rewrite-head p {
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 15px;
+  }
+
+  .rewrite-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+  }
+
+  .rewrite-grid .codebox {
+    align-self: stretch;
+  }
+
+  .rewrite-arrow {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--accent-ink);
+  }
+
+  .source-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 16px;
+  }
+
+  .source-card {
+    padding: 22px;
+    border-top: 3px solid var(--source);
+  }
+
+  .source-system {
+    font: 12px var(--font-mono);
+    color: var(--faint);
+  }
+
+  .source-card h3 {
+    margin-top: 4px;
+    font-size: 18px;
+    font-weight: 650;
+  }
+
+  .source-desc {
+    margin-top: 8px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .source-tables {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+  }
+
+  .source-tables code {
+    font-size: 11.5px;
+  }
+
+  .source-refresh {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--faint);
+  }
+
+  .mapping-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+
+  .points {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .point {
+    padding: 26px;
+  }
+
+  .point-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin-bottom: 18px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--accent-ink);
+  }
+
+  .point h3 {
+    font-size: 18px;
+    font-weight: 650;
+  }
+
+  .point p {
+    margin-top: 8px;
+    font-size: 15px;
+    color: var(--muted);
+  }
+
+  .reading {
+    display: grid;
+    border-top: 1px solid var(--line);
+  }
+
+  .reading a {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 4px;
+    border-bottom: 1px solid var(--line);
+    transition: color 0.2s;
+  }
+
+  .reading a:hover {
+    color: var(--accent-ink);
+  }
+
+  .reading-title {
+    font-weight: 600;
+  }
+
+  .reading-meta {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--faint);
+  }
+
+  .reading a :global(svg) {
+    flex: none;
+    color: var(--faint);
+    transition: transform 0.3s var(--ease);
+  }
+
+  .reading a:hover :global(svg) {
+    color: var(--accent-ink);
+    transform: translateX(3px);
+  }
+
+  @media (max-width: 900px) {
+    .rewrite-grid,
+    .mapping-grid,
+    .points {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .rewrite-arrow {
+      justify-self: center;
+      rotate: 90deg;
+    }
+  }
+</style>

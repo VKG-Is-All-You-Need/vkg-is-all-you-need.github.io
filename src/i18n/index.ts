@@ -12,7 +12,15 @@ export const LANG_TAGS: Record<Lang, string> = { zh: 'zh-CN', en: 'en' };
 export const LANG_NAMES: Record<Lang, string> = { zh: '中文', en: 'English' };
 
 /** 已有英文版的页面（中文路径）。不在此列的页面切换到英文时转到英文版示例目录。 */
-const TRANSLATED = new Set(['/', '/resources/', '/learn/', '/about/', '/examples/']);
+const TRANSLATED = new Set([
+  '/',
+  '/resources/',
+  '/learn/',
+  '/about/',
+  '/examples/',
+  '/examples/geo/',
+  '/examples/city/',
+]);
 
 /** 供 [...lang] 动态路由的 getStaticPaths 使用：根路径为中文，en 为英文。 */
 export const langPaths = () =>

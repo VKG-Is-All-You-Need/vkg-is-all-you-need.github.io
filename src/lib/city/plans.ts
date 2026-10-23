@@ -8,7 +8,9 @@
  * 商店的到访次数按客流强度模型（commerce.ts）每 5 分钟抽样一次：居民与上班族先去，其余由访客补足。
  * 具名人物的安排是手写的（mobility.ts），这里只登记他们用车的请求。
  */
+import { tr } from '../../i18n/runtime';
 import { city, type Building } from '../geo/city';
+import { term } from '../geo/names';
 import { pointInPolygon, rectCenter, seededRandom, type Point } from '../geo/spatial';
 import { footfallRate, shops, type Shop, type ShopCategory } from './commerce';
 import {
@@ -426,7 +428,12 @@ function commit(
     case 'bus': {
       const [a, b] = choice.stops!;
       return [
-        { type: 'bus', from: a, to: b, label: `乘公交至${nodeById.get(b)!.name}` },
+        {
+          type: 'bus',
+          from: a,
+          to: b,
+          label: tr(`乘公交至${nodeById.get(b)!.name}`, `to ${term(nodeById.get(b)!.name)}`),
+        },
         { type: 'walk', to, label },
       ];
     }
@@ -441,10 +448,11 @@ function commit(
         to: gate ? nodePoint(gate.node) : pb,
         exit: choice.exit,
       });
-      if (gate) return [{ type: 'taxi', trip: id, label: '乘网约车离开' }];
+      if (gate)
+        return [{ type: 'taxi', trip: id, label: tr('乘网约车离开', 'leaving the district') }];
       return [
-        { type: 'taxi', trip: id, label: '乘网约车' },
-        { type: 'walk', to, label: '下车后步行' },
+        { type: 'taxi', trip: id, label: tr('乘网约车', 'to the destination') },
+        { type: 'walk', to, label: tr('下车后步行', 'Walk from the drop-off') },
       ];
     }
     case 'car': {
@@ -455,7 +463,7 @@ function commit(
       });
       return [
         { type: 'drive', trip: id, label },
-        { type: 'walk', to, label: '停车后步行' },
+        { type: 'walk', to, label: tr('停车后步行', 'Walk from the parked car') },
       ];
     }
   }
@@ -577,7 +585,7 @@ function outing(ctx: Ctx, home: Point, t: number, weekend: boolean): Activity | 
       start: t,
       end: t + between(ctx, 2400, 5400),
       mode: 'visit',
-      label: `在${place.name}`,
+      label: tr(`在${place.name}`, `At ${term(place.name)}`),
     };
   }
   if (roll < 0.6) {
@@ -592,7 +600,7 @@ const stroll = (ctx: Ctx, t: number, seconds: number): Activity => ({
   start: t,
   end: t + seconds,
   mode: 'visit',
-  label: '在湖滨公园散步',
+  label: tr('在湖滨公园散步', 'Walking in Lakeside Park'),
   run: false,
 });
 
@@ -603,7 +611,7 @@ function shopActivity(ctx: Ctx, shop: Shop, t: number): Activity {
     start: t,
     end: t + between(ctx, a, b) * 60,
     mode: 'shop',
-    label: `在${shop.name}`,
+    label: tr(`在${shop.name}`, `At ${term(shop.name)}`),
     shop,
   };
 }
@@ -623,7 +631,7 @@ function residentDay(ctx: Ctx, person: Person, shift: WorkShift | undefined): St
       start: shift.start,
       end: shift.end,
       mode: 'work',
-      label: `在${company.name}工作`,
+      label: tr(`在${company.name}工作`, `Working at ${term(company.name)}`),
       car: owner,
     };
     // 社区活动与班次冲突时提前下班或晚到
@@ -663,7 +671,7 @@ function residentDay(ctx: Ctx, person: Person, shift: WorkShift | undefined): St
       start: event.start,
       end: event.end,
       mode: 'event',
-      label: event.title,
+      label: term(event.title),
       run: event.title === '夜跑' ? true : undefined,
     });
   }
@@ -687,26 +695,33 @@ function residentDay(ctx: Ctx, person: Person, shift: WorkShift | undefined): St
 
   const p = builder(ctx, person, home, at(day, 6));
   p.push({ type: 'begin', at: home });
-  p.stay('home', at(day, 6), '在家');
+  p.stay('home', at(day, 6), tr('在家', 'At home'));
   let carAt: 'home' | 'work' = 'home';
   for (const [i, act] of acts.entries()) {
     const previous = acts[i - 1];
     // 当天不再回公司：先把车开回家
     const done = !acts.slice(i).some((a) => a.mode === 'work');
     if (carAt === 'work' && done) {
-      p.go(home, null, { car: carRoute(person, previous.spot, home) }, '开车回家');
-      p.stay('home', p.now + 300, '在家');
+      p.go(home, null, { car: carRoute(person, previous.spot, home) }, tr('开车回家', 'home'));
+      p.stay('home', p.now + 300, tr('在家', 'At home'));
       carAt = 'home';
     } else if (previous && act.start - previous.end > hours(1, 15) && p.here !== home) {
-      p.go(home, null, { taxi: 0.2 }, '回家');
-      p.stay('home', p.now, '在家');
+      p.go(home, null, { taxi: 0.2 }, tr('回家', 'home'));
+      p.stay('home', p.now, tr('在家', 'At home'));
     }
     const byCar = act.mode === 'work' && act.car && carAt === 'home';
     const arrive = p.go(
       act.spot,
       act.start,
       byCar ? { car: carRoute(person, p.here, act.spot) } : { taxi: 0.25 },
-      act.mode === 'work' ? '去上班' : `去${act.label.replace(/^在/, '')}`,
+      act.mode === 'work'
+        ? tr('去上班', 'to work')
+        : tr(
+            `去${act.label.replace(/^在/, '')}`,
+            act.mode === 'event'
+              ? `to the ${act.label.toLowerCase()}`
+              : `to ${buildingName(act.spot)}`,
+          ),
     );
     if (byCar) carAt = 'work';
     if (act.shop) {
@@ -725,11 +740,11 @@ function residentDay(ctx: Ctx, person: Person, shift: WorkShift | undefined): St
   if (p.now < at(day, 23, 50)) {
     if (carAt === 'work') {
       const previous = acts.at(-1)!;
-      p.go(home, null, { car: carRoute(person, previous.spot, home) }, '开车回家');
+      p.go(home, null, { car: carRoute(person, previous.spot, home) }, tr('开车回家', 'home'));
     } else if (p.here !== home) {
-      p.go(home, null, { taxi: 0.25 }, '回家');
+      p.go(home, null, { taxi: 0.25 }, tr('回家', 'home'));
     }
-    p.stay('home', at(day, 24), '在家');
+    p.stay('home', at(day, 24), tr('在家', 'At home'));
   }
   return p.steps;
 }
@@ -800,16 +815,30 @@ function visit(
   const appear = arriveBy - there.seconds;
   const p = builder(ctx, person, origin.spot, appear);
   p.push({ type: 'appear', at: origin.spot, t: appear, via: origin.via });
-  p.goWith(target, there, `去${buildingName(target)}`);
+  p.goWith(target, there, tr(`去${buildingName(target)}`, `to ${buildingName(target)}`));
   stay(p);
   if (taxiOut && ctx.random() < (rainAt(p.now) > 0.3 ? taxiOut : taxiOut / 10)) {
-    p.go(target, null, { exit: pickGate(ctx) }, '乘网约车离开');
-    p.push({ type: 'leave', via: 'car', label: '驶出街区' });
+    p.go(target, null, { exit: pickGate(ctx) }, tr('乘网约车离开', 'leaving the district'));
+    p.push({ type: 'leave', via: 'car', label: tr('驶出街区', 'Leaving the district') });
   } else {
     // 多数从原路返回
     const exit = ctx.random() < 0.8 ? origin : pickOrigin(ctx, targetPoint);
-    p.go(exit.spot, null, {}, exit.via === 'metro' ? '步行至地铁站' : '步行离开');
-    p.push({ type: 'leave', via: exit.via, label: exit.via === 'metro' ? '进站' : '走出街区' });
+    p.go(
+      exit.spot,
+      null,
+      {},
+      exit.via === 'metro'
+        ? tr('步行至地铁站', 'Walk to the metro station')
+        : tr('步行离开', 'Walk out of the district'),
+    );
+    p.push({
+      type: 'leave',
+      via: exit.via,
+      label:
+        exit.via === 'metro'
+          ? tr('进站', 'Entering the station')
+          : tr('走出街区', 'Leaving the district'),
+    });
   }
   ctx.plan.steps.set(person.id, p.steps);
 }
@@ -849,21 +878,25 @@ function carVisit(
     if (person === driver) q.steps.push(...p.steps);
     else stay(q, person);
     ctx.plan.steps.set(person.id, [
-      { type, trip: inbound, label: `开车去${buildingName(target)}` },
-      { type: 'walk', to: target, label: '停车后步行' },
+      {
+        type,
+        trip: inbound,
+        label: tr(`开车去${buildingName(target)}`, `to ${buildingName(target)}`),
+      },
+      { type: 'walk', to: target, label: tr('停车后步行', 'Walk from the parked car') },
       ...q.steps,
-      { type, trip: outbound, label: '开车离开' },
-      { type: 'leave', via: 'car', label: '驶出街区' },
+      { type, trip: outbound, label: tr('开车离开', 'leaving the district') },
+      { type: 'leave', via: 'car', label: tr('驶出街区', 'Leaving the district') },
     ]);
   }
 }
 
 const buildingName = (spot: Spot) =>
-  spot.kind === 'building' ? buildingById.get(spot.id)!.name : '湖滨公园';
+  term(spot.kind === 'building' ? buildingById.get(spot.id)!.name : '湖滨公园');
 
 function shopStay(ctx: Ctx, shop: Shop, dwell: number) {
   return (p: ReturnType<typeof builder>, person: Person) => {
-    p.stay('shop', p.now + dwell, `在${shop.name}`, {
+    p.stay('shop', p.now + dwell, tr(`在${shop.name}`, `At ${term(shop.name)}`), {
       minimum: 120,
       shop: shop.id,
       amount: purchase(ctx, person, shop),
@@ -879,7 +912,8 @@ function officeDay(ctx: Ctx, person: Person): void {
   const officePoint = roughPoint(office);
   const start = at(day, 8, 50) + (DAYS[day].weekend ? 1800 : 0) + between(ctx, -1, 1) * 1800;
   const end = start + between(ctx, hours(8, 20), hours(10));
-  const label = `在${buildingById.get(person.workplace!)!.name}上班`;
+  const workplace = buildingById.get(person.workplace!)!.name;
+  const label = tr(`在${workplace}上班`, `Working at ${term(workplace)}`);
   const work = (p: ReturnType<typeof builder>) => {
     const lunch = ctx.random() < 0.3 && p.now < at(day, 11, 30);
     if (lunch) {
@@ -887,29 +921,49 @@ function officeDay(ctx: Ctx, person: Person): void {
       const shop = pickShop(ctx, officePoint, t, ['咖啡', '面包店', '便利店']);
       if (shop) {
         p.stay('work', t, label);
-        const reach = p.go(building(shop.buildingId), null, { bus: false }, `去${shop.name}`);
+        const reach = p.go(
+          building(shop.buildingId),
+          null,
+          { bus: false },
+          tr(`去${shop.name}`, `to ${term(shop.name)}`),
+        );
         claim(ctx, shop.id, reach);
         const [a, b] = DWELL[shop.category];
-        p.stay('shop', reach + Math.min(between(ctx, a, b), 40) * 60, `在${shop.name}`, {
-          minimum: 120,
-          shop: shop.id,
-          amount: purchase(ctx, person, shop),
-        });
-        p.go(office, null, { bus: false }, '回办公室');
+        p.stay(
+          'shop',
+          reach + Math.min(between(ctx, a, b), 40) * 60,
+          tr(`在${shop.name}`, `At ${term(shop.name)}`),
+          {
+            minimum: 120,
+            shop: shop.id,
+            amount: purchase(ctx, person, shop),
+          },
+        );
+        p.go(office, null, { bus: false }, tr('回办公室', 'back to the office'));
       }
     }
     p.stay('work', Math.max(end, p.now + 1800), label);
     if (!person.drives && ctx.random() < 0.12) {
       const shop = pickShop(ctx, officePoint, p.now + 300, ['咖啡', '便利店', '面包店', '商场']);
       if (shop) {
-        const reach = p.go(building(shop.buildingId), null, {}, `去${shop.name}`);
+        const reach = p.go(
+          building(shop.buildingId),
+          null,
+          {},
+          tr(`去${shop.name}`, `to ${term(shop.name)}`),
+        );
         claim(ctx, shop.id, reach);
         const [a, b] = DWELL[shop.category];
-        p.stay('shop', reach + between(ctx, a, b) * 60, `在${shop.name}`, {
-          minimum: 120,
-          shop: shop.id,
-          amount: purchase(ctx, person, shop),
-        });
+        p.stay(
+          'shop',
+          reach + between(ctx, a, b) * 60,
+          tr(`在${shop.name}`, `At ${term(shop.name)}`),
+          {
+            minimum: 120,
+            shop: shop.id,
+            amount: purchase(ctx, person, shop),
+          },
+        );
       }
     }
   };
@@ -931,17 +985,31 @@ const FACILITIES: Facility[] = [
     building: byKind('医院')[0],
     hours: [8, 17, 28, 12],
     dwell: [40, 150],
-    label: '在市立医院看病',
+    label: tr('在市立医院看病', 'Seeing a doctor at City Hospital'),
   },
-  { building: byKind('图书馆')[0], hours: [9, 20, 10, 18], dwell: [40, 150], label: '在市图书馆' },
+  {
+    building: byKind('图书馆')[0],
+    hours: [9, 20, 10, 18],
+    dwell: [40, 150],
+    label: tr('在市图书馆', 'At City Library'),
+  },
   {
     building: byKind('博物馆')[0],
     hours: [9, 17, 8, 25],
     dwell: [50, 120],
-    label: '在城市博物馆参观',
+    label: tr('在城市博物馆参观', 'Visiting City Museum'),
   },
-  { building: byKind('游客中心')[0], hours: [9, 18, 5, 14], dwell: [10, 25], label: '在游客中心' },
-  { hours: [7, 20, 6, 20], dwell: [25, 60], label: '在湖滨公园散步' },
+  {
+    building: byKind('游客中心')[0],
+    hours: [9, 18, 5, 14],
+    dwell: [10, 25],
+    label: tr('在游客中心', 'At the Visitor Center'),
+  },
+  {
+    hours: [7, 20, 6, 20],
+    dwell: [25, 60],
+    label: tr('在湖滨公园散步', 'Walking in Lakeside Park'),
+  },
 ];
 
 // ── 一天的安排 ──

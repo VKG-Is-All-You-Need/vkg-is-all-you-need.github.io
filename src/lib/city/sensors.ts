@@ -3,6 +3,8 @@
  * 读数以官方气象站为基准，叠加各自位置的小气候差异：中心区与屋顶在日照下更热，公园更凉、更湿，
  * 临水处湿度偏高。个别传感器在某些时段出现故障（离线、湿度卡死、温度漂移），用于演示数据质量校验。
  */
+import { tr } from '../../i18n/runtime';
+import { term } from '../geo/names';
 import { city } from '../geo/city';
 import { rectCenter, seededRandom, type Point } from '../geo/spatial';
 import { EW_STREETS, NS_STREETS } from './roads';
@@ -137,15 +139,23 @@ export const neighborsOf = (sensor: EnvSensor, radius = 340) =>
 /** 安装位置的描述（来自城市基础数据：最近的路口或所在建筑）。 */
 export function placeOf(sensor: EnvSensor): string {
   if (sensor.buildingId) {
-    return `${city.buildings.find((b) => b.id === sensor.buildingId)!.name}屋顶`;
+    const building = city.buildings.find((b) => b.id === sensor.buildingId)!.name;
+    return tr(`${building}屋顶`, `Rooftop of ${term(building)}`);
   }
-  if (sensor.mount === '公园') return `${city.parks[0].name}${sensor.water ? '湖边' : ''}`;
+  if (sensor.mount === '公园') {
+    const park = city.parks[0].name;
+    return tr(
+      `${park}${sensor.water ? '湖边' : ''}`,
+      sensor.water ? `Lakeshore in ${term(park)}` : term(park),
+    );
+  }
   // 路灯杆在街道边：按坐标找到所在的南北向或东西向街道
   const { x, y } = sensor.at;
   const k = Math.round(x / 160);
   const m = Math.round(y / 180);
   const ns = Math.abs(x - k * 160) <= 20 ? NS_STREETS[k - 1] : undefined;
   const ew = Math.abs(y - m * 180) <= 20 ? EW_STREETS[m - 1] : undefined;
-  if (ns && ew) return `${ns} × ${ew} 路口`;
-  return ns ?? ew ?? '街道';
+  if (ns && ew) return tr(`${ns} × ${ew} 路口`, `${term(ns)} × ${term(ew)}`);
+  const street = ns ?? ew;
+  return street ? term(street) : tr('街道', 'Street');
 }

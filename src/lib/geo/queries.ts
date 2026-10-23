@@ -1,5 +1,7 @@
 /** 示例中的 GeoSPARQL 查询、对应的 PostGIS SQL（简化形式）以及在示例数据上的求值。 */
+import { currentLang, tr } from '../../i18n/runtime';
 import { FACILITY_CLASS, type Building, type City } from './city';
+import { capitalize, term } from './names';
 import {
   distanceRectPoint,
   pointInPolygon,
@@ -62,7 +64,7 @@ export interface GeoQuery {
   run(city: City): QueryResult;
 }
 
-const metres = (value: number) => `${Math.round(value)} 米`;
+const metres = (value: number) => tr(`${Math.round(value)} 米`, `${Math.round(value)} m`);
 
 const FACILITY_MAPPING: Record<string, string> = {
   学校: 'school',
@@ -89,16 +91,19 @@ function distanceToBoundary(building: Building, polygon: Polygon): number {
   );
 }
 
-export const queries: GeoQuery[] = [
+const buildQueries = (): GeoQuery[] => [
   {
     id: 'cafes',
-    title: '中心站 300 米内的咖啡馆',
+    title: tr('中心站 300 米内的咖啡馆', 'Cafes within 300 m of Central Station'),
     feature: 'geof:distance → ST_Distance',
-    description: '计算每家咖啡馆与中心站的距离，保留 300 米以内的结果并按距离排序。',
+    description: tr(
+      '计算每家咖啡馆与中心站的距离，保留 300 米以内的结果并按距离排序。',
+      'Computes the distance from each cafe to Central Station, keeps those within 300 m and sorts them by distance.',
+    ),
     sparql: `SELECT ?name ?dist WHERE {
-  ?s a :Station ; :name "中心站" ;
+  ?s a :Station ; :name "${term('中心站')}" ;
      geo:hasGeometry/geo:asWKT ?sWkt .
-  ?c a :Building ; :kind "咖啡馆" ; :name ?name ;
+  ?c a :Building ; :kind "${term('咖啡馆')}" ; :name ?name ;
      geo:hasGeometry/geo:asWKT ?cWkt .
   BIND (geof:distance(?cWkt, ?sWkt, uom:metre) AS ?dist)
   FILTER (?dist < 300)
@@ -107,8 +112,8 @@ ORDER BY ?dist`,
     sql: `SELECT b.name,
        ST_Distance(b.footprint, s.location) AS dist
 FROM   buildings b, stations s
-WHERE  s.name = '中心站'
-  AND  b.kind = '咖啡馆'
+WHERE  s.name = '${term('中心站')}'
+  AND  b.kind = '${term('咖啡馆')}'
   AND  ST_Distance(b.footprint, s.location) < 300
 ORDER  BY dist`,
     run(city) {
@@ -147,11 +152,14 @@ ORDER  BY dist`,
   },
   {
     id: 'park',
-    title: '湖滨公园内的建筑',
+    title: tr('湖滨公园内的建筑', 'Buildings in Lakeside Park'),
     feature: 'geof:sfWithin → ST_Within',
-    description: '判断建筑轮廓是否完全位于公园范围内，属于拓扑关系查询。',
+    description: tr(
+      '判断建筑轮廓是否完全位于公园范围内，属于拓扑关系查询。',
+      'Tests whether each building footprint lies entirely within the park, a topological relation query.',
+    ),
     sparql: `SELECT ?name WHERE {
-  ?p a :Park ; :name "湖滨公园" ;
+  ?p a :Park ; :name "${term('湖滨公园')}" ;
      geo:hasGeometry/geo:asWKT ?pWkt .
   ?b a :Building ; :name ?name ;
      geo:hasGeometry/geo:asWKT ?bWkt .
@@ -159,7 +167,7 @@ ORDER  BY dist`,
 }`,
     sql: `SELECT b.name
 FROM   buildings b, parks p
-WHERE  p.name = '湖滨公园'
+WHERE  p.name = '${term('湖滨公园')}'
   AND  ST_Within(b.footprint, p.area)`,
     run(city) {
       const park = city.parks.find((p) => p.name === '湖滨公园')!;
@@ -171,8 +179,11 @@ WHERE  p.name = '湖滨公园'
         .sort((a, z) => a.d - z.d)
         .slice(0, 3);
       return {
-        hits: inside.map((b) => ({ id: b.id, detail: '位于公园内' })),
-        misses: near.map(({ b, d }) => ({ id: b.id, detail: `距公园边界 ${metres(d)}` })),
+        hits: inside.map((b) => ({ id: b.id, detail: tr('位于公园内', 'inside the park') })),
+        misses: near.map(({ b, d }) => ({
+          id: b.id,
+          detail: tr(`距公园边界 ${metres(d)}`, `${metres(d)} from the park boundary`),
+        })),
         focus: { type: 'area', polygon: park.area },
         plan: {
           classes: [':Park', ':Building'],
@@ -202,7 +213,7 @@ WHERE  p.name = '湖滨公园'
             ...near.map(({ b, d }) => ({
               from: `b:${b.id}`,
               to: `p:${park.id}`,
-              label: `边界外 ${metres(d)}`,
+              label: tr(`边界外 ${metres(d)}`, `${metres(d)} outside`),
               hit: false,
             })),
           ],
@@ -212,10 +223,12 @@ WHERE  p.name = '湖滨公园'
   },
   {
     id: 'facilities',
-    title: '地铁站 250 米内的公共设施',
-    feature: '本体推理 + geof:distance',
-    description:
+    title: tr('地铁站 250 米内的公共设施', 'Public facilities within 250 m of a metro station'),
+    feature: tr('本体推理 + geof:distance', 'Ontology reasoning + geof:distance'),
+    description: tr(
       '数据库中没有“公共设施”这一类别。本体将学校、医院、图书馆与博物馆归入 :PublicFacility，再与距离条件组合。',
+      'The database has no "public facility" category. The ontology groups schools, hospitals, libraries and museums under :PublicFacility, which is then combined with a distance condition.',
+    ),
     sparql: `SELECT DISTINCT ?name WHERE {
   ?f a :PublicFacility ; :name ?name ;
      geo:hasGeometry/geo:asWKT ?fWkt .
@@ -223,10 +236,10 @@ WHERE  p.name = '湖滨公园'
      geo:hasGeometry/geo:asWKT ?sWkt .
   FILTER (geof:distance(?fWkt, ?sWkt, uom:metre) < 250)
 }`,
-    sql: `-- :PublicFacility 经本体展开为 4 个类
+    sql: `${tr('-- :PublicFacility 经本体展开为 4 个类', '-- :PublicFacility expands to 4 classes via the ontology')}
 SELECT DISTINCT b.name
 FROM   buildings b, stations s
-WHERE  b.kind IN ('学校', '医院', '图书馆', '博物馆')
+WHERE  b.kind IN (${['学校', '医院', '图书馆', '博物馆'].map((kind) => `'${term(kind)}'`).join(', ')})
   AND  ST_Distance(b.footprint, s.location) < 250`,
     run(city) {
       const facilities = city.buildings
@@ -240,7 +253,10 @@ WHERE  b.kind IN ('学校', '医院', '图书馆', '博物馆')
         .sort((a, z) => a.d - z.d);
       const describe = ({ b, s, d }: (typeof facilities)[number]) => ({
         id: b.id,
-        detail: `${b.kind} · 距${s.name} ${metres(d)}`,
+        detail: tr(
+          `${b.kind} · 距${s.name} ${metres(d)}`,
+          `${capitalize(term(b.kind))} · ${metres(d)} from ${term(s.name)}`,
+        ),
       });
       const subclasses = [':School', ':Hospital', ':Library', ':Museum'];
       return {
@@ -276,7 +292,17 @@ WHERE  b.kind IN ('学校', '医院', '图书馆', '博物馆')
   },
 ];
 
-export const MAPPING = `mappingId  building
+const byLang = new Map<string, GeoQuery[]>();
+
+/** 当前语言下的示例查询。 */
+export function geoQueries(): GeoQuery[] {
+  const lang = currentLang();
+  let list = byLang.get(lang);
+  if (!list) byLang.set(lang, (list = buildQueries()));
+  return list;
+}
+
+export const mapping = () => `mappingId  building
 target     :building/{id} a :Building ; :name {name} ; :kind {kind} ;
                geo:hasGeometry :building/{id}/geom .
            :building/{id}/geom geo:asWKT {wkt}^^geo:wktLiteral .
@@ -285,7 +311,7 @@ source     SELECT id, name, kind, ST_AsText(footprint) AS wkt
 
 mappingId  school
 target     :building/{id} a :School .
-source     SELECT id FROM buildings WHERE kind = '学校'
+source     SELECT id FROM buildings WHERE kind = '${term('学校')}'
 
 mappingId  station
 target     :station/{id} a :Station ; :name {name} ;

@@ -3,6 +3,8 @@
  * 结果列表、对象详情卡片，以及三维场景的按需加载与全屏。
  */
 import { city } from '../../lib/geo/city';
+import { capitalize, term } from '../../lib/geo/names';
+import { tr } from '../../i18n/runtime';
 import { shopById, shopByBuilding } from '../../lib/city/commerce';
 import { isRide, pedestriansAt, peopleInside, personAt, type Leg } from '../../lib/city/mobility';
 import { platformOf } from '../../lib/city/plans';
@@ -127,27 +129,38 @@ interface Card {
   empty?: string;
 }
 
-const buildingName = (id: number) => city.buildings.find((b) => b.id === id)?.name ?? `建筑 #${id}`;
+const buildingName = (id: number) => {
+  const building = city.buildings.find((b) => b.id === id);
+  return building ? term(building.name) : tr(`建筑 #${id}`, `Building #${id}`);
+};
+const plateOf = (id: string) => term(vehicleById.get(id)!.plate);
+const nodeName = (id: number) => term(nodeById.get(id)!.name);
+const edgeName = (id: number) => term(edgeById.get(id)!.name);
+/** 列举：中文用顿号，英文用逗号。 */
+const list = (items: string[]) => items.join(tr('、', ', '));
+const more = (shown: number, total: number) => (total > shown ? tr(' 等', ' and others') : '');
 
 /** 人物在卡片与说明中的称呼：明细视图中具名人物显示姓名，其余显示编号。 */
 function personLabel(id: string, detail: boolean): string {
   const person = personById.get(id);
   if (!person) return id;
-  if (detail && person.persona) return person.name!;
-  return person.kind === 'resident' ? `居民 ${id}` : `外来人员 ${id}`;
+  if (detail && person.persona) return term(person.name!);
+  return person.kind === 'resident'
+    ? tr(`居民 ${id}`, `Resident ${id}`)
+    : tr(`外来人员 ${id}`, `Non-resident ${id}`);
 }
 
 const building = (id: number): Selection => ({ type: 'building', id });
 const vehicleRef = (id: string): Ref => ({
-  name: vehicleById.get(id)!.plate,
+  name: plateOf(id),
   target: { type: 'vehicle', id },
 });
 const nodeRef = (id: number): Ref => ({
-  name: nodeById.get(id)!.name,
+  name: nodeName(id),
   target: { type: 'node', id },
 });
 const edgeRef = (id: number): Ref => ({
-  name: edgeById.get(id)!.name,
+  name: edgeName(id),
   target: { type: 'edge', id },
 });
 const personRef = (id: string, detail: boolean): Ref => ({
@@ -159,23 +172,28 @@ const personRef = (id: string, detail: boolean): Ref => ({
 function describeLeg(leg: Leg, person: Person, detail: boolean): { text: string; refs: Ref[] } {
   const refs: Ref[] = [];
   if (leg.vehicle) refs.push(vehicleRef(leg.vehicle));
-  const plate = leg.vehicle ? vehicleById.get(leg.vehicle)!.plate : '';
+  const plate = leg.vehicle ? plateOf(leg.vehicle) : '';
+  // 英文的具名人物行程以动词开头（如 “Walk to North Station”），接在方式之后时去掉动词
+  const after = (verb: string) => leg.label.replace(new RegExp(`^${verb} `), '');
   let text: string;
   switch (leg.mode) {
     case 'walk':
-      text = `步行 · ${leg.label}`;
+      text = tr(`步行 · ${leg.label}`, `Walking · ${after('Walk')}`);
       break;
     case 'bus':
-      text = `在${plate}上 · ${leg.label}`;
+      text = tr(`在${plate}上 · ${leg.label}`, `On ${plate} · ${after('Bus')}`);
       break;
     case 'drive':
-      text = `驾驶 ${plate} · ${leg.label}`;
+      text = tr(`驾驶 ${plate} · ${leg.label}`, `Driving ${plate} · ${after('Drive')}`);
       break;
     case 'ride':
-      text = `乘坐 ${plate}`;
+      text = tr(`乘坐 ${plate}`, `Riding in ${plate}`);
       break;
     case 'taxi':
-      text = `乘网约车 ${plate} · ${leg.label}`;
+      text = tr(
+        `乘网约车 ${plate} · ${leg.label}`,
+        `In ride-hailing car ${plate} · ${after('Ride-hailing car')}`,
+      );
       break;
     default:
       text = leg.label;
@@ -236,28 +254,29 @@ function selectionTitle(selection: Selection, detail: boolean): string {
     case 'building':
       return buildingName(selection.id);
     case 'vehicle':
-      return vehicleById.get(selection.id)!.plate;
+      return plateOf(selection.id);
     case 'person':
       return personLabel(selection.id, detail);
     case 'sensor':
       return selection.id;
     case 'node':
-      return nodeById.get(selection.id)!.name;
+      return nodeName(selection.id);
     case 'edge':
-      return edgeById.get(selection.id)!.name;
+      return edgeName(selection.id);
   }
 }
 
-/** 某人此刻在哪里（简短）：所在建筑、所乘车辆或正在步行。 */
+/** 某人此刻在哪里（简短，接在称呼之后）：所在建筑、所乘车辆或正在步行。 */
 function whereabouts(id: string, t: number): string {
   const state = personAt(id, t);
-  if (!state) return '不在街区';
+  if (!state) return tr('不在街区', ' outside the district');
   const leg = state.leg;
-  if (leg.vehicle && isRide(leg.mode)) return `在${vehicleById.get(leg.vehicle)!.plate}上`;
-  if (leg.building !== undefined) return `在${buildingName(leg.building)}`;
-  if (leg.mode === 'wait') return leg.label;
-  if (leg.mode === 'walk') return '步行中';
-  return leg.label;
+  if (leg.vehicle && isRide(leg.mode))
+    return tr(`在${plateOf(leg.vehicle)}上`, ` on ${plateOf(leg.vehicle)}`);
+  if (leg.building !== undefined)
+    return tr(`在${buildingName(leg.building)}`, ` at ${buildingName(leg.building)}`);
+  if (leg.mode === 'walk') return tr('步行中', ' walking');
+  return tr(leg.label, ` (${leg.label})`);
 }
 
 function buildingCard(id: number, t: number, on: ReadonlySet<SourceId>, detail: boolean): Card {
@@ -266,15 +285,28 @@ function buildingCard(id: number, t: number, on: ReadonlySet<SourceId>, detail: 
   const company = companies.find((c) => c.buildingId === id);
   const residents = people.filter((p) => p.homeId === id).map((p) => p.id);
   const hosted = events.filter((e) => e.venue.kind === 'building' && e.venue.id === id);
-  const rows: CardRow[] = [{ source: 'gis', text: `${building.kind} · ${building.floors} 层` }];
+  const rows: CardRow[] = [
+    {
+      source: 'gis',
+      text: tr(
+        `${building.kind} · ${building.floors} 层`,
+        `${capitalize(term(building.kind))} · ${building.floors} floors`,
+      ),
+    },
+  ];
   if (shop) {
     rows.push({
       source: 'commerce',
-      text: `${shop.name} · ${shop.category} · ${formatTime(shop.open[0])}–${formatTime(shop.open[1])}`,
+      text: `${term(shop.name)} · ${capitalize(term(shop.category))} · ${formatTime(shop.open[0])}–${formatTime(shop.open[1])}`,
     });
+    const hour = footfallCount(shop, t - 3600, t);
+    const today = footfallCount(shop, startOfDay(dayOf(t)), t);
     rows.push({
       source: 'iot',
-      text: `计数器 ${shop.sensor} · 近一小时进店 ${footfallCount(shop, t - 3600, t)} 人 · 今日累计 ${footfallCount(shop, startOfDay(dayOf(t)), t)} 人`,
+      text: tr(
+        `计数器 ${shop.sensor} · 近一小时进店 ${hour} 人 · 今日累计 ${today} 人`,
+        `Counter ${shop.sensor} · ${hour} visitors in the last hour · ${today} today`,
+      ),
     });
   }
   for (const sensor of ENV_SENSORS.filter((s) => s.buildingId === id)) {
@@ -282,12 +314,21 @@ function buildingCard(id: number, t: number, on: ReadonlySet<SourceId>, detail: 
     rows.push({
       source: 'iot',
       text: reading
-        ? `屋顶温湿度传感器 ${sensor.id} · ${reading.temperature.toFixed(1)}°C · ${reading.humidity}%`
-        : `屋顶温湿度传感器 ${sensor.id} · 离线`,
+        ? tr(
+            `屋顶温湿度传感器 ${sensor.id} · ${reading.temperature.toFixed(1)}°C · ${reading.humidity}%`,
+            `Rooftop sensor ${sensor.id} · ${reading.temperature.toFixed(1)}°C · ${reading.humidity}%`,
+          )
+        : tr(`屋顶温湿度传感器 ${sensor.id} · 离线`, `Rooftop sensor ${sensor.id} · offline`),
     });
   }
   if (company) {
-    rows.push({ source: 'hr', text: `${company.name} · 此刻在岗 ${presence(company.id, t)} 人` });
+    rows.push({
+      source: 'hr',
+      text: tr(
+        `${company.name} · 此刻在岗 ${presence(company.id, t)} 人`,
+        `${term(company.name)} · ${presence(company.id, t)} present now`,
+      ),
+    });
   }
   if (residents.length || hosted.length) {
     // 住户名单等于住址：只在明细视图中列出
@@ -298,12 +339,18 @@ function buildingCard(id: number, t: number, on: ReadonlySet<SourceId>, detail: 
       text: [
         residents.length
           ? detail
-            ? `登记住户 ${residents.length} 人：${roster.join('、')}`
-            : `登记住户 ${residents.length} 人（明细视图中列出住户）`
+            ? tr(
+                `登记住户 ${residents.length} 人：${roster.join('、')}`,
+                `${residents.length} registered residents: ${roster.join(', ')}`,
+              )
+            : tr(
+                `登记住户 ${residents.length} 人（明细视图中列出住户）`,
+                `${residents.length} registered residents (listed in the detail view)`,
+              )
           : '',
         ...hosted
           .filter((e) => dayOf(e.start) === dayOf(t))
-          .map((e) => `${e.title} ${formatTime(e.start)}–${formatTime(e.end)}`),
+          .map((e) => `${term(e.title)} ${formatTime(e.start)}–${formatTime(e.end)}`),
       ]
         .filter(Boolean)
         .join(' · '),
@@ -311,26 +358,36 @@ function buildingCard(id: number, t: number, on: ReadonlySet<SourceId>, detail: 
   }
   const commerce = shop && on.has('commerce');
   const inside = peopleInside(id, t);
-  let truth = inside.length ? `此刻楼内 ${inside.length} 人` : '此刻楼内无人';
+  let truth = inside.length
+    ? tr(`此刻楼内 ${inside.length} 人`, `${inside.length} people inside now`)
+    : tr('此刻楼内无人', 'Nobody inside now');
   const truthRefs: Ref[] = [];
   if (detail && residents.length) {
     // 住户在家几人，外出的人此刻在哪里
     const out = residents.filter((r) => !inside.includes(r));
-    truth += ` · 住户在家 ${residents.length - out.length} 人`;
+    truth += tr(
+      ` · 住户在家 ${residents.length - out.length} 人`,
+      ` · ${residents.length - out.length} residents at home`,
+    );
     if (out.length) {
       const shown = out.slice(0, 4);
-      truth += `，外出 ${out.length} 人：${shown.map((r) => `${personLabel(r, detail)}${whereabouts(r, t)}`).join('、')}`;
-      if (out.length > shown.length) truth += ' 等';
+      const where = list(shown.map((r) => `${personLabel(r, detail)}${whereabouts(r, t)}`));
+      truth += tr(`，外出 ${out.length} 人：${where}`, `, ${out.length} out: ${where}`);
+      truth += more(shown.length, out.length);
       truthRefs.push(...shown.map((r) => personRef(r, detail)));
     }
   } else if (detail && inside.length) {
     const shown = inside.slice(0, 4);
-    truth += `：${shown.map((p) => personLabel(p, detail)).join('、')}${inside.length > shown.length ? ' 等' : ''}`;
+    truth += `${tr('：', ': ')}${list(shown.map((p) => personLabel(p, detail)))}${more(shown.length, inside.length)}`;
     truthRefs.push(...shown.map((p) => personRef(p, detail)));
   }
   return {
-    kind: on.has('gis') ? building.kind : '建筑',
-    title: on.has('gis') ? building.name : commerce ? shop.name : `建筑 #${id}`,
+    kind: on.has('gis') ? capitalize(term(building.kind)) : tr('建筑', 'Building'),
+    title: on.has('gis')
+      ? term(building.name)
+      : commerce
+        ? term(shop.name)
+        : tr(`建筑 #${id}`, `Building #${id}`),
     iri: `:building/${id}`,
     cls: commerce ? (shop.category === '咖啡' ? ':Cafe' : ':Shop') : ':Building',
     rows,
@@ -344,46 +401,57 @@ function vehicleCard(id: string, t: number, detail: boolean): Card {
   const state = vehicleAt(vehicle, t);
   const kind =
     vehicle.kind === 'bus'
-      ? '公交'
+      ? tr('公交', 'Bus')
       : vehicle.kind === 'taxi'
-        ? '网约车'
+        ? tr('网约车', 'Ride-hailing car')
         : vehicle.kind === 'van'
-          ? '配送车'
-          : '小汽车';
+          ? tr('配送车', 'Delivery van')
+          : tr('小汽车', 'Car');
   const rows: CardRow[] = [
     {
       source: 'traffic',
       text: state
-        ? `${state.waiting ? '等待红灯' : `${Math.round(state.speed * 3.6)} km/h`} · 坐标 (${Math.round(state.x)}, ${Math.round(state.y)})`
-        : '此刻不在路上',
+        ? `${state.waiting ? tr('等待红灯', 'Waiting at a red light') : `${Math.round(state.speed * 3.6)} km/h`} · ${tr('坐标', 'position')} (${Math.round(state.x)}, ${Math.round(state.y)})`
+        : tr('此刻不在路上', 'Not on the road now'),
     },
   ];
   if (state) {
     const edge = edgeById.get(state.edge)!;
     rows.push({
       source: 'gis',
-      text: state.waiting ? `停在 ${nodeById.get(state.node)!.name} 路口` : `行驶在 ${edge.name}`,
+      text: state.waiting
+        ? tr(`停在 ${nodeName(state.node)} 路口`, `Stopped at ${nodeName(state.node)}`)
+        : tr(`行驶在 ${term(edge.name)}`, `Driving on ${term(edge.name)}`),
       refs: [state.waiting ? nodeRef(state.node) : edgeRef(edge.id)],
     });
   }
   if (vehicle.owner) {
     const owner = personById.get(vehicle.owner)!;
     const company = companyById.get(carOwners.find((c) => c.person === owner.id)!.companyId)!;
-    const who = detail && owner.persona ? owner.name! : owner.id;
+    const who = detail && owner.persona ? term(owner.name!) : owner.id;
+    const employer = term(company.name);
     rows.push({
       source: 'hr',
-      text: `停车许可 · ${company.name}员工${detail && owner.persona ? ` ${who}` : `（${who}）`}`,
+      text: tr(
+        `停车许可 · ${company.name}员工${detail && owner.persona ? ` ${who}` : `（${who}）`}`,
+        `Parking permit · ${employer} employee ${detail && owner.persona ? who : `(${who})`}`,
+      ),
       refs: [
         { name: who, target: { type: 'person', id: owner.id } },
-        { name: company.name, target: building(company.buildingId) },
+        { name: employer, target: building(company.buildingId) },
       ],
     });
   }
   if (vehicle.kind === 'taxi' && vehicle.driver === 'P05') {
     rows.push({
       source: 'hr',
-      text: detail ? '司机王磊 · 畅行出行员工（虚构）' : '司机为畅行出行员工（聚合视图不显示姓名）',
-      refs: detail ? [{ name: '王磊', target: { type: 'person', id: 'P05' } }] : [],
+      text: detail
+        ? tr('司机王磊 · 畅行出行员工（虚构）', 'Driver Wang Lei · SmoothRide employee (fictional)')
+        : tr(
+            '司机为畅行出行员工（聚合视图不显示姓名）',
+            'The driver is a SmoothRide employee (name hidden in the aggregate view)',
+          ),
+      refs: detail ? [{ name: term('王磊'), target: { type: 'person', id: 'P05' } }] : [],
     });
   }
   const day = dayOf(t);
@@ -395,11 +463,14 @@ function vehicleCard(id: string, t: number, detail: boolean): Card {
     // 公交排班：午后在湖滨站换班
     const crew = busCrews.find((c) => c.bus === id)!;
     const handover = handoversOf(day).find((h) => h.bus === id);
-    const shift = handover && t >= handover.arrive ? '晚班' : '早班';
-    const onDuty = shift === '晚班' ? crew.late : crew.early;
+    const late = Boolean(handover && t >= handover.arrive);
+    const onDuty = late ? crew.late : crew.early;
     rows.push({
       source: 'mobility',
-      text: `车上 ${busLoad(id, t)} 人 · 今日上车刷卡 ${taps.length} 次 · 当班司机 ${onDuty}（${shift}）`,
+      text: tr(
+        `车上 ${busLoad(id, t)} 人 · 今日上车刷卡 ${taps.length} 次 · 当班司机 ${onDuty}（${late ? '晚班' : '早班'}）`,
+        `${busLoad(id, t)} on board · ${taps.length} boarding taps today · driver on duty ${onDuty} (${late ? 'late' : 'early'} shift)`,
+      ),
       refs: [{ name: onDuty, target: { type: 'person', id: onDuty } }],
     });
   }
@@ -411,8 +482,14 @@ function vehicleCard(id: string, t: number, detail: boolean): Card {
     rows.push({
       source: 'mobility',
       text: current
-        ? `司机 ${who} · ${t < current.pickup ? '前往接客' : '载客中'} · 乘客 ${personLabel(current.person, detail)} · 今日已完成 ${done} 单`
-        : `司机 ${who} · 空车 · 今日已完成 ${done} 单`,
+        ? tr(
+            `司机 ${who} · ${t < current.pickup ? '前往接客' : '载客中'} · 乘客 ${personLabel(current.person, detail)} · 今日已完成 ${done} 单`,
+            `Driver ${who} · ${t < current.pickup ? 'on the way to pick up' : 'with passenger'} · passenger ${personLabel(current.person, detail)} · ${done} trips completed today`,
+          )
+        : tr(
+            `司机 ${who} · 空车 · 今日已完成 ${done} 单`,
+            `Driver ${who} · vacant · ${done} trips completed today`,
+          ),
       refs: [
         personRef(vehicle.driver!, detail),
         ...(current ? [personRef(current.person, detail)] : []),
@@ -421,25 +498,32 @@ function vehicleCard(id: string, t: number, detail: boolean): Card {
   }
   let truth: string;
   const truthRefs: Ref[] = [];
-  if (!state) truth = '此刻不在街区内的道路上';
-  else if (!driver) truth = '停靠中，驾驶人不在车上';
+  if (!state) truth = tr('此刻不在街区内的道路上', 'Not on a road in the district now');
+  else if (!driver) truth = tr('停靠中，驾驶人不在车上', 'Parked; the driver is not on board');
   else {
-    const role = vehicle.kind === 'bus' ? '司机' : vehicle.kind === 'van' ? '配送员' : '驾驶人';
+    const role =
+      vehicle.kind === 'bus'
+        ? tr('司机', 'Driver')
+        : vehicle.kind === 'van'
+          ? tr('配送员', 'Courier')
+          : tr('驾驶人', 'Driver');
     truth = `${role} ${personLabel(driver, detail)}`;
     truthRefs.push(personRef(driver, detail));
     // 车上的人：最多列出四位，可以逐个点开
     if (passengers.length) {
       const shown = passengers.slice(0, 4);
-      truth += ` · 车上 ${shown.map((p) => personLabel(p, detail)).join('、')}`;
-      if (passengers.length > shown.length) truth += ` 等 ${passengers.length} 人`;
+      const names = list(shown.map((p) => personLabel(p, detail)));
+      truth += tr(` · 车上 ${names}`, ` · on board: ${names}`);
+      if (passengers.length > shown.length)
+        truth += tr(` 等 ${passengers.length} 人`, ` (${passengers.length} in total)`);
       truthRefs.push(...shown.map((p) => personRef(p, detail)));
     }
-    if (vehicle.role === 'through') truth += ' · 路过街区';
-    if (vehicle.role === 'guest') truth += ' · 开车来访';
+    if (vehicle.role === 'through') truth += tr(' · 路过街区', ' · passing through');
+    if (vehicle.role === 'guest') truth += tr(' · 开车来访', ' · visiting by car');
   }
   return {
     kind,
-    title: vehicle.plate,
+    title: term(vehicle.plate),
     iri: `:vehicle/${id}`,
     cls: vehicle.kind === 'bus' ? ':Bus' : vehicle.kind === 'taxi' ? ':Taxi' : ':Vehicle',
     rows,
@@ -462,15 +546,24 @@ function personCard(id: string, t: number, detail: boolean): Card {
     rows.push({
       source: 'community',
       text: [
-        detail ? `登记居民 · 住在${home}` : '登记居民（聚合视图不显示住址）',
-        ...today.map((e) => (detail ? `报名${e.title}` : '今日报名社区活动')),
+        detail
+          ? tr(`登记居民 · 住在${home}`, `Registered resident · lives at ${home}`)
+          : tr(
+              '登记居民（聚合视图不显示住址）',
+              'Registered resident (address hidden in the aggregate view)',
+            ),
+        ...today.map((e) =>
+          detail
+            ? tr(`报名${e.title}`, `signed up for ${term(e.title)}`)
+            : tr('今日报名社区活动', 'signed up for a community event today'),
+        ),
       ].join(' · '),
       refs: detail
         ? [
             { name: home, target: building(person.homeId!) },
             ...today
               .filter((e) => e.venue.kind === 'building')
-              .map((e) => ({ name: e.title, target: building(e.venue.id) })),
+              .map((e) => ({ name: term(e.title), target: building(e.venue.id) })),
           ]
         : [],
     });
@@ -479,23 +572,34 @@ function personCard(id: string, t: number, detail: boolean): Card {
     const company = companyById.get(person.companyId)!;
     const session = sessionsOf(day).find((s) => s.personId === id && s.start <= t);
     const permit = vehicleByOwner.get(id);
-    const parts = [`${company.name}员工`];
+    const employer = term(company.name);
+    const parts = [tr(`${company.name}员工`, `Employee of ${employer}`)];
     const refs: Ref[] = company.buildingId
-      ? [{ name: company.name, target: building(company.buildingId) }]
+      ? [{ name: employer, target: building(company.buildingId) }]
       : [];
     if (company.buildingId) {
       parts.push(
         !session
-          ? '今日尚无门禁记录'
+          ? tr('今日尚无门禁记录', 'no access records today')
           : !detail
-            ? '今日有门禁记录'
+            ? tr('今日有门禁记录', 'access records today')
             : session.end <= t
-              ? `今日 ${formatTime(session.start)} 进门，${formatTime(session.end)} 离开`
-              : `今日 ${formatTime(session.start)} 进门`,
+              ? tr(
+                  `今日 ${formatTime(session.start)} 进门，${formatTime(session.end)} 离开`,
+                  `in at ${formatTime(session.start)}, out at ${formatTime(session.end)} today`,
+                )
+              : tr(
+                  `今日 ${formatTime(session.start)} 进门`,
+                  `in at ${formatTime(session.start)} today`,
+                ),
       );
     }
     if (permit) {
-      parts.push(detail ? `停车许可 ${permit.plate}` : '有停车许可');
+      parts.push(
+        detail
+          ? tr(`停车许可 ${term(permit.plate)}`, `parking permit ${term(permit.plate)}`)
+          : tr('有停车许可', 'has a parking permit'),
+      );
       if (detail) refs.push(vehicleRef(permit.id));
     }
     rows.push({ source: 'hr', text: parts.join(' · '), refs });
@@ -506,8 +610,11 @@ function personCard(id: string, t: number, detail: boolean): Card {
     rows.push({
       source: 'mobility',
       text: detail
-        ? `公交卡 ${person.card} · 今日刷卡 ${taps.length} 次，最近 ${formatTime(last.time)} 在${nodeById.get(last.node)!.name}${last.kind === 'board' ? '上车' : '下车'}（${vehicleById.get(last.bus)!.plate}）`
-        : `今日公交刷卡 ${taps.length} 次`,
+        ? tr(
+            `公交卡 ${person.card} · 今日刷卡 ${taps.length} 次，最近 ${formatTime(last.time)} 在${nodeName(last.node)}${last.kind === 'board' ? '上车' : '下车'}（${plateOf(last.bus)}）`,
+            `Transit card ${person.card} · ${taps.length} taps today, last at ${formatTime(last.time)}: ${last.kind === 'board' ? 'boarded' : 'alighted'} at ${nodeName(last.node)} (${plateOf(last.bus)})`,
+          )
+        : tr(`今日公交刷卡 ${taps.length} 次`, `${taps.length} transit taps today`),
       refs: detail ? [nodeRef(last.node), vehicleRef(last.bus)] : [],
     });
   }
@@ -519,8 +626,11 @@ function personCard(id: string, t: number, detail: boolean): Card {
     rows.push({
       source: 'mobility',
       text: detail
-        ? `今日网约车订单 ${orders.length} 单，最近一单 ${vehicleById.get(last.vehicle)!.plate}`
-        : `今日网约车订单 ${orders.length} 单`,
+        ? tr(
+            `今日网约车订单 ${orders.length} 单，最近一单 ${plateOf(last.vehicle)}`,
+            `${orders.length} ride orders today, the latest with ${plateOf(last.vehicle)}`,
+          )
+        : tr(`今日网约车订单 ${orders.length} 单`, `${orders.length} ride orders today`),
       refs: detail ? [vehicleRef(last.vehicle)] : [],
     });
   }
@@ -528,7 +638,7 @@ function personCard(id: string, t: number, detail: boolean): Card {
   if (own?.kind === 'taxi') {
     rows.push({
       source: 'mobility',
-      text: `网约车司机 · ${own.plate}`,
+      text: tr(`网约车司机 · ${term(own.plate)}`, `Ride-hailing driver · ${term(own.plate)}`),
       refs: [vehicleRef(own.id)],
     });
   }
@@ -536,7 +646,10 @@ function personCard(id: string, t: number, detail: boolean): Card {
   if (crew) {
     rows.push({
       source: 'mobility',
-      text: `公交司机 · ${vehicleById.get(crew.bus)!.plate}${crew.early === id ? '早班' : '晚班'}`,
+      text: tr(
+        `公交司机 · ${plateOf(crew.bus)}${crew.early === id ? '早班' : '晚班'}`,
+        `Bus driver · ${plateOf(crew.bus)}, ${crew.early === id ? 'early' : 'late'} shift`,
+      ),
       refs: [vehicleRef(crew.bus)],
     });
   }
@@ -547,11 +660,17 @@ function personCard(id: string, t: number, detail: boolean): Card {
     rows.push({
       source: 'commerce',
       text: !shop
-        ? `会员${detail ? ` ${person.member}` : ''} · 今日尚无消费`
+        ? tr(
+            `会员${detail ? ` ${person.member}` : ''} · 今日尚无消费`,
+            `Member${detail ? ` ${person.member}` : ''} · no purchases today`,
+          )
         : detail
-          ? `会员 ${person.member} · 今日消费 ${bought.length} 笔，共 ${total} 元，最近在${shop.name}`
-          : `会员 · 今日消费 ${bought.length} 笔`,
-      refs: shop && detail ? [{ name: shop.name, target: building(shop.buildingId) }] : [],
+          ? tr(
+              `会员 ${person.member} · 今日消费 ${bought.length} 笔，共 ${total} 元，最近在${shop.name}`,
+              `Member ${person.member} · ${bought.length} purchases today, ¥${total} in total, latest at ${term(shop.name)}`,
+            )
+          : tr(`会员 · 今日消费 ${bought.length} 笔`, `Member · ${bought.length} purchases today`),
+      refs: shop && detail ? [{ name: term(shop.name), target: building(shop.buildingId) }] : [],
     });
   }
   // 停车许可把车牌对应到人：开自己的车时，交通时序给出车辆位置
@@ -559,10 +678,13 @@ function personCard(id: string, t: number, detail: boolean): Card {
   if (leg?.mode === 'drive' && leg.vehicle && vehicleById.get(leg.vehicle)!.owner === id) {
     const v = vehicleAt(vehicleById.get(leg.vehicle)!, t);
     if (v) {
-      const plate = vehicleById.get(leg.vehicle)!.plate;
+      const plate = plateOf(leg.vehicle);
       rows.push({
         source: 'traffic',
-        text: `所驾车辆 ${plate} 此刻${v.waiting ? `停在 ${nodeById.get(v.node)!.name} 路口` : `行驶在 ${edgeById.get(v.edge)!.name}`}`,
+        text: tr(
+          `所驾车辆 ${plate} 此刻${v.waiting ? `停在 ${nodeName(v.node)} 路口` : `行驶在 ${edgeName(v.edge)}`}`,
+          `Car ${plate} is ${v.waiting ? `stopped at ${nodeName(v.node)}` : `driving on ${edgeName(v.edge)}`}`,
+        ),
         refs: [vehicleRef(leg.vehicle), v.waiting ? nodeRef(v.node) : edgeRef(v.edge)],
       });
     }
@@ -570,9 +692,9 @@ function personCard(id: string, t: number, detail: boolean): Card {
   const kind =
     person.kind === 'resident'
       ? person.companyId
-        ? '居民 · 员工'
-        : '居民'
-      : `外来人员${person.role ? ` · ${person.role}` : ''}`;
+        ? tr('居民 · 员工', 'Resident · employee')
+        : tr('居民', 'Resident')
+      : `${tr('外来人员', 'Non-resident')}${person.role ? ` · ${term(person.role)}` : ''}`;
   const truth = state ? describeLeg(state.leg, person, detail) : null;
   return {
     kind,
@@ -580,13 +702,21 @@ function personCard(id: string, t: number, detail: boolean): Card {
     iri: `:person/${id}`,
     cls: person.companyId ? ':Employee' : ':Person',
     rows,
-    truth: truth?.text ?? '此刻不在街区内',
+    truth: truth?.text ?? tr('此刻不在街区内', 'Outside the district now'),
     truthRefs: truth?.refs,
-    empty: '各数据源中都没有此人的记录：只有模拟实况知道此人在这里。',
+    empty: tr(
+      '各数据源中都没有此人的记录：只有模拟实况知道此人在这里。',
+      'No source has any record of this person; only the simulation knows they are here.',
+    ),
   };
 }
 
-const LIGHT = { green: '绿灯', yellow: '黄灯', red: '红灯' } as const;
+const light = (state: 'green' | 'yellow' | 'red') =>
+  ({
+    green: tr('绿灯', 'green'),
+    yellow: tr('黄灯', 'yellow'),
+    red: tr('红灯', 'red'),
+  })[state];
 const kmh = (speed: number) => Math.round(speed * 3.6);
 
 function nodeCard(id: number, t: number, detail: boolean): Card {
@@ -595,7 +725,7 @@ function nodeCard(id: number, t: number, detail: boolean): Card {
   const rows: CardRow[] = [
     {
       source: 'gis',
-      text: `${gate ? '街区出入口' : '路口'} · 坐标 (${node.x}, ${node.y})`,
+      text: `${gate ? tr('街区出入口', 'District entrance') : tr('路口', 'Intersection')} · ${tr('坐标', 'position')} (${node.x}, ${node.y})`,
     },
   ];
   const states = statesAt(t);
@@ -607,19 +737,33 @@ function nodeCard(id: number, t: number, detail: boolean): Card {
     source: 'traffic',
     text: [
       gate
-        ? '没有信号灯'
-        : `南北向${LIGHT[signalState(id, 'ns', t)]} · 东西向${LIGHT[signalState(id, 'ew', t)]}`,
+        ? tr('没有信号灯', 'No traffic lights')
+        : tr(
+            `南北向${light(signalState(id, 'ns', t))} · 东西向${light(signalState(id, 'ew', t))}`,
+            `North–south ${light(signalState(id, 'ns', t))} · east–west ${light(signalState(id, 'ew', t))}`,
+          ),
       waiting.length
-        ? `等灯 ${waiting.length} 辆（${(['ew', 'ns'] as const)
-            .map(
-              (axis) => [axis, waiting.filter((v) => states.get(v)!.axis === axis).length] as const,
-            )
-            .filter(([, n]) => n)
-            .map(([axis, n]) => `${axis === 'ew' ? '东西向' : '南北向'} ${n} 辆`)
-            .join(
-              '，',
-            )}）：${shown.map((v) => vehicleById.get(v)!.plate).join('、')}${waiting.length > shown.length ? ' 等' : ''}`
-        : '此刻没有车辆等灯',
+        ? (() => {
+            const axes = (['ew', 'ns'] as const)
+              .map(
+                (axis) =>
+                  [axis, waiting.filter((v) => states.get(v)!.axis === axis).length] as const,
+              )
+              .filter(([, n]) => n)
+              .map(([axis, n]) =>
+                tr(
+                  `${axis === 'ew' ? '东西向' : '南北向'} ${n} 辆`,
+                  `${n} ${axis === 'ew' ? 'east–west' : 'north–south'}`,
+                ),
+              )
+              .join(tr('，', ', '));
+            const plates = `${list(shown.map(plateOf))}${more(shown.length, waiting.length)}`;
+            return tr(
+              `等灯 ${waiting.length} 辆（${axes}）：${plates}`,
+              `${waiting.length} waiting at the light (${axes}): ${plates}`,
+            );
+          })()
+        : tr('此刻没有车辆等灯', 'No vehicles waiting at the light'),
     ].join(' · '),
     refs: shown.map(vehicleRef),
   });
@@ -630,8 +774,11 @@ function nodeCard(id: number, t: number, detail: boolean): Card {
     rows.push({
       source: 'mobility',
       text: next
-        ? `公交站 · 下一班 ${vehicleById.get(next.bus)!.plate} ${t >= next.arrive ? '正在进站' : `${formatTime(next.arrive)} 到站`}`
-        : '公交站 · 今日已收车',
+        ? tr(
+            `公交站 · 下一班 ${plateOf(next.bus)} ${t >= next.arrive ? '正在进站' : `${formatTime(next.arrive)} 到站`}`,
+            `Bus stop · next bus ${plateOf(next.bus)} ${t >= next.arrive ? 'arriving now' : `at ${formatTime(next.arrive)}`}`,
+          )
+        : tr('公交站 · 今日已收车', 'Bus stop · service has ended for today'),
       refs: next ? [vehicleRef(next.bus)] : [],
     });
     // 站台上候车的人
@@ -645,19 +792,29 @@ function nodeCard(id: number, t: number, detail: boolean): Card {
       .map((p) => p.person);
     if (waitingPeople.length) {
       const names = waitingPeople.slice(0, detail ? 4 : 0);
+      const who = names.length
+        ? `${tr('：', ': ')}${list(names.map((p) => personLabel(p, detail)))}${more(names.length, waitingPeople.length)}`
+        : '';
       parts.push(
-        `站台候车 ${waitingPeople.length} 人${names.length ? `：${names.map((p) => personLabel(p, detail)).join('、')}${waitingPeople.length > names.length ? ' 等' : ''}` : ''}`,
+        tr(
+          `站台候车 ${waitingPeople.length} 人${who}`,
+          `${waitingPeople.length} waiting at the platform${who}`,
+        ),
       );
       truthRefs.push(...names.map((p) => personRef(p, detail)));
     } else {
-      parts.push('站台无人候车');
+      parts.push(tr('站台无人候车', 'Nobody waiting at the platform'));
     }
   }
   const nearby = pedestriansAt(t).filter((p) => Math.hypot(p.x - node.x, p.y - node.y) < 40);
-  parts.push(nearby.length ? `路口附近行人 ${nearby.length} 人` : '路口附近没有行人');
+  parts.push(
+    nearby.length
+      ? tr(`路口附近行人 ${nearby.length} 人`, `${nearby.length} pedestrians nearby`)
+      : tr('路口附近没有行人', 'No pedestrians nearby'),
+  );
   return {
-    kind: gate ? '出入口' : '路口',
-    title: node.name,
+    kind: gate ? tr('出入口', 'Entrance') : tr('路口', 'Intersection'),
+    title: term(node.name),
     iri: `:intersection/${id}`,
     cls: ':Intersection',
     rows,
@@ -675,23 +832,34 @@ function edgeCard(id: number, t: number): Card {
   const average = speeds.get(id);
   const shown = on.slice(0, 4);
   return {
-    kind: '路段',
-    title: edge.name,
+    kind: tr('路段', 'Road segment'),
+    title: term(edge.name),
     iri: `:road/${id}`,
     cls: ':RoadSegment',
     rows: [
-      { source: 'gis', text: `长 ${Math.round(edge.length)} 米` },
+      {
+        source: 'gis',
+        text: tr(`长 ${Math.round(edge.length)} 米`, `${Math.round(edge.length)} m long`),
+      },
       {
         source: 'traffic',
         text: [
-          `此刻 ${on.length} 辆车${on.length ? `（行驶 ${moving.length} 辆）` : ''}`,
-          average ? `近 10 分钟平均车速 ${kmh(average)} km/h` : '近 10 分钟没有车辆驶过',
+          tr(
+            `此刻 ${on.length} 辆车${on.length ? `（行驶 ${moving.length} 辆）` : ''}`,
+            `${on.length} vehicles now${on.length ? ` (${moving.length} moving)` : ''}`,
+          ),
+          average
+            ? tr(
+                `近 10 分钟平均车速 ${kmh(average)} km/h`,
+                `average speed over the last 10 minutes ${kmh(average)} km/h`,
+              )
+            : tr('近 10 分钟没有车辆驶过', 'no vehicles in the last 10 minutes'),
         ].join(' · '),
       },
     ],
     truth: on.length
-      ? `路上：${shown.map((v) => vehicleById.get(v)!.plate).join('、')}${on.length > shown.length ? ' 等' : ''}`
-      : '此刻路上没有车',
+      ? `${tr('路上：', 'On the road: ')}${list(shown.map(plateOf))}${more(shown.length, on.length)}`
+      : tr('此刻路上没有车', 'No vehicles on the road now'),
     truthRefs: shown.map(vehicleRef),
   };
 }
@@ -704,18 +872,32 @@ function sensorCard(id: string, t: number): Card {
     {
       source: 'iot',
       text: reading
-        ? `${reading.temperature.toFixed(1)}°C · 湿度 ${reading.humidity}% · ${formatTime(reading.ts)} 上报`
-        : '离线，没有最新读数',
+        ? tr(
+            `${reading.temperature.toFixed(1)}°C · 湿度 ${reading.humidity}% · ${formatTime(reading.ts)} 上报`,
+            `${reading.temperature.toFixed(1)}°C · humidity ${reading.humidity}% · reported at ${formatTime(reading.ts)}`,
+          )
+        : tr('离线，没有最新读数', 'Offline, no recent reading'),
     },
-    { source: 'gis', text: `${placeOf(sensor)} · ${sensor.mount}` },
+    { source: 'gis', text: `${placeOf(sensor)} · ${term(sensor.mount)}` },
     {
       source: 'weather',
-      text: reading
-        ? `气象站 ${station.temperature.toFixed(1)}°C · 湿度 ${station.humidity}% · 温差 ${reading.temperature - station.temperature >= 0 ? '+' : '−'}${Math.abs(reading.temperature - station.temperature).toFixed(1)}°C`
-        : `气象站 ${station.temperature.toFixed(1)}°C · 湿度 ${station.humidity}%`,
+      text:
+        tr(
+          `气象站 ${station.temperature.toFixed(1)}°C · 湿度 ${station.humidity}%`,
+          `Weather station ${station.temperature.toFixed(1)}°C · humidity ${station.humidity}%`,
+        ) +
+        (reading
+          ? ` · ${tr('温差', 'difference')} ${reading.temperature - station.temperature >= 0 ? '+' : '−'}${Math.abs(reading.temperature - station.temperature).toFixed(1)}°C`
+          : ''),
     },
   ];
-  return { kind: '温湿度传感器', title: id, iri: `:sensor/${id}`, cls: ':EnvSensor', rows };
+  return {
+    kind: tr('温湿度传感器', 'Temperature and humidity sensor'),
+    title: id,
+    iri: `:sensor/${id}`,
+    cls: ':EnvSensor',
+    rows,
+  };
 }
 
 /** 结果行对应的实体（公园中的地点没有详情卡片）。 */
@@ -822,7 +1004,8 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
   const timeline = root.querySelector<HTMLElement>('.timeline')!;
   const reduced = prefersReducedMotion();
 
-  let active: CityQuery = cityQueries[0];
+  const queries = cityQueries();
+  let active: CityQuery = queries[0];
   let t = active.suggest;
   let detail = false;
   let sources = new Set<SourceId>(ALL_SOURCES);
@@ -848,7 +1031,7 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
     const notes = result.notes
       .map(
         (note) =>
-          `<li${note.includes('未接入') ? ' class="is-missing"' : ''}>${escapeHtml(note)}</li>`,
+          `<li${note.includes(tr('未接入', 'not connected')) ? ' class="is-missing"' : ''}>${escapeHtml(note)}</li>`,
       )
       .join('');
     const rows = result.rows
@@ -861,10 +1044,10 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
       })
       .join('');
     const toLayers = result.entities.length
-      ? '<button type="button" class="to-layers" data-city-to-layers>在分层视图中查看</button>'
+      ? `<button type="button" class="to-layers" data-city-to-layers>${tr('在分层视图中查看', 'View in the layered view')}</button>`
       : '';
     const html = `
-      <p class="results-head${result.status === 'unavailable' ? ' is-unavailable' : ''}">结果 <span>${escapeHtml(result.summary)}</span>${toLayers}</p>
+      <p class="results-head${result.status === 'unavailable' ? ' is-unavailable' : ''}">${tr('结果', 'Results')} <span>${escapeHtml(result.summary)}</span>${toLayers}</p>
       ${notes ? `<ul class="notes" role="list">${notes}</ul>` : ''}
       ${rows ? `<ul role="list">${rows}</ul>` : ''}`;
     if (html !== lastResultHtml) {
@@ -902,25 +1085,25 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
     );
     const foot =
       connected.length >= 2
-        ? `${connected.length} 个数据源的记录映射到同一个 IRI，在图谱中是同一个实体。<button type="button" class="to-layers" data-city-to-layers>在分层视图中查看</button>`
+        ? `${tr(`${connected.length} 个数据源的记录映射到同一个 IRI，在图谱中是同一个实体。`, `Records from ${connected.length} sources map to the same IRI and are one entity in the graph.`)}<button type="button" class="to-layers" data-city-to-layers>${tr('在分层视图中查看', 'View in the layered view')}</button>`
         : connected.length === 1
-          ? '目前只有一个已接入的数据源描述它。'
+          ? tr('目前只有一个已接入的数据源描述它。', 'Only one connected source describes it.')
           : !data.rows.length && data.empty
             ? escapeHtml(data.empty)
-            : '没有已接入的数据源描述它。';
+            : tr('没有已接入的数据源描述它。', 'No connected source describes it.');
     const truth = data.truth
-      ? `<p class="card-truth"><span>模拟实况</span><span class="card-text">${linkify(data.truth, data.truthRefs)}</span></p>`
+      ? `<p class="card-truth"><span>${tr('模拟实况', 'Simulation')}</span><span class="card-text">${linkify(data.truth, data.truthRefs)}</span></p>`
       : '';
     const rows = data.rows
       .map((row) => {
         const source = sourceById.get(row.source)!;
         const on = sources.has(row.source);
-        return `<li${on ? '' : ' class="is-off"'} style="--source:${source.color}"><span class="card-source">${escapeHtml(source.name)}</span><span class="card-text">${on ? linkify(row.text, row.refs) : '未接入'}</span></li>`;
+        return `<li${on ? '' : ' class="is-off"'} style="--source:${source.color}"><span class="card-source">${escapeHtml(source.name)}</span><span class="card-text">${on ? linkify(row.text, row.refs) : tr('未接入', 'Not connected')}</span></li>`;
       })
       .join('');
     const previous = trail.at(-1);
     const back = previous
-      ? `<button type="button" class="card-back" data-card-back>← 返回 ${escapeHtml(selectionTitle(previous, detail))}</button>`
+      ? `<button type="button" class="card-back" data-card-back>← ${tr('返回', 'Back to')} ${escapeHtml(selectionTitle(previous, detail))}</button>`
       : '';
     const html = `
       ${back}
@@ -930,8 +1113,8 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
           <h3 class="card-title">${escapeHtml(data.title)}</h3>
         </div>
         <div class="card-actions">
-          <button type="button" class="card-close" data-card-collapse aria-expanded="${!cardCollapsed}" aria-label="${cardCollapsed ? '展开详情' : '收起详情'}" title="${cardCollapsed ? '展开' : '收起'}">${cardCollapsed ? CHEVRON_UP : CHEVRON_DOWN}</button>
-          <button type="button" class="card-close" data-card-close aria-label="关闭详情" title="关闭">${CLOSE_ICON}</button>
+          <button type="button" class="card-close" data-card-collapse aria-expanded="${!cardCollapsed}" aria-label="${cardCollapsed ? tr('展开详情', 'Expand details') : tr('收起详情', 'Collapse details')}" title="${cardCollapsed ? tr('展开', 'Expand') : tr('收起', 'Collapse')}">${cardCollapsed ? CHEVRON_UP : CHEVRON_DOWN}</button>
+          <button type="button" class="card-close" data-card-close aria-label="${tr('关闭详情', 'Close details')}" title="${tr('关闭', 'Close')}">${CLOSE_ICON}</button>
         </div>
       </div>
       <p class="card-iri"><code>${escapeHtml(data.iri)}</code><span>${escapeHtml(data.cls)}</span></p>
@@ -969,14 +1152,18 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
     clock.textContent = formatTime(t);
     if (sources.has('weather')) {
       const o = observationAt(t);
-      const parts = [o.condition, `${Math.round(o.temperature)}°C`, `湿度 ${o.humidity}%`];
-      if (o.precipitation > 0) parts.push(`降水 ${o.precipitation} mm`);
-      if (o.visibility < 2000) parts.push(`能见度 ${o.visibility} m`);
-      if (o.wind >= 6) parts.push(`风 ${Math.round(o.wind)} m/s`);
+      const parts = [
+        term(o.condition),
+        `${Math.round(o.temperature)}°C`,
+        `${tr('湿度', 'humidity')} ${o.humidity}%`,
+      ];
+      if (o.precipitation > 0) parts.push(`${tr('降水', 'precipitation')} ${o.precipitation} mm`);
+      if (o.visibility < 2000) parts.push(`${tr('能见度', 'visibility')} ${o.visibility} m`);
+      if (o.wind >= 6) parts.push(`${tr('风', 'wind')} ${Math.round(o.wind)} m/s`);
       weather.textContent = parts.join(' · ');
       weather.classList.remove('is-off');
     } else {
-      weather.textContent = '气象未接入';
+      weather.textContent = tr('气象未接入', 'Weather not connected');
       weather.classList.add('is-off');
     }
   };
@@ -994,7 +1181,7 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
     markerBox.innerHTML = dayMarkers(day)
       .map(
         (m) =>
-          `<span class="marker marker-${m.kind}" style="left:${percent(m.from)}%;width:${percent(m.to) - percent(m.from)}%" title="${escapeHtml(`${m.label} ${formatTime(m.from)}–${formatTime(m.to)}`)}"><i>${escapeHtml(m.label)}</i></span>`,
+          `<span class="marker marker-${m.kind}" style="left:${percent(m.from)}%;width:${percent(m.to) - percent(m.from)}%" title="${escapeHtml(`${term(m.label)} ${formatTime(m.from)}–${formatTime(m.to)}`)}"><i>${escapeHtml(term(m.label))}</i></span>`,
       )
       .join('');
   };
@@ -1030,7 +1217,7 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
     if (value && t >= endOfDay(DAY_COUNT - 1)) t = startOfDay(0);
     playing = value;
     playButton.setAttribute('aria-pressed', String(playing));
-    playButton.setAttribute('aria-label', playing ? '暂停' : '播放');
+    playButton.setAttribute('aria-label', playing ? tr('暂停', 'Pause') : tr('播放', 'Play'));
     cancelAnimationFrame(frame);
     lastFrame = 0;
     if (playing) frame = requestAnimationFrame(tick);
@@ -1069,9 +1256,12 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
       const id = badge.dataset.sourceNeed as SourceId;
       badge.hidden = !active.sources.includes(id);
       badge.classList.toggle('is-missing', !sources.has(id));
-      badge.textContent = sources.has(id) ? '需要' : '缺少';
+      badge.textContent = sources.has(id) ? tr('需要', 'Needed') : tr('缺少', 'Missing');
     });
-    sourceCount.textContent = `${sources.size} / ${SOURCES.length} 已接入`;
+    sourceCount.textContent = tr(
+      `${sources.size} / ${SOURCES.length} 已接入`,
+      `${sources.size} / ${SOURCES.length} connected`,
+    );
     syncHud();
     scene?.setSources(sources);
   };
@@ -1121,14 +1311,14 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
   groupTabs.forEach((tab) =>
     tab.addEventListener(
       'click',
-      () => showQuery(cityQueries.find((q) => q.group === tab.dataset.groupTab)!),
+      () => showQuery(queries.find((q) => q.group === tab.dataset.groupTab)!),
       { signal },
     ),
   );
   queryButtons.forEach((button) =>
     button.addEventListener(
       'click',
-      () => showQuery(cityQueries.find((q) => q.id === button.dataset.cityQuery)!),
+      () => showQuery(queries.find((q) => q.id === button.dataset.cityQuery)!),
       { signal },
     ),
   );
@@ -1216,7 +1406,9 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
   // ── 夜景显示：场景始终按夜间光照呈现，模拟时间不变 ──
   const syncNightButton = () => {
     nightButton.setAttribute('aria-pressed', String(nightView));
-    nightButton.title = nightView ? '夜景显示：已开启' : '夜景显示：光照跟随模拟时间';
+    nightButton.title = nightView
+      ? tr('夜景显示：已开启', 'Night view: on')
+      : tr('夜景显示：光照跟随模拟时间', 'Night view: off, lighting follows the simulated time');
   };
   nightButton.addEventListener(
     'click',
@@ -1307,7 +1499,10 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
     stage.classList.toggle('is-pseudo-fullscreen', pseudoFullscreen);
     document.documentElement.classList.toggle('geo-locked', pseudoFullscreen);
     fullscreenButton.setAttribute('aria-pressed', String(full));
-    fullscreenButton.setAttribute('aria-label', full ? '退出全屏' : '全屏');
+    fullscreenButton.setAttribute(
+      'aria-label',
+      full ? tr('退出全屏', 'Exit full screen') : tr('全屏', 'Full screen'),
+    );
     // 画面比例变化较大：等下一帧完成布局与尺寸回调后再重新取景
     requestAnimationFrame(() => requestAnimationFrame(() => scene?.resetView()));
   };
@@ -1395,11 +1590,13 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
   const loadScene = async () => {
     if (!webglAvailable()) {
       stage.classList.add('is-fallback');
-      status.textContent =
-        '当前环境不支持 WebGL，三维场景不可用；查询、数据源开关与时间轴仍可使用。';
+      status.textContent = tr(
+        '当前环境不支持 WebGL，三维场景不可用；查询、数据源开关与时间轴仍可使用。',
+        'WebGL is not available, so the 3D scene cannot be shown; queries, source switches and the timeline still work.',
+      );
       return;
     }
-    status.textContent = '正在加载三维场景…';
+    status.textContent = tr('正在加载三维场景…', 'Loading the 3D scene…');
     try {
       const { createCityScene } = await import('./scene');
       if (signal.aborted) return;
@@ -1421,7 +1618,10 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
     } catch (error) {
       console.error(error);
       stage.classList.add('is-fallback');
-      status.textContent = '三维场景加载失败；查询、数据源开关与时间轴仍可使用。';
+      status.textContent = tr(
+        '三维场景加载失败；查询、数据源开关与时间轴仍可使用。',
+        'The 3D scene failed to load; queries, source switches and the timeline still work.',
+      );
     }
   };
 

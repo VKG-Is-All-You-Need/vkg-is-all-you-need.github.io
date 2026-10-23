@@ -2,24 +2,92 @@
 import '../../styles/explorer.css';
 import Icon from '../ui/Icon.astro';
 import WeatherIcon from './WeatherIcon.astro';
-import { cityQueries, QUERY_GROUPS } from '../../lib/city/queries';
+import { cityQueries, queryGroups } from '../../lib/city/queries';
 import { ALL_SOURCES, SOURCES } from '../../lib/city/sources';
 import { dayMarkers } from '../../lib/city/calendar';
 import { DAY_END, DAY_START, DAYS, dayOf, formatTime, hours, timeOfDay } from '../../lib/city/time';
 import { DAY_WEATHER, observationAt } from '../../lib/city/weather';
+import { term } from '../../lib/geo/names';
+import { langOf } from '../../i18n';
 
-const first = cityQueries[0];
+const lang = langOf(Astro.url.pathname);
+const queries = cityQueries();
+const first = queries[0];
 const initial = first.run({ t: first.suggest, sources: new Set(ALL_SOURCES), detail: false });
 const initialDay = dayOf(first.suggest);
 const observation = observationAt(first.suggest);
 const percent = (seconds: number) => ((seconds - DAY_START) / (DAY_END - DAY_START)) * 100;
 
-const presets = [
-  { id: 'all', label: '全部接入' },
-  { id: 'gis', label: '只接 GIS' },
-  { id: 'mobility', label: '交通 + 气象' },
-  { id: 'people', label: '人与出行' },
-];
+const t = {
+  zh: {
+    days: '日期',
+    humidity: '湿度',
+    queries: '示例查询',
+    groups: '查询分组',
+    people: '人物数据',
+    peopleView: '人物数据的展示方式',
+    aggregate: '聚合',
+    detail: '明细（虚构）',
+    results: '结果',
+    sources: '数据源',
+    connected: `${SOURCES.length} / ${SOURCES.length} 已接入`,
+    need: '需要',
+    presetsLabel: '快捷组合',
+    presets: ['全部接入', '只接 GIS', '交通 + 气象', '人与出行'],
+    sourcesHint: '关闭某个数据源，看看哪些结果会消失或退化。标记“需要”的是当前查询依赖的数据源。',
+    time: '模拟时间',
+    play: '播放',
+    speed: '播放速度',
+    view: '视图',
+    city: '城市',
+    layers: '分层',
+    night: '夜景显示',
+    nightOn: '夜景显示：已开启',
+    reset: '复位视角',
+    fullscreen: '全屏',
+    hintTitle: '分层视图',
+    hint: '查询结果按来源分层展示：底层是八个独立的数据源，经映射汇入虚拟知识图谱，顶层是本体。由多个数据源描述的同一实体在图谱层合并为一个节点。',
+    hintGo: '查看分层视图',
+    hintLater: '稍后再看',
+  },
+  en: {
+    days: 'Day',
+    humidity: 'humidity',
+    queries: 'Example queries',
+    groups: 'Query groups',
+    people: 'People data',
+    peopleView: 'How people data is shown',
+    aggregate: 'Aggregate',
+    detail: 'Detail (fictional)',
+    results: 'Results',
+    sources: 'Data sources',
+    connected: `${SOURCES.length} / ${SOURCES.length} connected`,
+    need: 'Needed',
+    presetsLabel: 'Presets',
+    presets: ['All sources', 'GIS only', 'Traffic + weather', 'People and mobility'],
+    sourcesHint:
+      'Switch off a source to see which results disappear or degrade. Sources marked "Needed" are used by the current query.',
+    time: 'Simulated time',
+    play: 'Play',
+    speed: 'Playback speed',
+    view: 'View',
+    city: 'City',
+    layers: 'Layers',
+    night: 'Night view',
+    nightOn: 'Night view: on',
+    reset: 'Reset view',
+    fullscreen: 'Full screen',
+    hintTitle: 'Layered view',
+    hint: 'The layered view arranges query results by source: the eight independent data sources at the bottom feed into the virtual knowledge graph through mappings, with the ontology on top. An entity described by several sources becomes a single node in the graph layer.',
+    hintGo: 'Open the layered view',
+    hintLater: 'Later',
+  },
+}[lang];
+
+const presets = ['all', 'gis', 'mobility', 'people'].map((id, i) => ({
+  id,
+  label: t.presets[i],
+}));
 ---
 
 <div class="city xp" data-city>
@@ -28,7 +96,7 @@ const presets = [
       <div class="pins" data-city-pins aria-hidden="true"></div>
       <p class="status" data-city-status role="status"></p>
       <div class="top">
-        <div class="days" role="group" aria-label="日期">
+        <div class="days" role="group" aria-label={t.days}>
           {DAYS.map((day) => {
             const weather = DAY_WEATHER[day.index];
             return (
@@ -37,9 +105,9 @@ const presets = [
                 class:list={['day', `day-${weather.kind}`]}
                 data-city-day={day.index}
                 aria-pressed={day.index === initialDay ? 'true' : 'false'}
-                title={`${day.label} · ${weather.summary} · ${weather.low}–${weather.high}°C`}
+                title={`${term(day.label)} · ${term(weather.summary)} · ${weather.low}–${weather.high}°C`}
               >
-                <span class="day-label">{day.label}</span>
+                <span class="day-label">{term(day.label)}</span>
                 <WeatherIcon kind={weather.kind} />
                 <span class="day-temp">
                   {weather.high}°<i>{weather.low}°</i>
@@ -53,7 +121,7 @@ const presets = [
             {formatTime(first.suggest)}
           </span>
           <span class="hud-weather" data-city-weather>
-            {observation.condition} · {Math.round(observation.temperature)}°C · 湿度{' '}
+            {term(observation.condition)} · {Math.round(observation.temperature)}°C · {t.humidity}{' '}
             {observation.humidity}%
           </span>
         </div>
@@ -61,9 +129,9 @@ const presets = [
       <div class="detail-card" data-city-card hidden aria-live="polite"></div>
     </div>
 
-    <aside class="panel panel-queries" aria-label="示例查询">
-      <div class="group-tabs" role="tablist" aria-label="查询分组">
-        {QUERY_GROUPS.map((group, i) => (
+    <aside class="panel panel-queries" aria-label={t.queries}>
+      <div class="group-tabs" role="tablist" aria-label={t.groups}>
+        {queryGroups().map((group, i) => (
           <button
             type="button"
             role="tab"
@@ -75,7 +143,7 @@ const presets = [
         ))}
       </div>
       <div class="queries">
-        {cityQueries.map((query, i) => (
+        {queries.map((query, i) => (
           <button
             type="button"
             data-city-query={query.id}
@@ -94,19 +162,19 @@ const presets = [
         ))}
       </div>
       <div class="privacy" data-city-privacy hidden>
-        <span>人物数据</span>
-        <div class="segmented" role="group" aria-label="人物数据的展示方式">
+        <span>{t.people}</span>
+        <div class="segmented" role="group" aria-label={t.peopleView}>
           <button type="button" data-city-detail="false" aria-pressed="true">
-            聚合
+            {t.aggregate}
           </button>
           <button type="button" data-city-detail="true" aria-pressed="false">
-            明细（虚构）
+            {t.detail}
           </button>
         </div>
       </div>
       <div class="results" data-city-result>
         <p class="results-head">
-          结果 <span>{initial.summary}</span>
+          {t.results} <span>{initial.summary}</span>
         </p>
         <ul class="notes" role="list">
           {initial.notes.map((note) => (
@@ -126,11 +194,11 @@ const presets = [
       </div>
     </aside>
 
-    <aside class="panel panel-sources" aria-label="数据源">
+    <aside class="panel panel-sources" aria-label={t.sources}>
       <div class="sources-head">
-        <p class="panel-label">数据源</p>
+        <p class="panel-label">{t.sources}</p>
         <span class="sources-count" data-city-source-count>
-          7 / 7 已接入
+          {t.connected}
         </span>
       </div>
       <ul class="sources" role="list">
@@ -144,7 +212,7 @@ const presets = [
                 <span class="source-system">{source.system}</span>
               </span>
               <span class="source-need" data-source-need={source.id} hidden>
-                需要
+                {t.need}
               </span>
               <span class="source-switch" aria-hidden="true">
                 <span />
@@ -153,20 +221,18 @@ const presets = [
           </li>
         ))}
       </ul>
-      <div class="presets" role="group" aria-label="快捷组合">
+      <div class="presets" role="group" aria-label={t.presetsLabel}>
         {presets.map((preset) => (
           <button type="button" data-city-preset={preset.id}>
             {preset.label}
           </button>
         ))}
       </div>
-      <p class="sources-hint">
-        关闭某个数据源，看看哪些结果会消失或退化。标记“需要”的是当前查询依赖的数据源。
-      </p>
+      <p class="sources-hint">{t.sourcesHint}</p>
     </aside>
 
-    <div class="timeline" role="group" aria-label="模拟时间">
-      <button type="button" class="play" data-city-play aria-pressed="false" aria-label="播放">
+    <div class="timeline" role="group" aria-label={t.time}>
+      <button type="button" class="play" data-city-play aria-pressed="false" aria-label={t.play}>
         <svg class="when-paused" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M7 5v14l12-7z" fill="currentColor"></path>
         </svg>
@@ -174,7 +240,7 @@ const presets = [
           <path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"></path>
         </svg>
       </button>
-      <div class="speeds" role="group" aria-label="播放速度">
+      <div class="speeds" role="group" aria-label={t.speed}>
         {[1, 10, 60, 300].map((speed) => (
           <button
             type="button"
@@ -191,9 +257,9 @@ const presets = [
             <span
               class:list={['marker', `marker-${m.kind}`]}
               style={`left:${percent(m.from)}%;width:${percent(m.to) - percent(m.from)}%`}
-              title={`${m.label} ${formatTime(m.from)}–${formatTime(m.to)}`}
+              title={`${term(m.label)} ${formatTime(m.from)}–${formatTime(m.to)}`}
             >
-              <i>{m.label}</i>
+              <i>{term(m.label)}</i>
             </span>
           ))}
         </div>
@@ -203,7 +269,7 @@ const presets = [
           max={DAY_END - 60}
           step="60"
           value={timeOfDay(first.suggest)}
-          aria-label="模拟时间"
+          aria-label={t.time}
           data-city-time
         />
         <div class="ticks" aria-hidden="true">
@@ -213,43 +279,41 @@ const presets = [
         </div>
       </div>
       <div class="timeline-tools">
-        <div class="view-switch" role="group" aria-label="视图">
+        <div class="view-switch" role="group" aria-label={t.view}>
           <button type="button" data-city-view="city" aria-pressed="true">
             <Icon name="map" size={15} />
-            <span>城市</span>
+            <span>{t.city}</span>
           </button>
           <button type="button" data-city-view="layers" aria-pressed="false">
             <Icon name="layers" size={15} />
-            <span>分层</span>
+            <span>{t.layers}</span>
           </button>
         </div>
         <button
           type="button"
           data-city-night
           aria-pressed="true"
-          aria-label="夜景显示"
-          title="夜景显示：已开启"
+          aria-label={t.night}
+          title={t.nightOn}
         >
           <Icon name="moon" size={16} />
         </button>
-        <button type="button" data-city-reset aria-label="复位视角">
+        <button type="button" data-city-reset aria-label={t.reset}>
           <Icon name="home" size={16} />
         </button>
-        <button type="button" data-city-fullscreen aria-pressed="false" aria-label="全屏">
+        <button type="button" data-city-fullscreen aria-pressed="false" aria-label={t.fullscreen}>
           <Icon name="maximize" size={16} class="when-normal" />
           <Icon name="minimize" size={16} class="when-full" />
         </button>
         <div class="view-hint" data-city-hint role="note" hidden>
-          <p class="view-hint-title">分层视图</p>
-          <p>
-            查询结果按来源分层展示：底层是八个独立的数据源，经映射汇入虚拟知识图谱，顶层是本体。由多个数据源描述的同一实体在图谱层合并为一个节点。
-          </p>
+          <p class="view-hint-title">{t.hintTitle}</p>
+          <p>{t.hint}</p>
           <div class="view-hint-actions">
             <button type="button" class="view-hint-go" data-city-hint-go>
-              查看分层视图
+              {t.hintGo}
             </button>
             <button type="button" class="view-hint-later" data-city-hint-close>
-              稍后再看
+              {t.hintLater}
             </button>
           </div>
         </div>

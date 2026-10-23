@@ -2,6 +2,7 @@
  * 模拟时间：自周一 00:00 起的秒数，覆盖一周。每天的演示范围为 06:00–24:00，
  * 播放到 24:00 时直接进入下一天的 06:00。
  */
+import { term } from '../geo/names';
 
 export const HOUR = 3600;
 export const DAY = 24 * HOUR;
@@ -44,7 +45,7 @@ export const formatTime = (t: number) => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 };
 
-export const formatDayTime = (t: number) => `${DAYS[dayOf(t)].label} ${formatTime(t)}`;
+export const formatDayTime = (t: number) => `${term(DAYS[dayOf(t)].label)} ${formatTime(t)}`;
 
 /** 以 center 为峰值、width 为标准差（秒）的高斯曲线，峰值为 1。 */
 export const bell = (t: number, center: number, width: number) =>

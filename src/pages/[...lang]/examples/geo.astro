@@ -1,0 +1,675 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import PageHeader from '../../../components/ui/PageHeader.astro';
+import SectionHeading from '../../../components/ui/SectionHeading.astro';
+import Icon from '../../../components/ui/Icon.astro';
+import GeoExplorer from '../../../components/geo/GeoExplorer.astro';
+import { city } from '../../../lib/geo/city';
+import { term } from '../../../lib/geo/names';
+import { ONTOLOGY, geoQueries, mapping } from '../../../lib/geo/queries';
+import { pointToWkt, polygonToWkt, rectToWkt } from '../../../lib/geo/spatial';
+import { highlight } from '../../../lib/highlight';
+import { langOf, langPaths, localize } from '../../../i18n';
+import { setLang } from '../../../i18n/runtime';
+
+export const getStaticPaths = langPaths;
+
+const lang = langOf(Astro.url.pathname);
+setLang(lang);
+
+const nameOf = (id: number) => term(city.buildings.find((b) => b.id === id)!.name);
+const runs = geoQueries().map((query) => ({ query, result: query.run(city) }));
+const sampleBuildings = city.buildings.slice(0, 8);
+const shorten = (wkt: string, max = 44) => (wkt.length > max ? `${wkt.slice(0, max)}…` : wkt);
+
+const t = {
+  zh: {
+    title: 'VKG × 地理信息',
+    meta: '交互示例：PostGIS 中的建筑、地铁站与公园经映射成为 GeoSPARQL 虚拟知识图谱，空间查询在执行时被改写为 PostGIS 空间 SQL。',
+    label: '示例',
+    description:
+      '一座虚构街区的建筑、地铁站与公园存储在 PostGIS 中。映射将它们以 GeoSPARQL 词汇呈现为虚拟知识图谱，空间查询在执行时被改写为 PostGIS 空间 SQL。分层视图自下而上展示数据源、映射、虚拟知识图谱与本体，选择一个查询即可逐层查看它的执行过程；点击建筑可查看对应的数据库记录与虚拟三元组。',
+    scene: '交互场景',
+    footnote:
+      '示例数据为虚构；坐标为投影坐标，单位为米。查询结果由示例数据实时计算，SQL 为便于阅读的简化形式，与 Ontop 的实际输出存在差异。',
+    rewriteTitle: '查询如何改写',
+    rewriteDescription:
+      '左侧为面向本体的 GeoSPARQL 查询，右侧为改写后发往 PostGIS 的 SQL。GeoSPARQL 函数被转换为对应的空间函数，在数据库中执行。代码省略了前缀声明。',
+    sqlLabel: 'PostGIS SQL（简化）',
+    result: '结果：',
+    hit: (name: string, detail: string) => `${name}（${detail}）`,
+    joiner: '、',
+    mappingTitle: '映射与本体',
+    mappingDescription:
+      '映射用 ST_AsText 把几何列呈现为 geo:wktLiteral，数据仍保留在 PostGIS 中。本体只有四条公理，用于查询 3 中的 :PublicFacility。',
+    mappingLabel: 'Ontop 映射（节选）',
+    ontologyLabel: '本体（Turtle）',
+    mappingNote: '医院、图书馆、博物馆的映射与 school 相同，仅 WHERE 条件不同。',
+    dataTitle: '源数据',
+    dataDescription: '数据保存在 PostGIS 的三张表中，几何列使用 PostGIS 的 geometry 类型。',
+    rows: (n: number) => `${n} 行`,
+    sample: `共 ${city.buildings.length} 行，列出前 ${sampleBuildings.length} 行`,
+    pointsTitle: '要点',
+    points: [
+      [
+        'database',
+        '几何保留在数据库中',
+        '几何以 PostGIS 类型存储在源表中；映射将其呈现为 geo:wktLiteral，不复制、不转换源数据。',
+      ],
+      [
+        'map',
+        '空间函数下推到数据库',
+        'geof:distance、geof:sfWithin 等函数在改写时转换为 ST_Distance、ST_Within 等 PostGIS 函数，由数据库执行。',
+      ],
+      [
+        'hierarchy',
+        '本体与空间条件组合',
+        '数据库中没有“公共设施”类别。本体将学校、医院、图书馆与博物馆归入 :PublicFacility，再与距离条件组合。',
+      ],
+    ],
+    functionsCaption: 'GeoSPARQL 函数与 PostGIS 函数的常见对应',
+    meaning: '含义',
+    functions: [
+      ['geof:sfWithin', 'ST_Within', '几何 A 完全位于 B 内'],
+      ['geof:sfContains', 'ST_Contains', '几何 A 包含 B'],
+      ['geof:sfIntersects', 'ST_Intersects', '两个几何相交'],
+      ['geof:distance', 'ST_Distance', '两个几何之间的最短距离'],
+      ['geof:buffer', 'ST_Buffer', '按距离生成缓冲区'],
+      ['geof:envelope', 'ST_Envelope', '几何的外包矩形'],
+    ],
+    readingTitle: '延伸阅读',
+    reading: [
+      ['OGC GeoSPARQL 1.1', '标准规范', 'https://docs.ogc.org/is/22-047r1/22-047r1.html'],
+      ['Ontop 标准兼容性', '含 GeoSPARQL 支持范围', '/resources/#ontop-compliance'],
+      ['Südtirol Open Data OBDA', 'PostGIS + Ontop 案例', '/resources/#suedtirol-open-data'],
+      ['ATKIS', 'PostGIS → Ontop/SPARQL → QGIS', '/resources/#atkis'],
+      ['GeoQA Portal', '地理问答与 LLM', '/resources/#geoqa-portal'],
+    ],
+  },
+  en: {
+    title: 'VKG × Geospatial',
+    meta: 'Interactive example: buildings, metro stations and parks in PostGIS become a GeoSPARQL virtual knowledge graph through mappings, and spatial queries are rewritten into PostGIS spatial SQL at query time.',
+    label: 'Examples',
+    description:
+      'The buildings, metro stations and parks of a fictional district are stored in PostGIS. Mappings present them as a virtual knowledge graph using the GeoSPARQL vocabulary, and spatial queries are rewritten into PostGIS spatial SQL at query time. The layered view shows the data source, mappings, virtual knowledge graph and ontology from bottom to top; select a query to follow its execution layer by layer, or click a building to see its database row and virtual triples.',
+    scene: 'Interactive scene',
+    footnote:
+      'The data is fictional; coordinates are projected, in metres. Query results are computed from the sample data on the fly; the SQL is simplified for readability and differs from the actual output of Ontop.',
+    rewriteTitle: 'How queries are rewritten',
+    rewriteDescription:
+      'On the left is the GeoSPARQL query over the ontology; on the right is the SQL sent to PostGIS after rewriting. GeoSPARQL functions are translated into the corresponding spatial functions and executed in the database. Prefix declarations are omitted.',
+    sqlLabel: 'PostGIS SQL (simplified)',
+    result: 'Result: ',
+    hit: (name: string, detail: string) => `${name} (${detail})`,
+    joiner: ', ',
+    mappingTitle: 'Mappings and ontology',
+    mappingDescription:
+      'The mappings use ST_AsText to present geometry columns as geo:wktLiteral, while the data stays in PostGIS. The ontology has only four axioms, used for :PublicFacility in query 3.',
+    mappingLabel: 'Ontop mappings (excerpt)',
+    ontologyLabel: 'Ontology (Turtle)',
+    mappingNote:
+      'The mappings for hospitals, libraries and museums are the same as for schools except for the WHERE condition.',
+    dataTitle: 'Source data',
+    dataDescription:
+      'The data is stored in three PostGIS tables; geometry columns use the PostGIS geometry type.',
+    rows: (n: number) => `${n} rows`,
+    sample: `${city.buildings.length} rows, first ${sampleBuildings.length} shown`,
+    pointsTitle: 'Key points',
+    points: [
+      [
+        'database',
+        'Geometries stay in the database',
+        'Geometries are stored in the source tables as PostGIS types; mappings present them as geo:wktLiteral without copying or transforming the source data.',
+      ],
+      [
+        'map',
+        'Spatial functions are pushed down',
+        'Functions such as geof:distance and geof:sfWithin are translated into PostGIS functions such as ST_Distance and ST_Within during rewriting and executed by the database.',
+      ],
+      [
+        'hierarchy',
+        'Ontology combined with spatial conditions',
+        'The database has no "public facility" category. The ontology groups schools, hospitals, libraries and museums under :PublicFacility, which is then combined with a distance condition.',
+      ],
+    ],
+    functionsCaption: 'Common correspondences between GeoSPARQL and PostGIS functions',
+    meaning: 'Meaning',
+    functions: [
+      ['geof:sfWithin', 'ST_Within', 'Geometry A lies entirely within B'],
+      ['geof:sfContains', 'ST_Contains', 'Geometry A contains B'],
+      ['geof:sfIntersects', 'ST_Intersects', 'The two geometries intersect'],
+      ['geof:distance', 'ST_Distance', 'Shortest distance between two geometries'],
+      ['geof:buffer', 'ST_Buffer', 'Buffer at a given distance'],
+      ['geof:envelope', 'ST_Envelope', 'Bounding rectangle of a geometry'],
+    ],
+    readingTitle: 'Further reading',
+    reading: [
+      ['OGC GeoSPARQL 1.1', 'Standard', 'https://docs.ogc.org/is/22-047r1/22-047r1.html'],
+      ['Ontop standards compliance', 'Including GeoSPARQL support', '/resources/#ontop-compliance'],
+      ['Südtirol Open Data OBDA', 'PostGIS + Ontop case study', '/resources/#suedtirol-open-data'],
+      ['ATKIS', 'PostGIS → Ontop/SPARQL → QGIS', '/resources/#atkis'],
+      ['GeoQA Portal', 'Geographic QA with LLMs', '/resources/#geoqa-portal'],
+    ],
+  },
+}[lang];
+
+const reading = t.reading.map(([title, meta, href]) => ({
+  title,
+  meta,
+  href: localize(href, lang),
+  external: href.startsWith('http'),
+}));
+---
+
+<BaseLayout title={t.title} description={t.meta}>
+  <PageHeader label={t.label} title={t.title} description={t.description} />
+
+  <section class="container" aria-label={t.scene}>
+    <GeoExplorer />
+    <p class="footnote">{t.footnote}</p>
+  </section>
+
+  <section class="section" aria-labelledby="rewrite-title">
+    <div class="container">
+      <SectionHeading
+        id="rewrite-title"
+        title={t.rewriteTitle}
+        description={t.rewriteDescription}
+      />
+      {runs.map(({ query, result }, i) => (
+        <article class="rewrite" data-query-panel={query.id} data-reveal>
+          <header class="rewrite-head">
+            <span class="rewrite-index">{String(i + 1).padStart(2, '0')}</span>
+            <div>
+              <h3>{query.title}</h3>
+              <p>{query.description}</p>
+            </div>
+          </header>
+          <div class="rewrite-grid">
+            <div class="codebox">
+              <p class="codebox-label">GeoSPARQL</p>
+              <pre set:html={`<code>${highlight(query.sparql)}</code>`} />
+            </div>
+            <span class="rewrite-arrow" aria-hidden="true">
+              <Icon name="arrow-right" size={18} />
+            </span>
+            <div class="codebox">
+              <p class="codebox-label">{t.sqlLabel}</p>
+              <pre set:html={`<code>${highlight(query.sql)}</code>`} />
+            </div>
+          </div>
+          <p class="rewrite-result">
+            {t.result}
+            {result.hits.map((hit) => t.hit(nameOf(hit.id), hit.detail)).join(t.joiner)}
+          </p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section section-rule" aria-labelledby="mapping-title">
+    <div class="container">
+      <SectionHeading
+        id="mapping-title"
+        title={t.mappingTitle}
+        description={t.mappingDescription}
+      />
+      <div class="mapping-grid" data-reveal>
+        <div class="codebox">
+          <p class="codebox-label">{t.mappingLabel}</p>
+          <pre set:html={`<code>${highlight(mapping())}</code>`} />
+        </div>
+        <div class="mapping-side">
+          <div class="codebox">
+            <p class="codebox-label">{t.ontologyLabel}</p>
+            <pre set:html={`<code>${highlight(ONTOLOGY)}</code>`} />
+          </div>
+          <p class="note">{t.mappingNote}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-rule" aria-labelledby="data-title">
+    <div class="container">
+      <SectionHeading id="data-title" title={t.dataTitle} description={t.dataDescription} />
+      <div class="tables" data-reveal>
+        <figure class="table-card">
+          <figcaption>
+            stations <span>{t.rows(city.stations.length)}</span>
+          </figcaption>
+          <table>
+            <thead>
+              <tr>
+                <th>id</th>
+                <th>name</th>
+                <th>line</th>
+                <th>location</th>
+              </tr>
+            </thead>
+            <tbody>
+              {city.stations.map((s) => (
+                <tr>
+                  <td>{s.id}</td>
+                  <td>{term(s.name)}</td>
+                  <td>{term(s.line)}</td>
+                  <td class="wkt">{pointToWkt(s.location)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </figure>
+        <figure class="table-card">
+          <figcaption>
+            parks <span>{t.rows(city.parks.length)}</span>
+          </figcaption>
+          <table>
+            <thead>
+              <tr>
+                <th>id</th>
+                <th>name</th>
+                <th>area</th>
+              </tr>
+            </thead>
+            <tbody>
+              {city.parks.map((p) => (
+                <tr>
+                  <td>{p.id}</td>
+                  <td>{term(p.name)}</td>
+                  <td class="wkt" title={polygonToWkt(p.area)}>
+                    {shorten(polygonToWkt(p.area))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </figure>
+        <figure class="table-card table-wide">
+          <figcaption>
+            buildings <span>{t.sample}</span>
+          </figcaption>
+          <table>
+            <thead>
+              <tr>
+                <th>id</th>
+                <th>name</th>
+                <th>kind</th>
+                <th>floors</th>
+                <th>footprint</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sampleBuildings.map((b) => (
+                <tr>
+                  <td>{b.id}</td>
+                  <td>{term(b.name)}</td>
+                  <td>{term(b.kind)}</td>
+                  <td>{b.floors}</td>
+                  <td class="wkt" title={rectToWkt(b.footprint)}>
+                    {shorten(rectToWkt(b.footprint), 52)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-rule" aria-labelledby="points-title">
+    <div class="container">
+      <SectionHeading id="points-title" title={t.pointsTitle} />
+      <ul class="points" role="list">
+        {t.points.map(([icon, title, text], i) => (
+          <li
+            class="point spotlight"
+            data-reveal
+            style={i ? `--reveal-delay:${i * 90}ms` : undefined}
+          >
+            <span class="point-icon">
+              <Icon name={icon as 'database' | 'map' | 'hierarchy'} size={20} />
+            </span>
+            <h3>{title}</h3>
+            <p>{text}</p>
+          </li>
+        ))}
+      </ul>
+
+      <figure class="functions" data-reveal>
+        <figcaption>{t.functionsCaption}</figcaption>
+        <table>
+          <thead>
+            <tr>
+              <th>GeoSPARQL</th>
+              <th>PostGIS</th>
+              <th>{t.meaning}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {t.functions.map(([geof, st, meaning]) => (
+              <tr>
+                <td>
+                  <code>{geof}</code>
+                </td>
+                <td>
+                  <code>{st}</code>
+                </td>
+                <td>{meaning}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </figure>
+    </div>
+  </section>
+
+  <section class="section section-rule" aria-labelledby="reading-title">
+    <div class="container">
+      <SectionHeading id="reading-title" title={t.readingTitle} />
+      <ul class="reading" role="list" data-reveal>
+        {reading.map((item) => (
+          <li>
+            <a
+              href={item.href}
+              target={item.external ? '_blank' : undefined}
+              rel={item.external ? 'noopener' : undefined}
+            >
+              <span class="reading-title">{item.title}</span>
+              <span class="reading-meta">{item.meta}</span>
+              <Icon name={item.external ? 'arrow-up-right' : 'arrow-right'} size={16} />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .footnote {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--faint);
+  }
+
+  /* 代码窗口 */
+  .codebox {
+    min-width: 0;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--code-bg);
+    overflow: hidden;
+  }
+
+  .codebox-label {
+    padding: 9px 16px;
+    border-bottom: 1px solid rgb(255 255 255 / 0.07);
+    font: 12px var(--font-mono);
+    color: var(--code-faint);
+  }
+
+  .codebox pre {
+    margin: 0;
+    padding: 16px;
+    font: 13px/1.8 var(--font-mono);
+    color: var(--code-ink);
+    overflow-x: auto;
+  }
+
+  .codebox :global(.k) {
+    color: var(--code-kw);
+  }
+
+  .codebox :global(.v) {
+    color: var(--code-var);
+  }
+
+  .codebox :global(.s) {
+    color: var(--code-str);
+  }
+
+  .codebox :global(.f) {
+    color: #f29fb8;
+  }
+
+  .codebox :global(.c) {
+    color: var(--code-faint);
+  }
+
+  /* 改写对照 */
+  .rewrite + .rewrite {
+    margin-top: 48px;
+  }
+
+  .rewrite-head {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .rewrite-index {
+    font: 500 14px/1.9 var(--font-mono);
+    color: var(--accent-ink);
+  }
+
+  .rewrite-head h3 {
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .rewrite-head p {
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 15px;
+  }
+
+  .rewrite-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+  }
+
+  .rewrite-grid .codebox {
+    align-self: stretch;
+  }
+
+  .rewrite-arrow {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--accent-ink);
+  }
+
+  .rewrite-result {
+    margin-top: 14px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  /* 映射 */
+  .mapping-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+
+  .mapping-side {
+    display: grid;
+    gap: 12px;
+  }
+
+  .note {
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  /* 源数据表 */
+  .tables {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .table-card {
+    margin: 0;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    overflow-x: auto;
+  }
+
+  .table-wide {
+    grid-column: 1 / -1;
+  }
+
+  figcaption {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    font: 600 13px var(--font-mono);
+  }
+
+  figcaption span {
+    font: 400 12px var(--font-sans);
+    color: var(--faint);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+
+  th {
+    padding: 8px 16px;
+    text-align: left;
+    font: 400 12px var(--font-mono);
+    color: var(--faint);
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .wkt {
+    font: 12px var(--font-mono);
+    color: var(--muted);
+  }
+
+  /* 要点 */
+  .points {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .point {
+    padding: 26px;
+  }
+
+  .point-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin-bottom: 18px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--accent-ink);
+  }
+
+  .point h3 {
+    font-size: 18px;
+    font-weight: 650;
+  }
+
+  .point p {
+    margin-top: 8px;
+    font-size: 15px;
+    color: var(--muted);
+  }
+
+  .functions {
+    margin: 32px 0 0;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    overflow-x: auto;
+  }
+
+  .functions figcaption {
+    font: 600 14px var(--font-sans);
+  }
+
+  /* 延伸阅读 */
+  .reading {
+    display: grid;
+    border-top: 1px solid var(--line);
+  }
+
+  .reading a {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 4px;
+    border-bottom: 1px solid var(--line);
+    transition: color 0.2s;
+  }
+
+  .reading a:hover {
+    color: var(--accent-ink);
+  }
+
+  .reading-title {
+    font-weight: 600;
+  }
+
+  .reading-meta {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--faint);
+  }
+
+  .reading a :global(svg) {
+    flex: none;
+    color: var(--faint);
+    transition: transform 0.3s var(--ease);
+  }
+
+  .reading a:hover :global(svg) {
+    color: var(--accent-ink);
+    transform: translateX(3px);
+  }
+
+  @media (max-width: 900px) {
+    .rewrite-grid,
+    .mapping-grid,
+    .tables,
+    .points {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .rewrite-arrow {
+      justify-self: center;
+      rotate: 90deg;
+    }
+  }
+</style>

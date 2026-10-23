@@ -2,10 +2,71 @@
 import '../../styles/explorer.css';
 import Icon from '../ui/Icon.astro';
 import { city } from '../../lib/geo/city';
-import { queries } from '../../lib/geo/queries';
+import { term } from '../../lib/geo/names';
+import { geoQueries } from '../../lib/geo/queries';
+import { langOf } from '../../i18n';
 
-const nameOf = (id: number) => city.buildings.find((b) => b.id === id)!.name;
+const lang = langOf(Astro.url.pathname);
+const queries = geoQueries();
+const nameOf = (id: number) => term(city.buildings.find((b) => b.id === id)!.name);
 const first = queries[0].run(city);
+const t = {
+  zh: {
+    steps: '查询执行过程',
+    stepNames: ['本体推理', '映射改写', '空间 SQL', '返回结果'],
+    controls: '场景控制',
+    layers: '分层',
+    night: '夜晚',
+    rotate: '自动旋转',
+    reset: '复位视角',
+    fullscreen: '全屏',
+    hint: '拖动旋转 · 滚轮缩放 · 点击建筑查看数据 · F 全屏',
+    plan: '街区平面图，点击可选择建筑',
+    planCaption: '平面图',
+    queries: '示例查询',
+    results: '结果',
+    count: `${first.hits.length} 项`,
+    layerKind: '分层视图',
+    layerTitle: '一次查询经过的四层',
+    legend: [
+      ['onto', '本体', '类与类之间的关系，例如 :School ⊑ :PublicFacility。'],
+      ['graph', '虚拟知识图谱', '由映射按需生成的实体，节点位于对应建筑的正上方。'],
+      ['map', '映射', '将表中的行与几何列转换为三元组。'],
+      ['data', '数据源', 'PostGIS 中的表与几何，数据不迁移。'],
+    ],
+    infoText: '点击任意建筑，查看它在各层中的对应：数据库记录、虚拟三元组与所属的类。',
+  },
+  en: {
+    steps: 'Query execution',
+    stepNames: ['Ontology reasoning', 'Mapping rewriting', 'Spatial SQL', 'Results'],
+    controls: 'Scene controls',
+    layers: 'Layers',
+    night: 'Night',
+    rotate: 'Auto-rotate',
+    reset: 'Reset view',
+    fullscreen: 'Full screen',
+    hint: 'Drag to rotate · Scroll to zoom · Click a building for its data · F for full screen',
+    plan: 'Plan of the district; click to select a building',
+    planCaption: 'Plan',
+    queries: 'Example queries',
+    results: 'Results',
+    count: String(first.hits.length),
+    layerKind: 'Layered view',
+    layerTitle: 'The four layers a query passes through',
+    legend: [
+      ['onto', 'Ontology', 'Relations between classes, such as :School ⊑ :PublicFacility.'],
+      [
+        'graph',
+        'Virtual knowledge graph',
+        'Entities generated on demand by the mappings; each node sits directly above its building.',
+      ],
+      ['map', 'Mappings', 'Turn table rows and geometry columns into triples.'],
+      ['data', 'Data source', 'Tables and geometries in PostGIS; the data is not migrated.'],
+    ],
+    infoText:
+      'Click any building to see its counterpart in each layer: the database row, the virtual triples and its classes.',
+  },
+}[lang];
 ---
 
 <div class="geo xp" data-geo>
@@ -13,55 +74,49 @@ const first = queries[0].run(city);
     <div class="viewport" data-geo-viewport>
       <div class="pins" data-geo-pins aria-hidden="true"></div>
       <p class="status" data-geo-status role="status"></p>
-      <ol class="steps" aria-label="查询执行过程">
-        <li data-geo-step>
-          <span>1</span>本体推理
-        </li>
-        <li data-geo-step>
-          <span>2</span>映射改写
-        </li>
-        <li data-geo-step>
-          <span>3</span>空间 SQL
-        </li>
-        <li data-geo-step>
-          <span>4</span>返回结果
-        </li>
+      <ol class="steps" aria-label={t.steps}>
+        {t.stepNames.map((step, i) => (
+          <li data-geo-step>
+            <span>{i + 1}</span>
+            {step}
+          </li>
+        ))}
       </ol>
-      <div class="toolbar" role="group" aria-label="场景控制">
+      <div class="toolbar" role="group" aria-label={t.controls}>
         <button type="button" data-geo-view aria-pressed="true">
           <Icon name="layers" size={16} />
-          <span data-label>分层</span>
+          <span data-label>{t.layers}</span>
         </button>
         <button type="button" data-geo-mode aria-pressed="true">
           <Icon name="moon" size={16} class="when-night" />
           <Icon name="sun" size={16} class="when-day" />
-          <span data-label>夜晚</span>
+          <span data-label>{t.night}</span>
         </button>
         <button type="button" data-geo-rotate aria-pressed="false">
           <Icon name="rotate" size={16} />
-          <span>自动旋转</span>
+          <span>{t.rotate}</span>
         </button>
         <button type="button" data-geo-reset>
           <Icon name="home" size={16} />
-          <span>复位视角</span>
+          <span>{t.reset}</span>
         </button>
-        <button type="button" data-geo-fullscreen aria-pressed="false" aria-label="全屏">
+        <button type="button" data-geo-fullscreen aria-pressed="false" aria-label={t.fullscreen}>
           <Icon name="maximize" size={16} class="when-normal" />
           <Icon name="minimize" size={16} class="when-full" />
-          <span data-label>全屏</span>
+          <span data-label>{t.fullscreen}</span>
         </button>
-        <span class="hint">拖动旋转 · 滚轮缩放 · 点击建筑查看数据 · F 全屏</span>
+        <span class="hint">{t.hint}</span>
       </div>
       <figure class="planbox">
-        <canvas data-geo-plan role="img" aria-label="街区平面图，点击可选择建筑"></canvas>
+        <canvas data-geo-plan role="img" aria-label={t.plan}></canvas>
         <figcaption>
-          平面图 <span>N ↑</span>
+          {t.planCaption} <span>N ↑</span>
         </figcaption>
       </figure>
     </div>
 
-    <aside class="panel panel-queries" aria-label="示例查询">
-      <p class="panel-label">示例查询</p>
+    <aside class="panel panel-queries" aria-label={t.queries}>
+      <p class="panel-label">{t.queries}</p>
       <div class="queries">
         {queries.map((query, i) => (
           <button type="button" data-query={query.id} aria-pressed={i === 0 ? 'true' : 'false'}>
@@ -75,7 +130,7 @@ const first = queries[0].run(city);
       </div>
       <div class="results" data-geo-results>
         <p class="results-head">
-          结果 <span>{first.hits.length} 项</span>
+          {t.results} <span>{t.count}</span>
           <code>{queries[0].feature}</code>
         </p>
         <ul role="list">
@@ -92,33 +147,18 @@ const first = queries[0].run(city);
     </aside>
 
     <aside class="panel panel-info" data-geo-info aria-live="polite">
-      <p class="info-kind">分层视图</p>
-      <h3 class="info-title">一次查询经过的四层</h3>
+      <p class="info-kind">{t.layerKind}</p>
+      <h3 class="info-title">{t.layerTitle}</h3>
       <ol class="layer-legend" role="list">
-        <li>
-          <i class="swatch swatch-onto"></i>
-          <b>本体</b>
-          <span>类与类之间的关系，例如 :School ⊑ :PublicFacility。</span>
-        </li>
-        <li>
-          <i class="swatch swatch-graph"></i>
-          <b>虚拟知识图谱</b>
-          <span>由映射按需生成的实体，节点位于对应建筑的正上方。</span>
-        </li>
-        <li>
-          <i class="swatch swatch-map"></i>
-          <b>映射</b>
-          <span>将表中的行与几何列转换为三元组。</span>
-        </li>
-        <li>
-          <i class="swatch swatch-data"></i>
-          <b>数据源</b>
-          <span>PostGIS 中的表与几何，数据不迁移。</span>
-        </li>
+        {t.legend.map(([swatch, title, text]) => (
+          <li>
+            <i class={`swatch swatch-${swatch}`}></i>
+            <b>{title}</b>
+            <span>{text}</span>
+          </li>
+        ))}
       </ol>
-      <p class="info-text">
-        点击任意建筑，查看它在各层中的对应：数据库记录、虚拟三元组与所属的类。
-      </p>
+      <p class="info-text">{t.infoText}</p>
     </aside>
   </div>
 </div>
