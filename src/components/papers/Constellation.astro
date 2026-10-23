@@ -1,13 +1,14 @@
 ---
 /**
- * 文献星图（文献页的动效版本）：每篇论文一颗星，连线取自发展历程页的传承关系。
+ * 文献星图（文献页的动效版本）：每篇论文一颗星，星点大小随库内被引次数增大。
+ * 连线有两类：发展历程页的传承关系，以及论文之间的引用（src/data/citations.json）。
  * 布局由 lib/constellation 中的注册表提供，各布局的坐标与背景都在构建时计算；
  * 扫描、布局切换、悬停与筛选联动见 scripts/papers-fx.ts。
  */
-import { LINKS, MILESTONES } from '../../data/history';
+import { MILESTONES } from '../../data/history';
 import { PAPER_TOPICS } from '../../data/papers';
 import { langOf, localize } from '../../i18n';
-import { buildContext, buildLayouts } from '../../lib/constellation';
+import { buildContext, buildLayouts, linkPath } from '../../lib/constellation';
 import { getPapers, getRepos, paperSummary } from '../../lib/papers';
 
 const lang = langOf(Astro.url.pathname);
@@ -25,17 +26,16 @@ for (const repo of repos) {
   }
 }
 
-// 历程页里程碑之间的传承关系，换算为论文之间的连线
-const paperIds = new Set(papers.map((paper) => paper.id));
-const paperOf = new Map(MILESTONES.filter((m) => m.paper).map((m) => [m.id, m.paper!]));
-const links = LINKS.flatMap(([from, to, kind]) => {
-  const a = paperOf.get(from);
-  const b = paperOf.get(to);
-  return a && b && a !== b && paperIds.has(a) && paperIds.has(b) ? [{ from: a, to: b, kind }] : [];
-});
+const links = ctx.links;
+const lineageCount = links.filter((link) => link.kind !== 'citation').length;
+const citationCount = links.length - lineageCount;
 
-const layouts = buildLayouts(ctx, links);
+const layouts = buildLayouts(ctx);
 const initial = layouts[0];
+
+// 星点大小：被库内引用越多越大，最多约为基础大小的 1.9 倍
+const maxCited = Math.max(1, ...ctx.stars.map((star) => star.cited));
+const sizeOf = (cited: number) => 1 + 0.9 * Math.sqrt(cited / maxCited);
 const maxHeight = Math.max(...layouts.map((layout) => layout.height));
 const maxWidth = Math.max(...layouts.map((layout) => layout.width));
 
@@ -60,31 +60,47 @@ const layoutNames = layouts.map((layout) => layout.label).join(lang === 'zh' ? '
 
 const t = {
   zh: {
-    label: `文献星图：每颗星代表一篇论文，带光环的论文附有代码，连线表示发展历程页中的传承关系。可选布局：${layoutNames}。`,
+    label: `文献星图：每颗星代表一篇论文，星越大表示被库内其他论文引用得越多，带光环的论文附有代码；连线表示发展历程页中的传承关系与论文之间的引用。可选布局：${layoutNames}。`,
     title: '文献星图',
     sub: `VKG / OBDA · ${ctx.from}–${ctx.to}`,
     papers: '论文',
     code: '附代码',
     repos: '仓库',
-    links: '传承',
-    keyPaper: '论文',
+    citations: '引用',
+    keyPaper: '论文（越大被引越多）',
     keyCode: '附有代码',
-    keyLink: '传承关系（取自发展历程）',
+    relations: '显示的关系',
+    lineage: '传承',
+    citation: '引用',
+    coauthor: '同作者',
+    relationTitle: {
+      lineage: '发展历程页中的传承关系',
+      citation: '论文之间的引用，数据来自 OpenAlex、Semantic Scholar 与 Crossref',
+      coauthor: '悬停时同时高亮有共同作者的论文',
+    },
     hint: '悬停或点击星点查看论文 · 搜索会同步点亮星图',
     replay: '重放',
     layout: '布局',
   },
   en: {
-    label: `Paper constellation: each star is a paper, a ring marks papers with code, and lines show lineage from the history page. Layouts: ${layoutNames}.`,
+    label: `Paper constellation: each star is a paper, larger stars are cited more often within the library, and a ring marks papers with code; lines show lineage from the history page and citations between papers. Layouts: ${layoutNames}.`,
     title: 'Paper constellation',
     sub: `VKG / OBDA · ${ctx.from}–${ctx.to}`,
     papers: 'papers',
     code: 'with code',
     repos: 'repos',
-    links: 'lineage',
-    keyPaper: 'Paper',
+    citations: 'citations',
+    keyPaper: 'Paper (larger: cited more)',
     keyCode: 'With code',
-    keyLink: 'Lineage (from the history page)',
+    relations: 'Relations shown',
+    lineage: 'Lineage',
+    citation: 'Citations',
+    coauthor: 'Co-authors',
+    relationTitle: {
+      lineage: 'Lineage from the history page',
+      citation: 'Citations between papers, from OpenAlex, Semantic Scholar and Crossref',
+      coauthor: 'On hover, also highlight papers that share an author',
+    },
     hint: 'Hover or tap a star for the paper · Search lights up matching stars',
     replay: 'Replay',
     layout: 'Layout',
@@ -94,8 +110,8 @@ const t = {
 const stats = [
   { value: papers.length, label: t.papers },
   { value: withCode, label: t.code },
+  { value: citationCount, label: t.citations },
   { value: repos.length, label: t.repos },
-  { value: links.length, label: t.links },
 ];
 
 /** 客户端切换布局所需的数据；背景图形已渲染在各自的图层中，不再重复。 */
@@ -246,16 +262,28 @@ const clientLayouts = layouts.map(
           ))}
 
           <g class="links">
-            {links.map((link, i) => (
-              <g class:list={['link', `link-${link.kind}`]} data-from={link.from} data-to={link.to}>
-                <path
-                  class="link-base"
-                  d={initial.links[i]}
-                  pathLength={link.kind === 'cite' ? 1 : undefined}
-                />
-                <path class="link-flow" d={initial.links[i]} />
-              </g>
-            ))}
+            {links.map((link) => {
+              const d = linkPath(
+                initial.link,
+                initial.positions[link.from],
+                initial.positions[link.to],
+              );
+              return (
+                <g
+                  class:list={['link', `link-${link.kind}`]}
+                  data-from={link.from}
+                  data-to={link.to}
+                  data-kind={link.kind}
+                >
+                  <path
+                    class="link-base"
+                    d={d}
+                    pathLength={link.kind === 'thread' ? undefined : 1}
+                  />
+                  {link.kind === 'cite' && <path class="link-flow" d={d} />}
+                </g>
+              );
+            })}
           </g>
 
           <g class="stars">
@@ -271,11 +299,18 @@ const clientLayouts = layouts.map(
                   aria-label={`${star.year} ${papers.find((paper) => paper.id === star.id)!.data.title}`}
                 >
                   <g class="star-pos">
-                    <circle class="star-hit" r="10" />
-                    <circle class="star-glow" r="13" fill="url(#star-glow)" />
-                    {star.code && <circle class="star-ring" r="7.5" />}
-                    <circle class="star-burst" r="9" />
-                    <circle class="star-core" r="3.2" />
+                    <circle class="star-hit" r={Math.max(10, 6 + 4 * sizeOf(star.cited))} />
+                    <circle
+                      class="star-glow"
+                      r={(13 * sizeOf(star.cited)).toFixed(1)}
+                      fill="url(#star-glow)"
+                    />
+                    {star.code && (
+                      <circle class="star-ring" r={(4.3 + 3.2 * sizeOf(star.cited)).toFixed(1)} />
+                    )}
+                    <circle class="star-burst" r={(9 * sizeOf(star.cited)).toFixed(1)} />
+                    <circle class="star-core" r={(3.2 * sizeOf(star.cited)).toFixed(1)} />
+                    <circle class="star-peer" r={(6 + 3 * sizeOf(star.cited)).toFixed(1)} />
                   </g>
                 </g>
               );
@@ -295,10 +330,23 @@ const clientLayouts = layouts.map(
         <i class="key key-code"></i>
         {t.keyCode}
       </span>
-      <span>
-        <i class="key key-link"></i>
-        {t.keyLink}
-      </span>
+      <div class="relations" role="group" aria-label={t.relations}>
+        {(['lineage', 'citation', 'coauthor'] as const).map((relation) => (
+          <button
+            type="button"
+            data-relation={relation}
+            aria-pressed="true"
+            title={t.relationTitle[relation]}
+          >
+            <i class:list={['key', `key-${relation}`]}></i>
+            {relation === 'lineage'
+              ? `${t.lineage} ${lineageCount}`
+              : relation === 'citation'
+                ? `${t.citation} ${citationCount}`
+                : t.coauthor}
+          </button>
+        ))}
+      </div>
       <span class="legend-hint">{t.hint}</span>
       <button type="button" class="replay" data-sky-replay>
         {t.replay}
@@ -869,6 +917,13 @@ const clientLayouts = layouts.map(
     fill: var(--sky-faint);
   }
 
+  /* 网络 */
+  .layer :global(.network-note) {
+    font-size: 11px;
+    fill: var(--sky-faint);
+    text-anchor: end;
+  }
+
   /* 扫描：沿路径描绘 */
   .trace {
     fill: none;
@@ -1116,6 +1171,42 @@ const clientLayouts = layouts.map(
     stroke-width: 1.8;
   }
 
+  .has-focus .link-citation.is-related .link-base {
+    stroke: rgb(170 215 255 / 0.75);
+    stroke-width: 1.1;
+  }
+
+  /* 有共同作者的论文：比无关论文亮，并加一圈虚线 */
+  .has-focus .star.is-peer:not(.is-related) {
+    opacity: 0.75;
+  }
+
+  .star-peer {
+    fill: none;
+    stroke: #f5d77a;
+    stroke-width: 1;
+    stroke-dasharray: 1.5 2.5;
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+
+  .has-focus .star.is-peer .star-peer {
+    opacity: 0.9;
+  }
+
+  /* 关系开关 */
+  .hide-lineage .link-cite,
+  .hide-lineage .link-thread,
+  .hide-citation .link-citation {
+    display: none;
+  }
+
+  /* 引用：数量多，画得细而淡 */
+  .link-citation .link-base {
+    stroke: rgb(170 200 255 / 0.13);
+    stroke-width: 0.7;
+  }
+
   /* 筛选：不匹配的星点变暗 */
   .is-filtered .star.is-off {
     opacity: 0.1;
@@ -1133,6 +1224,9 @@ const clientLayouts = layouts.map(
   .tip {
     position: absolute;
     z-index: 3;
+    max-height: calc(100% - 12px);
+    overflow-y: auto;
+    pointer-events: none;
     width: min(320px, calc(100% - 16px));
     padding: 12px 14px;
     border-radius: 12px;
@@ -1144,6 +1238,10 @@ const clientLayouts = layouts.map(
       0 20px 50px -20px rgb(0 0 0 / 0.9),
       0 0 30px -10px rgb(127 211 236 / 0.4);
     animation: tip-in 0.22s var(--ease);
+  }
+
+  .tip.is-pinned {
+    pointer-events: auto;
   }
 
   @keyframes tip-in {
@@ -1186,6 +1284,13 @@ const clientLayouts = layouts.map(
     color: var(--sky-ink-2);
   }
 
+  .tip :global(.tip-relations) {
+    margin-top: 6px;
+    font: 11.5px var(--font-mono);
+    color: #f5d77a;
+    opacity: 0.85;
+  }
+
   .tip :global(.tip-links) {
     display: flex;
     flex-wrap: wrap;
@@ -1224,8 +1329,8 @@ const clientLayouts = layouts.map(
   }
 
   .key-paper {
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: #7fd3ec;
     box-shadow: 0 0 8px #7fd3ec;
@@ -1238,9 +1343,57 @@ const clientLayouts = layouts.map(
     border: 1px dashed #7fd3ec;
   }
 
-  .key-link {
-    width: 24px;
-    border-top: 1.2px solid rgb(190 215 255 / 0.5);
+  .relations {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .relations button {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid var(--sky-line-strong);
+    font-size: 12px;
+    color: var(--sky-ink-2);
+    transition:
+      color 0.2s,
+      border-color 0.2s,
+      opacity 0.2s;
+  }
+
+  .relations button:hover {
+    border-color: rgb(127 211 236 / 0.5);
+  }
+
+  .relations button[aria-pressed='false'] {
+    color: var(--sky-faint);
+    border-style: dashed;
+  }
+
+  .relations button[aria-pressed='false'] .key {
+    opacity: 0.35;
+  }
+
+  .key-lineage {
+    width: 20px;
+    border-top: 1.6px solid #bfeaff;
+    box-shadow: 0 0 6px rgb(127 211 236 / 0.6);
+  }
+
+  .key-citation {
+    width: 20px;
+    border-top: 1px solid rgb(170 200 255 / 0.45);
+  }
+
+  .key-coauthor {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    border: 1.2px dotted #f5d77a;
   }
 
   .legend-hint {
@@ -1333,8 +1486,21 @@ const clientLayouts = layouts.map(
     }
 
     .layer :global(.rim-label),
-    .layer :global(.cluster-meta) {
+    .layer :global(.cluster-meta),
+    .layer :global(.network-note) {
       display: none;
+    }
+
+    /* 窄屏上画布比卡片还矮，卡片改为固定在屏幕底部的面板 */
+    .tip {
+      position: fixed;
+      top: auto !important;
+      right: 12px;
+      bottom: 12px;
+      left: 12px !important;
+      width: auto !important;
+      max-height: 55vh;
+      z-index: 40;
     }
 
     /* 星图缩小后加大点击范围 */

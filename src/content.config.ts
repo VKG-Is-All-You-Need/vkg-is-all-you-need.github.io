@@ -36,6 +36,11 @@ const papers = defineCollection({
     url: z.url(),
     /** 代码仓库或示例目录。 */
     code: z.url().optional(),
+    /**
+     * 本文引用的文献库内论文 id。引用关系主要由 npm run citations 从 OpenAlex、
+     * Semantic Scholar 与 Crossref 抓取（src/data/citations.json）；这里只补充三者都缺的引用。
+     */
+    cites: z.array(z.string()).optional(),
     summary: z.string(),
     summary_en: z.string(),
   }),

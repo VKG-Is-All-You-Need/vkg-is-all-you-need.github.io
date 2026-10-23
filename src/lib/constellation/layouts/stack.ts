@@ -1,4 +1,4 @@
-import { bow, CIRCLED, round, years } from '../shared';
+import { CIRCLED, round, years } from '../shared';
 import type { LayoutDef, Point, Shape } from '../types';
 
 const PX_PER_YEAR = 42;
@@ -86,7 +86,7 @@ export const stack: LayoutDef = {
       fit: false,
       positions,
       progress,
-      link: (a, b) => bow(a, b, -0.22),
+      link: { kind: 'bow', amount: -0.22 },
       sweep: { kind: 'line' },
       shapes,
     };

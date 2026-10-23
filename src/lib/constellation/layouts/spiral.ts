@@ -1,4 +1,4 @@
-import { curveToward, markYears, pathOf, polar, round } from '../shared';
+import { markYears, pathOf, polar, round } from '../shared';
 import type { LayoutDef, Point, Shape } from '../types';
 
 const WIDTH = 1068;
@@ -83,7 +83,7 @@ export const spiral: LayoutDef = {
       fit: true,
       positions,
       progress,
-      link: (a, b) => curveToward(a, b, CX, CY, 0.8),
+      link: { kind: 'toward', cx: CX, cy: CY, pull: 0.8 },
       sweep: { kind: 'trace', d },
       shapes,
     };

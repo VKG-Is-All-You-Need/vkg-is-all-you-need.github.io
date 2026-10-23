@@ -43,31 +43,6 @@ export function packOffset(index: number, size: number, spacing = 12): Point {
 export const packRadius = (size: number, spacing = 12): number =>
   size <= 1 ? 0 : size <= PATTERNS.length ? spacing * 0.75 : spacing * 0.62 * Math.sqrt(size);
 
-/** 二次曲线：控制点从两点中点向 (cx, cy) 靠拢，pull 为 1 时是直线，为 0 时经过 (cx, cy)。 */
-export function curveToward(a: Point, b: Point, cx: number, cy: number, pull: number): string {
-  const mx = cx + ((a.x + b.x) / 2 - cx) * pull;
-  const my = cy + ((a.y + b.y) / 2 - cy) * pull;
-  return `M${round(a.x)} ${round(a.y)} Q${round(mx)} ${round(my)} ${round(b.x)} ${round(b.y)}`;
-}
-
-/** 二次曲线：控制点沿两点连线的法向偏移 amount 倍的距离，形成一道弧。 */
-export function bow(a: Point, b: Point, amount: number): string {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const mx = (a.x + b.x) / 2 - dy * amount;
-  const my = (a.y + b.y) / 2 + dx * amount;
-  return `M${round(a.x)} ${round(a.y)} Q${round(mx)} ${round(my)} ${round(b.x)} ${round(b.y)}`;
-}
-
-/** 两点相对圆心的夹角（0–π）。 */
-export const angleBetween = (a: Point, b: Point, cx: number, cy: number): number =>
-  Math.abs(
-    Math.atan2(
-      (a.x - cx) * (b.y - cy) - (a.y - cy) * (b.x - cx),
-      (a.x - cx) * (b.x - cx) + (a.y - cy) * (b.y - cy),
-    ),
-  );
-
 export const pathOf = (points: Point[]): string =>
   points.map((p, i) => `${i ? 'L' : 'M'}${round(p.x)} ${round(p.y)}`).join(' ');
 

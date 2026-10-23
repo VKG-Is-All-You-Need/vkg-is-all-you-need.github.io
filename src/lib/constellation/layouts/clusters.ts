@@ -1,4 +1,4 @@
-import { bow, GOLDEN_ANGLE, round, yearProgress } from '../shared';
+import { GOLDEN_ANGLE, round, yearProgress } from '../shared';
 import type { LayoutDef, Point, Shape } from '../types';
 
 const WIDTH = 1068;
@@ -95,7 +95,7 @@ export const clusters: LayoutDef = {
       positions,
       progress,
       // 跨星团的连线画成弧线，同一星团内接近直线
-      link: (a, b) => bow(a, b, Math.hypot(b.x - a.x, b.y - a.y) > 120 ? 0.18 : 0.08),
+      link: { kind: 'bow', amount: 0.08, far: 120, farAmount: 0.18 },
       sweep: { kind: 'none' },
       shapes,
     };

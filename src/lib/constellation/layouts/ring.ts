@@ -1,4 +1,4 @@
-import { curveToward, polar, round, yearProgress, yearRatio } from '../shared';
+import { polar, round, yearProgress, yearRatio } from '../shared';
 import type { LayoutDef, Point, Shape } from '../types';
 
 const WIDTH = 1068;
@@ -96,7 +96,7 @@ export const ring: LayoutDef = {
       fit: true,
       positions,
       progress,
-      link: (a, b) => curveToward(a, b, CX, CY, 0.12),
+      link: { kind: 'toward', cx: CX, cy: CY, pull: 0.12 },
       sweep: { kind: 'none' },
       shapes,
     };

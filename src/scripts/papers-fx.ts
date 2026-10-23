@@ -1,8 +1,22 @@
+import { linkPath, type LinkStyle } from '../lib/constellation/links';
 import { prefersReducedMotion, watchVisibility } from './lifecycle';
+import { placeTip } from './tip';
 
 // 文献页动效版本：页首标题解码、星图的扫描点亮、布局切换、传承高亮、提示卡片与筛选联动。
 
 const LAYOUT_KEY = 'papers-sky-layout';
+const RELATIONS_KEY = 'papers-sky-relations';
+
+type Relation = 'lineage' | 'citation' | 'coauthor';
+
+/** 作者字符串拆成姓名集合（去掉 “et al.”）。 */
+const authorsOf = (text: string) =>
+  new Set(
+    text
+      .split(',')
+      .map((name) => name.replace(/\bet al\.?/, '').trim())
+      .filter(Boolean),
+  );
 
 interface StarInfo {
   year: number;
@@ -81,7 +95,7 @@ interface SkyLayout {
   fit: boolean;
   positions: Record<string, [number, number]>;
   progress: Record<string, number>;
-  links: string[];
+  link: LinkStyle;
   sweep: { kind: 'line' } | { kind: 'ripple'; r: number } | { kind: 'trace' } | { kind: 'none' };
   rows?: { top: number; height: number }[];
 }
@@ -218,9 +232,14 @@ export function initConstellation(root: HTMLElement, signal: AbortSignal): Const
     svg.setAttribute('height', String(h));
   };
   const setLinkPaths = () => {
-    links.forEach((link, i) => {
-      link.querySelectorAll('path').forEach((path) => path.setAttribute('d', layout.links[i]));
-    });
+    const point = (id: string) => {
+      const [x, y] = layout.positions[id];
+      return { x, y };
+    };
+    for (const link of links) {
+      const d = linkPath(layout.link, point(link.dataset.from!), point(link.dataset.to!));
+      link.querySelectorAll('path').forEach((path) => path.setAttribute('d', d));
+    }
   };
   const setLayout = (id: string, animate: boolean) => {
     const next = layouts.find((item) => item.id === id);
@@ -301,13 +320,23 @@ export function initConstellation(root: HTMLElement, signal: AbortSignal): Const
     );
   }
 
-  // ── 传承高亮与提示卡片 ──
-  const outgoing = new Map<string, string[]>();
-  const incoming = new Map<string, string[]>();
+  // ── 悬停高亮与提示卡片 ──
+  // 传承关系沿整条链高亮；引用只高亮直接引用与被引的论文；同作者的论文另加一圈虚线
+  const lineageOut = new Map<string, string[]>();
+  const lineageIn = new Map<string, string[]>();
+  const citing = new Map<string, string[]>();
+  const citedBy = new Map<string, string[]>();
+  const push = (map: Map<string, string[]>, key: string, value: string) =>
+    map.set(key, [...(map.get(key) ?? []), value]);
   for (const link of links) {
-    const { from, to } = link.dataset as { from: string; to: string };
-    outgoing.set(from, [...(outgoing.get(from) ?? []), to]);
-    incoming.set(to, [...(incoming.get(to) ?? []), from]);
+    const { from, to, kind } = link.dataset as { from: string; to: string; kind: string };
+    if (kind === 'citation') {
+      push(citing, to, from);
+      push(citedBy, from, to);
+    } else {
+      push(lineageOut, from, to);
+      push(lineageIn, to, from);
+    }
   }
   const walk = (start: string, edges: Map<string, string[]>) => {
     const seen = new Set<string>([start]);
@@ -322,12 +351,53 @@ export function initConstellation(root: HTMLElement, signal: AbortSignal): Const
     }
     return seen;
   };
+  const authors = new Map(Object.entries(info).map(([id, item]) => [id, authorsOf(item.authors)]));
+  const peersOf = (id: string) => {
+    const mine = authors.get(id)!;
+    return [...authors].filter(
+      ([other, names]) => other !== id && [...names].some((name) => mine.has(name)),
+    );
+  };
+
+  // 关系开关：传承、引用决定是否画线，同作者决定悬停时是否高亮
+  const relationButtons = [...root.querySelectorAll<HTMLButtonElement>('[data-relation]')];
+  const shown = new Set<Relation>(['lineage', 'citation', 'coauthor']);
+  try {
+    const saved = JSON.parse(localStorage.getItem(RELATIONS_KEY) ?? 'null') as Relation[] | null;
+    if (Array.isArray(saved)) {
+      shown.clear();
+      for (const relation of saved) shown.add(relation);
+    }
+  } catch {}
+  const applyRelations = () => {
+    root.classList.toggle('hide-lineage', !shown.has('lineage'));
+    root.classList.toggle('hide-citation', !shown.has('citation'));
+    for (const button of relationButtons) {
+      button.setAttribute('aria-pressed', String(shown.has(button.dataset.relation as Relation)));
+    }
+  };
+  applyRelations();
+  for (const button of relationButtons) {
+    button.addEventListener(
+      'click',
+      () => {
+        const relation = button.dataset.relation as Relation;
+        if (shown.has(relation)) shown.delete(relation);
+        else shown.add(relation);
+        applyRelations();
+        try {
+          localStorage.setItem(RELATIONS_KEY, JSON.stringify([...shown]));
+        } catch {}
+      },
+      { signal },
+    );
+  }
 
   let pinned: string | null = null;
   const clearFocus = () => {
     svg.classList.remove('has-focus');
-    svg.querySelectorAll('.is-related, .is-focus').forEach((el) => {
-      el.classList.remove('is-related', 'is-focus');
+    svg.querySelectorAll('.is-related, .is-focus, .is-peer').forEach((el) => {
+      el.classList.remove('is-related', 'is-focus', 'is-peer');
     });
     tip.hidden = true;
   };
@@ -356,30 +426,42 @@ export function initConstellation(root: HTMLElement, signal: AbortSignal): Const
         ? `<a href="${escapeHtml(item.history)}">${en ? 'History →' : '发展历程 →'}</a>`
         : '',
     ].join('');
-    tip.innerHTML = `<p class="tip-meta"><span>${item.year}</span><span>${escapeHtml(item.topic)} · ${escapeHtml(item.venue)}</span></p><p class="tip-title">${escapeHtml(item.title)}</p><p class="tip-authors">${escapeHtml(item.authors)}</p><p class="tip-text">${escapeHtml(item.summary)}</p><p class="tip-links">${linksHtml}</p>`;
+    const out = citing.get(id)?.length ?? 0;
+    const into = citedBy.get(id)?.length ?? 0;
+    const peers = peersOf(id).length;
+    const relations = en
+      ? `Cites ${out} · cited by ${into} in this library · ${peers} papers share an author`
+      : `引用库内 ${out} 篇 · 被库内 ${into} 篇引用 · 同作者论文 ${peers} 篇`;
+    tip.innerHTML = `<p class="tip-meta"><span>${item.year}</span><span>${escapeHtml(item.topic)} · ${escapeHtml(item.venue)}</span></p><p class="tip-title">${escapeHtml(item.title)}</p><p class="tip-authors">${escapeHtml(item.authors)}</p><p class="tip-text">${escapeHtml(item.summary)}</p><p class="tip-relations">${relations}</p><p class="tip-links">${linksHtml}</p>`;
     tip.hidden = false;
-    tip.style.width = `${Math.min(320, scroller.clientWidth - 16)}px`;
-    const tipWidth = tip.offsetWidth;
-    const tipHeight = tip.offsetHeight;
-    const minLeft = scroller.scrollLeft + 8;
-    const maxLeft = scroller.scrollLeft + scroller.clientWidth - tipWidth - 8;
-    const left = Math.min(Math.max(minLeft, x - 24), maxLeft);
-    const below = y + 18 + tipHeight < scroller.clientHeight;
-    tip.style.left = `${left}px`;
-    tip.style.top = `${below ? y + 18 : Math.max(6, y - tipHeight - 16)}px`;
+    placeTip(tip, scroller, x, y, 320);
   };
   const focus = (id: string) => {
     clearFocus();
-    const related = new Set([...walk(id, outgoing), ...walk(id, incoming)]);
+    const related = new Set<string>([id]);
+    if (shown.has('lineage')) {
+      for (const rid of [...walk(id, lineageOut), ...walk(id, lineageIn)]) related.add(rid);
+    }
+    if (shown.has('citation')) {
+      for (const rid of [...(citing.get(id) ?? []), ...(citedBy.get(id) ?? [])]) related.add(rid);
+    }
     svg.classList.add('has-focus');
     for (const rid of related) stars.get(rid)?.classList.add('is-related');
     stars.get(id)?.classList.add('is-focus');
+    if (shown.has('coauthor')) {
+      for (const [peer] of peersOf(id)) stars.get(peer)?.classList.add('is-peer');
+    }
     for (const link of links) {
-      if (related.has(link.dataset.from!) && related.has(link.dataset.to!)) {
-        link.classList.add('is-related');
-      }
+      const { from, to, kind } = link.dataset as { from: string; to: string; kind: string };
+      const hit =
+        kind === 'citation'
+          ? from === id || to === id
+          : related.has(from) && related.has(to) && shown.has('lineage');
+      if (hit) link.classList.add('is-related');
     }
     showTip(id);
+    // 只有点击固定后，卡片才接收指针（悬停时卡片若接收指针，会抢走星点的悬停状态）
+    tip.classList.toggle('is-pinned', pinned === id);
   };
 
   for (const [id, el] of stars) {

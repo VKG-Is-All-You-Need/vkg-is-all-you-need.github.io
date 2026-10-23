@@ -113,10 +113,7 @@ export const lanes: LayoutDef = {
       fit: false,
       positions,
       progress,
-      link(a, b) {
-        const dx = Math.max(Math.abs(b.x - a.x), 30) * 0.5;
-        return `M${a.x} ${a.y} C${round(a.x + dx)} ${a.y} ${round(b.x - dx)} ${b.y} ${b.x} ${b.y}`;
-      },
+      link: { kind: 'horizontal' },
       sweep: { kind: 'line' },
       shapes,
       rows: ctx.topics.map((_, i) => ({ top: AXIS_H + i * laneH, height: laneH })),

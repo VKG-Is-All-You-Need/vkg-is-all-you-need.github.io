@@ -1,13 +1,4 @@
-import {
-  angleBetween,
-  curveToward,
-  markYears,
-  packOffset,
-  polar,
-  round,
-  years,
-  yearRatio,
-} from '../shared';
+import { markYears, packOffset, polar, round, years, yearRatio } from '../shared';
 import type { LayoutDef, Point, Shape } from '../types';
 
 const WIDTH = 1068;
@@ -110,8 +101,7 @@ export const radial: LayoutDef = {
       positions,
       progress,
       // 跨扇区的连线向圆心弯曲，夹角越大弯得越多；相邻的星点之间接近直线
-      link: (a, b) =>
-        curveToward(a, b, CX, CY, 1 - 0.5 * Math.min(1, angleBetween(a, b, CX, CY) / Math.PI)),
+      link: { kind: 'toward', cx: CX, cy: CY, pull: 1, bend: 0.5 },
       sweep: { kind: 'ripple', cx: CX, cy: CY, r: R1 + 10 },
       shapes,
     };

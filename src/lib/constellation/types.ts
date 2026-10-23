@@ -1,9 +1,7 @@
 import type { Lang } from '../../i18n';
+import type { LinkStyle, Point } from './links';
 
-export interface Point {
-  x: number;
-  y: number;
-}
+export type { LinkStyle, Point };
 
 /** 一篇论文在星图中的输入数据；各种分组内的序号由 buildContext 预先算好。 */
 export interface SkyStar {
@@ -21,6 +19,18 @@ export interface SkyStar {
   /** 同主题中按年份排列的序号与数量。 */
   topicIndex: number;
   topicSize: number;
+  /** 被文献库内其他论文引用的次数。 */
+  cited: number;
+}
+
+/**
+ * 两篇论文之间的关系，from 为较早（被引用）的一方，to 为较晚（引用者）的一方。
+ * cite 与 thread 取自发展历程页的传承关系（明确的传承、同一问题线），citation 为论文引用。
+ */
+export interface SkyLink {
+  from: string;
+  to: string;
+  kind: 'cite' | 'thread' | 'citation';
 }
 
 export interface SkyTopic {
@@ -46,6 +56,8 @@ export interface SkyContext {
   eras: SkyEra[];
   /** 每年的论文数，下标为 year - from。 */
   perYear: number[];
+  /** 论文之间的关系；同一对论文只出现一次，传承优先于引用。 */
+  links: SkyLink[];
 }
 
 /** 背景图形：按 tag 原样渲染为 SVG 元素；带 data-p 的元素会随扫描进度出现。 */
@@ -71,8 +83,8 @@ export interface LayoutResult {
   positions: Record<string, Point>;
   /** 扫描进度（0–1），决定点亮顺序与布局切换时的出发顺序。 */
   progress: Record<string, number>;
-  /** 两颗星之间连线的路径。 */
-  link(a: Point, b: Point): string;
+  /** 连线的形状，路径由 links.ts 中的 linkPath 计算。 */
+  link: LinkStyle;
   sweep: Sweep;
   shapes: Shape[];
   /** 主题标签与画布中的行对齐时给出每行的位置；缺省时标签显示为图例。 */

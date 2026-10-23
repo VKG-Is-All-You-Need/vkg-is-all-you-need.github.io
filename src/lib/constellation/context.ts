@@ -1,8 +1,9 @@
-import { ERAS } from '../../data/history';
+import citations from '../../data/citations.json';
+import { ERAS, LINKS, MILESTONES } from '../../data/history';
 import { PAPER_TOPICS, paperTopics } from '../../data/papers';
 import type { Lang } from '../../i18n';
 import type { Paper, Repo } from '../papers';
-import type { SkyContext, SkyStar } from './types';
+import type { SkyContext, SkyLink, SkyStar } from './types';
 
 /** 主题颜色，按主题顺序取用；主题多于颜色数时循环使用。 */
 const PALETTE = [
@@ -39,6 +40,36 @@ function indexWithin<T>(items: T[], key: (item: T) => string): Map<T, [number, n
   return result;
 }
 
+/**
+ * 论文之间的关系：发展历程页的传承关系（里程碑换算为论文），加上抓取到的引用与 papers.yaml 中
+ * 手工补充的引用。同一对论文只保留一条，传承优先；方向统一为从较早的论文指向较晚的论文。
+ */
+function buildLinks(papers: Paper[]): SkyLink[] {
+  const ids = new Set(papers.map((paper) => paper.id));
+  const year = new Map(papers.map((paper) => [paper.id, paper.data.year]));
+  const links = new Map<string, SkyLink>();
+  const key = (a: string, b: string) => [a, b].sort().join(' ');
+  const add = (from: string, to: string, kind: SkyLink['kind']) => {
+    if (from === to || !ids.has(from) || !ids.has(to) || links.has(key(from, to))) return;
+    const [a, b] = year.get(from)! <= year.get(to)! ? [from, to] : [to, from];
+    links.set(key(from, to), { from: a, to: b, kind });
+  };
+
+  const paperOf = new Map(MILESTONES.filter((m) => m.paper).map((m) => [m.id, m.paper!]));
+  for (const [from, to, kind] of LINKS) {
+    const a = paperOf.get(from);
+    const b = paperOf.get(to);
+    if (a && b) add(a, b, kind);
+  }
+  const fetched = citations.cites as Record<string, string[]>;
+  for (const paper of papers) {
+    for (const cited of [...(fetched[paper.id] ?? []), ...(paper.data.cites ?? [])]) {
+      add(cited, paper.id, 'citation');
+    }
+  }
+  return [...links.values()];
+}
+
 export function buildContext(papers: Paper[], repos: Repo[], lang: Lang): SkyContext {
   const withRepo = new Set(repos.map((repo) => repo.data.paper).filter(Boolean));
   const topics = paperTopics(lang).map((topic, i) => ({
@@ -59,6 +90,13 @@ export function buildContext(papers: Paper[], repos: Repo[], lang: Lang): SkyCon
     )
     .map(({ paper }) => paper);
 
+  const links = buildLinks(papers);
+  // 被库内引用的次数：引用与明确的传承都计入，同一问题线不计
+  const cited = new Map<string, number>();
+  for (const link of links) {
+    if (link.kind !== 'thread') cited.set(link.from, (cited.get(link.from) ?? 0) + 1);
+  }
+
   const cell = indexWithin(ordered, (p) => `${p.data.topic}:${p.data.year}`);
   const byYear = indexWithin(ordered, (p) => String(p.data.year));
   const byTopic = indexWithin(ordered, (p) => p.data.topic);
@@ -74,6 +112,7 @@ export function buildContext(papers: Paper[], repos: Repo[], lang: Lang): SkyCon
     yearSize: byYear.get(paper)![1],
     topicIndex: byTopic.get(paper)![0],
     topicSize: byTopic.get(paper)![1],
+    cited: cited.get(paper.id) ?? 0,
   }));
 
   const from = Math.min(...stars.map((s) => s.year));
@@ -88,5 +127,5 @@ export function buildContext(papers: Paper[], repos: Repo[], lang: Lang): SkyCon
     (_, i) => stars.filter((s) => s.year === from + i).length,
   );
 
-  return { lang, stars, topics, from, to, eras, perYear };
+  return { lang, stars, topics, from, to, eras, perYear, links };
 }

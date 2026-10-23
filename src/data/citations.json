@@ -1,0 +1,593 @@
+{
+  "note": "由 npm run citations 生成，请勿手工编辑；补充引用请在 papers.yaml 中使用 cites 字段。",
+  "generated": "2026-10-23",
+  "cites": {
+    "aerospace-lens": [
+      "bosch",
+      "ontop-of-databases",
+      "vkg-overview"
+    ],
+    "atkis-dlm-kg": [
+      "citygml-kg",
+      "linkedgeodata"
+    ],
+    "axioms-through-mappings": [
+      "data-integration",
+      "dl-lite",
+      "dynamic-tboxes",
+      "linking-data",
+      "mastro",
+      "obda-survey",
+      "obdm",
+      "ontop-of-databases",
+      "optique"
+    ],
+    "beyond-relational": [
+      "bsbm",
+      "data-integration",
+      "epnet",
+      "linking-data",
+      "obda-survey",
+      "ontop-of-databases",
+      "ontop-swj",
+      "optique",
+      "rewriting-or-materialization",
+      "sparql-owl2ql"
+    ],
+    "bidirectional-vkg": [
+      "d2rq-update",
+      "fo-update",
+      "mapping-recovery-update",
+      "mastro",
+      "ontoaccess",
+      "ontop-iswc",
+      "ontop-swj",
+      "sparql-owl2ql",
+      "vkg-update-side-effects"
+    ],
+    "big-data-evolution": [
+      "data-integration",
+      "linking-data",
+      "ontop-swj",
+      "temporal-dl-obda"
+    ],
+    "bootox": [
+      "dl-lite",
+      "linking-data",
+      "ontology-extraction",
+      "optique",
+      "ultrawrap"
+    ],
+    "bosch": [
+      "obda-survey",
+      "ontop-swj",
+      "sdrl",
+      "siemens",
+      "squerall",
+      "statoil",
+      "vkg-overview"
+    ],
+    "burr": [
+      "bootox",
+      "bosch",
+      "kg-llm-benchmark",
+      "mapping-patterns",
+      "obda-survey",
+      "ontop-swj",
+      "rodi"
+    ],
+    "canonical-iris": [
+      "cross-linked",
+      "dl-lite",
+      "linking-data",
+      "maritime",
+      "ontop-swj",
+      "optique",
+      "rewriting-or-materialization",
+      "sparql-owl2ql",
+      "statoil"
+    ],
+    "chimera": [
+      "mastro",
+      "ontop-swj",
+      "optique",
+      "siemens",
+      "squerall",
+      "statoil",
+      "ultrawrap",
+      "vkg-overview"
+    ],
+    "chrontext": [
+      "linking-data",
+      "ontop-iswc",
+      "ontop-swj",
+      "ontop-temporal",
+      "optique",
+      "siemens",
+      "starql",
+      "vkg-overview"
+    ],
+    "citygml-kg": [
+      "linkedgeodata",
+      "ontop-iswc"
+    ],
+    "cross-linked": [
+      "dl-lite",
+      "dl-lite-relations",
+      "ontop-of-databases",
+      "sparql-owl2ql"
+    ],
+    "d2rq-update": [
+      "ontoaccess"
+    ],
+    "data-aware-processes": [
+      "dl-lite",
+      "linking-data",
+      "t-mappings"
+    ],
+    "datalogmtl-obda": [
+      "linking-data",
+      "ontop-of-databases",
+      "ontop-swj",
+      "sparql-owl2ql"
+    ],
+    "dl-lite": [
+      "linking-data"
+    ],
+    "dl-lite-evolution": [
+      "dl-lite",
+      "dl-lite-relations",
+      "linking-data"
+    ],
+    "dl-lite-relations": [
+      "data-integration",
+      "dl-lite",
+      "linking-data"
+    ],
+    "dynamic-tboxes": [
+      "data-integration",
+      "dl-lite",
+      "linking-data",
+      "mastro"
+    ],
+    "epnet": [
+      "cross-linked",
+      "dl-lite",
+      "linking-data",
+      "ontop-of-databases",
+      "ontop-swj",
+      "optique",
+      "rewriting-or-materialization"
+    ],
+    "fhir-ontop-omop": [
+      "ontop-iswc",
+      "ontop-patterns",
+      "ontop-swj",
+      "vkg-overview"
+    ],
+    "fo-update": [
+      "axioms-through-mappings",
+      "dl-lite",
+      "dl-lite-evolution",
+      "instance-level-evolution",
+      "linking-data",
+      "write-also-obda"
+    ],
+    "geoqa": [
+      "atkis-dlm-kg"
+    ],
+    "gtfs-bench": [
+      "bsbm",
+      "linking-data",
+      "npd",
+      "ontop-swj",
+      "ultrawrap",
+      "vig"
+    ],
+    "instance-level-evolution": [
+      "dl-lite",
+      "dl-lite-evolution",
+      "dl-lite-relations",
+      "linking-data"
+    ],
+    "krown": [
+      "bsbm",
+      "gtfs-bench",
+      "ontop-swj",
+      "vig"
+    ],
+    "linkedgeodata": [
+      "maritime",
+      "obda-survey",
+      "ontop-iswc",
+      "ontop-spatial",
+      "ontop-swj",
+      "statoil",
+      "vkg-overview"
+    ],
+    "linking-data": [
+      "data-integration",
+      "dl-lite"
+    ],
+    "ltl-rewritability": [
+      "dl-lite",
+      "dl-lite-relations",
+      "epnet",
+      "mastro",
+      "obda-survey",
+      "obdm",
+      "ontop-of-databases",
+      "optique",
+      "sdrl"
+    ],
+    "mapping-analysis": [
+      "dl-lite",
+      "linking-data",
+      "ontop-of-databases",
+      "optique",
+      "perfectmap"
+    ],
+    "mapping-patterns": [
+      "bootox",
+      "bsbm",
+      "data-integration",
+      "dl-lite",
+      "dl-lite-relations",
+      "linking-data",
+      "npd",
+      "ontop-patterns",
+      "ontop-swj",
+      "rodi",
+      "schema-transformation",
+      "statoil",
+      "vig",
+      "vkg-overview"
+    ],
+    "mapping-recovery-update": [
+      "dl-lite",
+      "fo-update",
+      "linking-data",
+      "ontop-swj",
+      "sparql-owl2ql",
+      "vkg-overview",
+      "write-also-obda"
+    ],
+    "mapping-repair": [
+      "dl-lite",
+      "linking-data",
+      "mapping-analysis",
+      "optique"
+    ],
+    "maritime": [
+      "linking-data",
+      "ontop-swj",
+      "sparql-owl2ql"
+    ],
+    "mastro": [
+      "data-integration",
+      "dl-lite",
+      "dl-lite-evolution",
+      "linking-data"
+    ],
+    "meteor": [
+      "ontop-temporal"
+    ],
+    "morph-csv": [
+      "beyond-relational",
+      "bsbm",
+      "data-integration",
+      "gtfs-bench",
+      "linking-data",
+      "ontop-swj",
+      "squerall",
+      "ultrawrap",
+      "vig"
+    ],
+    "obdf": [
+      "bsbm",
+      "dl-lite",
+      "linking-data",
+      "mastro",
+      "npd",
+      "obda-survey",
+      "ontop-iswc",
+      "ontop-of-databases",
+      "ontop-swj",
+      "squerall",
+      "ultrawrap",
+      "vig",
+      "vkg-overview"
+    ],
+    "obdf-kbs": [
+      "beyond-relational",
+      "bsbm",
+      "chrontext",
+      "dl-lite",
+      "dl-lite-relations",
+      "linking-data",
+      "mapping-patterns",
+      "maritime",
+      "mastro",
+      "npd",
+      "obda-survey",
+      "obdf",
+      "ontop-iswc",
+      "ontop-of-databases",
+      "ontop-swj",
+      "rewriting-or-materialization",
+      "sparql-owl2ql",
+      "squerall",
+      "ultrawrap",
+      "vkg-overview"
+    ],
+    "obdm": [
+      "dl-lite"
+    ],
+    "obdm-abstraction": [
+      "data-integration",
+      "dl-lite",
+      "linking-data",
+      "mapping-repair",
+      "obda-survey",
+      "obdm"
+    ],
+    "ocel": [
+      "ontop-iswc",
+      "schema-transformation",
+      "vkg-overview"
+    ],
+    "ontologies-to-the-rescue": [
+      "kg-llm-benchmark"
+    ],
+    "ontology-extraction": [
+      "data-integration",
+      "dl-lite",
+      "linking-data",
+      "semantic-mappings"
+    ],
+    "ontop-iswc": [
+      "dl-lite",
+      "dl-lite-relations",
+      "linking-data",
+      "mastro",
+      "ontop-of-databases",
+      "ontop-swj",
+      "sparql-owl2ql",
+      "vkg-overview"
+    ],
+    "ontop-of-databases": [
+      "linking-data",
+      "ultrawrap"
+    ],
+    "ontop-patterns": [
+      "bootox",
+      "gtfs-bench",
+      "obda-survey",
+      "ontop-iswc",
+      "ontop-swj",
+      "rodi",
+      "vkg-overview"
+    ],
+    "ontop-spatial": [
+      "maritime",
+      "ontop-swj",
+      "ultrawrap"
+    ],
+    "ontop-swj": [
+      "bootox",
+      "cross-linked",
+      "dl-lite",
+      "dl-lite-relations",
+      "linking-data",
+      "mastro",
+      "ontop-of-databases",
+      "optique",
+      "rewriting-or-materialization",
+      "sparql-owl2ql",
+      "t-mappings"
+    ],
+    "ontop-temporal": [
+      "datalogmtl-obda",
+      "obda-survey",
+      "ontop-swj"
+    ],
+    "ontop-temporal-framework": [
+      "datalogmtl-obda",
+      "dl-lite",
+      "linking-data",
+      "obda-survey",
+      "ontop-of-databases",
+      "ontop-swj",
+      "siemens",
+      "sparql-owl2ql",
+      "starql",
+      "temporal-dl-obda"
+    ],
+    "optique": [
+      "npd",
+      "starql"
+    ],
+    "perfectmap": [
+      "data-integration",
+      "dl-lite",
+      "linking-data",
+      "mastro",
+      "obdm",
+      "t-mappings"
+    ],
+    "rewriting-or-materialization": [
+      "bsbm",
+      "data-integration",
+      "linking-data",
+      "ontop-of-databases",
+      "perfectmap",
+      "ultrawrap"
+    ],
+    "rigor": [
+      "bootox",
+      "burr",
+      "rodi"
+    ],
+    "rodi": [
+      "bootox",
+      "ontop-swj",
+      "optique"
+    ],
+    "schema-transformation": [
+      "data-integration",
+      "dl-lite",
+      "linking-data",
+      "ontop-swj",
+      "statoil"
+    ],
+    "sdrl": [
+      "bootox",
+      "datalogmtl-obda",
+      "dl-lite",
+      "epnet",
+      "linking-data",
+      "mastro",
+      "obda-survey",
+      "ontop-of-databases",
+      "ontop-temporal-framework",
+      "rodi",
+      "siemens",
+      "sparqlstream",
+      "statoil",
+      "temporal-dl-obda",
+      "ultrawrap"
+    ],
+    "self-demonstrations": [
+      "bootox",
+      "ontop-of-databases",
+      "ontop-swj",
+      "rodi"
+    ],
+    "siemens": [
+      "bootox",
+      "dl-lite",
+      "linking-data",
+      "mastro",
+      "ontop-of-databases",
+      "optique",
+      "rodi",
+      "sparqlstream",
+      "starql",
+      "temporal-dl-obda",
+      "ultrawrap"
+    ],
+    "sparql-edit": [
+      "d2rq-update",
+      "mastro",
+      "ontoaccess",
+      "sparqlmap-update",
+      "write-also-obda"
+    ],
+    "sparql-owl2ql": [
+      "dl-lite",
+      "linking-data",
+      "mastro",
+      "ontop-of-databases",
+      "ultrawrap"
+    ],
+    "sparqlstream": [
+      "data-integration",
+      "linking-data"
+    ],
+    "spider4sparql": [
+      "linking-data",
+      "ontop-swj"
+    ],
+    "squerall": [
+      "bsbm",
+      "linking-data",
+      "optique"
+    ],
+    "starql": [
+      "sparqlstream",
+      "temporal-dl-obda"
+    ],
+    "statoil": [
+      "bootox",
+      "cross-linked",
+      "dl-lite",
+      "linking-data",
+      "mastro",
+      "npd",
+      "ontology-extraction",
+      "ontop-swj",
+      "optique",
+      "rodi",
+      "sparql-owl2ql",
+      "t-mappings",
+      "ultrawrap"
+    ],
+    "text2sql-kgqa": [
+      "bootox",
+      "mapping-patterns",
+      "vkg-overview"
+    ],
+    "ultrawrap": [
+      "bsbm",
+      "mastro"
+    ],
+    "vig": [
+      "bsbm",
+      "dl-lite",
+      "linking-data",
+      "ontop-swj",
+      "perfectmap",
+      "rewriting-or-materialization",
+      "sparql-owl2ql"
+    ],
+    "vkg-eo": [
+      "bsbm",
+      "ontop-iswc",
+      "ontop-swj"
+    ],
+    "vkg-overview": [
+      "bootox",
+      "canonical-iris",
+      "cross-linked",
+      "data-integration",
+      "dl-lite",
+      "epnet",
+      "linking-data",
+      "maritime",
+      "mastro",
+      "obda-survey",
+      "ontop-of-databases",
+      "ontop-spatial",
+      "ontop-swj",
+      "ontop-temporal",
+      "optique",
+      "perfectmap",
+      "rewriting-or-materialization",
+      "rodi",
+      "siemens",
+      "sparql-owl2ql",
+      "statoil",
+      "ultrawrap"
+    ],
+    "vkg-update-side-effects": [
+      "dl-lite",
+      "fo-update",
+      "linking-data",
+      "mapping-recovery-update",
+      "ontop-iswc",
+      "ontop-swj",
+      "sparql-owl2ql",
+      "vkg-overview"
+    ],
+    "watdiv": [
+      "bsbm"
+    ],
+    "write-also-obda": [
+      "data-integration",
+      "dl-lite",
+      "dl-lite-evolution",
+      "linking-data",
+      "ontop-swj"
+    ]
+  }
+}
