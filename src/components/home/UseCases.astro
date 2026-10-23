@@ -5,6 +5,7 @@
 import Icon from '../ui/Icon.astro';
 import SectionHeading from '../ui/SectionHeading.astro';
 import { langOf, localize, type Lang } from '../../i18n';
+import { art } from '../../lib/art';
 
 const lang = langOf(Astro.url.pathname);
 
@@ -179,22 +180,40 @@ const wavePoints = [...WAVE, ...WAVE, WAVE[0]]
   .map((y, i) => `${(i * 260) / WAVE.length},${y}`)
   .join(' ');
 
-/** 地理卡片的建筑：hit 为缓冲区内的建筑。 */
-const BUILDINGS = [
-  { x: 30, y: 22, w: 34, h: 22 },
-  { x: 74, y: 18, w: 24, h: 30, hit: true },
-  { x: 150, y: 20, w: 40, h: 24, hit: true },
-  { x: 204, y: 26, w: 30, h: 20 },
-  { x: 26, y: 92, w: 30, h: 34 },
-  { x: 86, y: 96, w: 36, h: 26, hit: true },
-  { x: 148, y: 98, w: 26, h: 30, hit: true },
-  { x: 196, y: 92, w: 40, h: 30 },
-];
+/** 建筑素材的宽高比（高 / 宽）。 */
+const BUILDING_RATIO = { 1: 1.047, 2: 0.88, 3: 1.927 } as const;
+const BUILDING_WIDTH = { 1: 38, 2: 44, 3: 24 } as const;
+
+/** 地理卡片的建筑：x、y 为底部中点，按 y 从后往前排列；hit 为缓冲区内的建筑。 */
+type Building = { x: number; y: number; type: keyof typeof BUILDING_RATIO; hit?: boolean };
+const BUILDINGS = (
+  [
+    { x: 130, y: 50, type: 3 },
+    { x: 72, y: 64, type: 1 },
+    { x: 190, y: 64, type: 2 },
+    { x: 40, y: 98, type: 2 },
+    { x: 222, y: 98, type: 1 },
+    { x: 96, y: 112, type: 1, hit: true },
+    { x: 166, y: 112, type: 2, hit: true },
+    { x: 130, y: 146, type: 1, hit: true },
+  ] as Building[]
+).map((b, k) => {
+  const w = BUILDING_WIDTH[b.type];
+  const h = w * BUILDING_RATIO[b.type];
+  return { ...b, k, w, h, left: b.x - w / 2, top: b.y - h };
+});
+
+/** 城市数据融合卡片的三个图层（由下往上绘制）：素材、标签序号、底边位置与展开时的位移。 */
+const LAYERS = [
+  { name: 'layer-terrain', label: 2, bottom: 190, dy: 14, ratio: 0.598 },
+  { name: 'layer-roads', label: 1, bottom: 160, dy: 0, ratio: 0.6 },
+  { name: 'layer-buildings', label: 0, bottom: 130, dy: -14, ratio: 0.617 },
+].map((layer) => ({ ...layer, top: layer.bottom - 170 * layer.ratio, h: 170 * layer.ratio }));
 
 /** 数据发布卡片：环绕知识图谱的资源。 */
 const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) => {
   const angle = (i / 6) * Math.PI * 2 - Math.PI / 2;
-  return { label, x: 130 + Math.cos(angle) * 92, y: 78 + Math.sin(angle) * 56 };
+  return { label, x: 180 + Math.cos(angle) * 92, y: 80 + Math.sin(angle) * 56 };
 });
 ---
 
@@ -211,117 +230,156 @@ const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) =
         >
           <div class="visual" aria-hidden="true">
             {item.id === 'industry' && (
-              <svg viewBox="0 0 520 150">
-                {[24, 62, 100].map((y, k) => (
-                  <g class="cyl" style={`--k:${k}`} transform={`translate(30 ${y})`}>
-                    <path d="M0 5v18c0 2.8 7 5 16 5s16-2.2 16-5V5" />
-                    <ellipse cx="16" cy="5" rx="16" ry="5" />
-                  </g>
+              <svg viewBox="0 0 520 160">
+                {[29, 81, 133].map((y, k) => (
+                  <path class="flow" style={`--k:${k}`} d={`M58 ${y} C150 ${y} 170 80 240 80`} />
                 ))}
-                {[38, 76, 114].map((y, k) => (
-                  <path class="flow" style={`--k:${k}`} d={`M70 ${y} C160 ${y} 170 76 250 76`} />
+                {[4, 56, 108].map((y, k) => (
+                  <image
+                    class="cyl"
+                    style={`--k:${k}`}
+                    href={art('db')}
+                    x="18"
+                    y={y}
+                    width="40"
+                    height="50"
+                  />
                 ))}
-                <circle class="hub" cx="262" cy="76" r="12" />
                 {[
-                  [262, 76, 340, 34],
-                  [262, 76, 352, 116],
-                  [340, 34, 420, 50],
-                  [352, 116, 420, 50],
-                  [420, 50, 486, 26],
-                  [420, 50, 470, 118],
-                  [352, 116, 470, 118],
+                  [262, 72, 340, 34],
+                  [262, 72, 352, 120],
+                  [340, 34, 420, 52],
+                  [352, 120, 420, 52],
+                  [420, 52, 486, 28],
+                  [420, 52, 470, 124],
+                  [352, 120, 470, 124],
                 ].map(([x1, y1, x2, y2]) => (
                   <line class="edge" x1={x1} y1={y1} x2={x2} y2={y2} />
                 ))}
+                <image class="hub" href={art('hub')} x="240" y="44" width="44" height="64" />
                 {[
                   [340, 34],
-                  [352, 116],
-                  [420, 50],
-                  [486, 26],
-                  [470, 118],
+                  [352, 120],
+                  [420, 52],
+                  [486, 28],
+                  [470, 124],
                 ].map(([cx, cy], k) => (
-                  <circle class="node" style={`--k:${k}`} cx={cx} cy={cy} r="7" />
+                  <image
+                    class="node"
+                    style={`--k:${k}`}
+                    href={art('node')}
+                    x={cx - 11}
+                    y={cy - 11}
+                    width="22"
+                    height="22"
+                  />
                 ))}
               </svg>
             )}
             {item.id === 'stream' && (
-              <svg viewBox="0 0 260 300">
-                <text class="label" x="0" y="14">
-                  {t.stream}
-                </text>
-                <line class="threshold" x1="0" x2="260" y1="42" y2="42" />
-                <clipPath id="uc-wave-clip">
-                  <rect x="0" y="0" width="260" height="100" />
-                </clipPath>
-                <g clip-path="url(#uc-wave-clip)">
-                  <polyline class="wave" points={wavePoints} />
-                </g>
-                <circle class="alert" cx="130" cy="34" r="5" />
-                <path class="join" d="M130 96 V150" />
-                <circle class="join-dot" cx="130" cy="150" r="4" />
-                <text class="label" x="0" y="184">
-                  {t.static}
-                </text>
-                {['T-101 · SGT-800', 'T-102 · SGT-800', 'T-207 · SGT-400'].map((row, k) => (
-                  <g class="row" style={`--k:${k}`}>
-                    <rect x="0" y={196 + k * 34} width="260" height="28" rx="6" />
-                    <text x="12" y={214 + k * 34}>
-                      {row}
-                    </text>
-                  </g>
+              <svg viewBox="0 0 260 440">
+                <image
+                  class="turbine"
+                  href={art('turbine')}
+                  x="30"
+                  y="0"
+                  width="200"
+                  height="130"
+                />
+                {[0, 1].map((k) => (
+                  <circle class="ping" style={`--k:${k}`} cx="84" cy="44" r="10" />
                 ))}
+                <circle class="sensor" cx="84" cy="44" r="3.5" />
+                <g transform="translate(0 146)">
+                  <text class="label" x="0" y="14">
+                    {t.stream}
+                  </text>
+                  <line class="threshold" x1="0" x2="260" y1="42" y2="42" />
+                  <clipPath id="uc-wave-clip">
+                    <rect x="0" y="0" width="260" height="100" />
+                  </clipPath>
+                  <g clip-path="url(#uc-wave-clip)">
+                    <polyline class="wave" points={wavePoints} />
+                  </g>
+                  <circle class="alert" cx="130" cy="34" r="5" />
+                  <path class="join" d="M130 96 V150" />
+                  <circle class="join-dot" cx="130" cy="150" r="4" />
+                  <text class="label" x="0" y="184">
+                    {t.static}
+                  </text>
+                  {['T-101 · SGT-800', 'T-102 · SGT-800', 'T-207 · SGT-400'].map((row, k) => (
+                    <g class="row" style={`--k:${k}`}>
+                      <rect x="0" y={196 + k * 34} width="260" height="28" rx="6" />
+                      <text x="12" y={214 + k * 34}>
+                        {row}
+                      </text>
+                    </g>
+                  ))}
+                </g>
               </svg>
             )}
             {item.id === 'geo' && (
-              <svg viewBox="0 0 260 150">
-                <path class="street" d="M0 70 H260 M120 0 V150 M0 140 L260 6" />
+              <svg viewBox="0 0 260 160">
+                <path class="street" d="M-20 29 L280 179 M-20 179 L280 29 M-20 95 L90 40" />
+                <ellipse class="buffer" cx="130" cy="104" rx="80" ry="40" />
                 {BUILDINGS.map((b) => (
-                  <rect
+                  <image
                     class:list={['bldg', { hit: b.hit }]}
-                    x={b.x}
-                    y={b.y}
+                    style={`--k:${b.k}`}
+                    href={art(`bldg-${b.type}`)}
+                    x={b.left}
+                    y={b.top}
                     width={b.w}
                     height={b.h}
-                    rx="3"
                   />
                 ))}
-                <circle class="buffer" cx="122" cy="70" r="56" />
-                <circle class="pin" cx="122" cy="70" r="5" />
+                <path class="pin-stem" d="M130 92 V104" />
+                <circle class="pin" cx="130" cy="90" r="5" />
               </svg>
             )}
             {item.id === 'fusion' && (
-              <svg viewBox="0 0 260 150">
-                {t.layers.map((label, k) => (
-                  <g class="layer" style={`--k:${k}`}>
-                    <path
-                      d="M130 20 L230 52 L130 84 L30 52 Z"
-                      transform={`translate(0 ${k * 22})`}
+              <svg viewBox="0 0 260 210">
+                {LAYERS.map((layer) => (
+                  <g class="layer" style={`--dy:${layer.dy}px`}>
+                    <image
+                      href={art(layer.name)}
+                      x="30"
+                      y={layer.top}
+                      width="170"
+                      height={layer.h}
                     />
-                    <text x="236" y={56 + k * 22}>
-                      {label}
+                    <text x="208" y={layer.bottom - 52}>
+                      {t.layers[layer.label]}
                     </text>
                   </g>
                 ))}
               </svg>
             )}
             {item.id === 'publish' && (
-              <svg viewBox="0 0 260 156">
+              <svg viewBox="0 0 360 160">
                 <g class="spin">
-                  <ellipse class="orbit" cx="130" cy="78" rx="92" ry="56" />
+                  <ellipse class="orbit" cx="180" cy="80" rx="92" ry="56" />
                 </g>
                 {SPOKES.map((s, k) => (
                   <g class="spoke" style={`--k:${k}`}>
-                    <line x1="130" y1="78" x2={s.x} y2={s.y} />
-                    <circle cx={s.x} cy={s.y} r="4" />
-                    <text x={s.x} y={s.y + (s.y > 78 ? 16 : -9)} text-anchor="middle">
+                    <line x1="180" y1="80" x2={s.x} y2={s.y} />
+                    <image href={art('node')} x={s.x - 7} y={s.y - 7} width="14" height="14" />
+                    <text x={s.x} y={s.y + (s.y > 80 ? 18 : -11)} text-anchor="middle">
                       {s.label}
                     </text>
                   </g>
                 ))}
-                <circle class="kg" cx="130" cy="78" r="17" />
-                <text class="kg-text" x="130" y="82" text-anchor="middle">
-                  KG
-                </text>
+                <image class="kg" href={art('kg')} x="148" y="48" width="64" height="65" />
+                <image class="float" href={art('dna')} x="14" y="42" width="44" height="59" />
+                <image
+                  class="float"
+                  style="--k:1"
+                  href={art('record')}
+                  x="300"
+                  y="50"
+                  width="52"
+                  height="51"
+                />
               </svg>
             )}
             {item.id === 'qa' && (
@@ -329,7 +387,10 @@ const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) =
                 <p class="bubble">
                   <span class="typing">{t.question}</span>
                 </p>
-                <span class="llm">LLM</span>
+                <span class="llm">
+                  <img src={art('llm')} width="60" height="46" alt="" loading="lazy" />
+                  LLM
+                </span>
                 <div class="qa-code">
                   <div class="qa-lines">
                     {[
@@ -430,7 +491,15 @@ const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) =
   }
 
   .case-stream .visual svg {
-    max-height: 320px;
+    max-height: 440px;
+  }
+
+  .case-fusion .visual svg {
+    max-height: 200px;
+  }
+
+  .case-geo .visual svg {
+    overflow: hidden;
   }
 
   .body {
@@ -492,11 +561,9 @@ const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) =
   }
 
   /* ── 工业数据集成 ── */
-  .cyl path,
-  .cyl ellipse {
-    fill: color-mix(in srgb, var(--accent) 10%, var(--surface));
-    stroke: var(--accent);
-    stroke-width: 1.4;
+  .cyl {
+    animation: uc-float 4s var(--ease) infinite;
+    animation-delay: calc(var(--k) * -1.3s);
   }
 
   .flow {
@@ -510,11 +577,9 @@ const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) =
   }
 
   .hub {
-    fill: var(--accent);
-    filter: drop-shadow(0 0 8px var(--glow));
     animation: uc-breathe 2.4s var(--ease) infinite;
     transform-box: fill-box;
-    transform-origin: center;
+    transform-origin: 50% 80%;
   }
 
   .edge {
@@ -523,11 +588,28 @@ const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) =
   }
 
   .node {
-    fill: var(--surface);
-    stroke: var(--accent);
-    stroke-width: 1.6;
     animation: uc-light 3s var(--ease) infinite;
     animation-delay: calc(var(--k) * 0.35s);
+  }
+
+  /* 流数据卡片：涡轮机上的传感器 */
+  .turbine {
+    animation: uc-float 5s var(--ease) infinite;
+  }
+
+  .sensor {
+    fill: var(--accent);
+    filter: drop-shadow(0 0 4px var(--glow));
+  }
+
+  .ping {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.2;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: uc-ping 2.4s var(--ease) infinite;
+    animation-delay: calc(var(--k) * 1.2s);
   }
 
   /* ── 流数据 ── */
@@ -588,20 +670,16 @@ const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) =
     stroke: var(--line-strong);
     stroke-width: 6;
     stroke-linecap: round;
-    opacity: 0.6;
-  }
-
-  .bldg {
-    fill: var(--surface-2);
-    stroke: var(--line-strong);
+    opacity: 0.4;
   }
 
   .bldg.hit {
     animation: uc-hit 4s var(--ease) infinite;
+    animation-delay: calc(var(--k) * 0.08s);
   }
 
   .buffer {
-    fill: color-mix(in srgb, var(--accent) 10%, transparent);
+    fill: color-mix(in srgb, var(--accent) 14%, transparent);
     stroke: var(--accent);
     stroke-dasharray: 4 4;
     transform-box: fill-box;
@@ -614,13 +692,12 @@ const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) =
     filter: drop-shadow(0 0 6px var(--glow));
   }
 
-  /* ── 城市数据融合 ── */
-  .layer path {
-    fill: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  .pin-stem {
     stroke: var(--accent);
-    stroke-width: 1.2;
+    stroke-width: 1.6;
   }
 
+  /* ── 城市数据融合 ── */
   .layer text {
     font: 11px var(--font-sans);
     fill: var(--muted);
@@ -628,14 +705,6 @@ const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) =
 
   .layer {
     animation: uc-merge 4.5s var(--ease) infinite;
-  }
-
-  .layer:nth-child(1) {
-    --dy: -12px;
-  }
-
-  .layer:nth-child(3) {
-    --dy: 12px;
   }
 
   /* ── 数据发布 ── */
@@ -657,10 +726,7 @@ const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) =
     animation: uc-dash 1.6s linear infinite reverse;
   }
 
-  .spoke circle {
-    fill: var(--surface);
-    stroke: var(--accent);
-    stroke-width: 1.4;
+  .spoke image {
     animation: uc-light 3.6s var(--ease) infinite;
     animation-delay: calc(var(--k) * 0.6s);
   }
@@ -671,13 +737,15 @@ const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) =
   }
 
   .kg {
-    fill: var(--accent);
     filter: drop-shadow(0 0 10px var(--glow));
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: uc-breathe 3.6s var(--ease) infinite;
   }
 
-  .kg-text {
-    font: 700 11px var(--font-sans);
-    fill: #041015;
+  .float {
+    animation: uc-float 4.5s var(--ease) infinite;
+    animation-delay: calc(var(--k, 0) * -2s);
   }
 
   /* ── 自然语言问答 ── */
@@ -707,19 +775,27 @@ const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) =
 
   .llm {
     position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 2px;
     margin-inline: 22px;
-    padding: 3px 10px;
-    border-radius: 999px;
-    background: var(--accent);
-    font: 700 11px/1.6 var(--font-sans);
-    color: #041015;
+    font: 700 10.5px/1.4 var(--font-mono);
+    letter-spacing: 0.08em;
+    color: var(--accent-ink);
+  }
+
+  .llm img {
+    display: block;
+    width: 60px;
+    height: auto;
+    animation: uc-chip 3s var(--ease) infinite;
   }
 
   .llm::before,
   .llm::after {
     content: '';
     position: absolute;
-    top: 50%;
+    top: 38%;
     width: 18px;
     border-top: 1.4px solid var(--line-strong);
   }
@@ -799,8 +875,14 @@ const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) =
   }
 
   @keyframes uc-breathe {
+    0%,
+    100% {
+      transform: none;
+      filter: drop-shadow(0 0 4px var(--glow));
+    }
     50% {
-      transform: scale(1.25);
+      transform: scale(1.06);
+      filter: drop-shadow(0 0 14px var(--accent));
     }
   }
 
@@ -808,10 +890,38 @@ const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) =
     0%,
     60%,
     100% {
-      fill: var(--surface);
+      filter: drop-shadow(0 0 0 transparent);
     }
     20% {
-      fill: var(--accent);
+      filter: drop-shadow(0 0 6px var(--accent)) brightness(1.15);
+    }
+  }
+
+  @keyframes uc-float {
+    50% {
+      transform: translateY(-3px);
+    }
+  }
+
+  @keyframes uc-ping {
+    0% {
+      transform: scale(0.3);
+      opacity: 0.9;
+    }
+    100% {
+      transform: scale(2.4);
+      opacity: 0;
+    }
+  }
+
+  @keyframes uc-chip {
+    0%,
+    100% {
+      filter: drop-shadow(0 0 2px transparent);
+    }
+    40%,
+    60% {
+      filter: drop-shadow(0 0 10px var(--accent));
     }
   }
 
@@ -850,13 +960,13 @@ const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) =
     25%,
     95%,
     100% {
-      fill: var(--surface-2);
-      stroke: var(--line-strong);
+      transform: none;
+      filter: drop-shadow(0 0 0 transparent);
     }
     45%,
     80% {
-      fill: color-mix(in srgb, var(--accent) 30%, var(--surface));
-      stroke: var(--accent);
+      transform: translateY(-3px);
+      filter: drop-shadow(0 0 7px var(--accent)) brightness(1.08) saturate(1.4);
     }
   }
 
@@ -950,7 +1060,7 @@ const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) =
     }
 
     .case-stream .visual svg {
-      max-height: 220px;
+      max-height: 320px;
     }
   }
 </style>

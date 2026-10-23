@@ -7,6 +7,7 @@
 import Icon, { type IconName } from '../ui/Icon.astro';
 import SectionHeading from '../ui/SectionHeading.astro';
 import { langOf, localize, type Lang } from '../../i18n';
+import { LEARN_ART, art } from '../../lib/art';
 import { getResourceGroups, getResources } from '../../lib/resources';
 
 const lang = langOf(Astro.url.pathname);
@@ -193,7 +194,14 @@ const shot = (name: string, theme: string) => `/previews/${name}-${lang}-${theme
                   <ol class="mock-learn">
                     {t.stages.map((stage, k) => (
                       <li style={`--k:${k}`}>
-                        <span class="mock-node">{String(k + 1).padStart(2, '0')}</span>
+                        <img
+                          class="mock-node"
+                          src={art(LEARN_ART[k])}
+                          width="34"
+                          height="34"
+                          alt=""
+                          loading="lazy"
+                        />
                         <span class="mock-stage">{stage}</span>
                       </li>
                     ))}
@@ -203,6 +211,14 @@ const shot = (name: string, theme: string) => `/previews/${name}-${lang}-${theme
                   <ul class="mock-resources">
                     {groups.map((group, k) => (
                       <li style={`--k:${k};--w:${group.items.length / maxCount}`}>
+                        <img
+                          class="mock-icon"
+                          src={art(`cat-${group.category.id}`)}
+                          width="20"
+                          height="20"
+                          alt=""
+                          loading="lazy"
+                        />
                         <span class="mock-label">{group.category.label}</span>
                         <span class="mock-bar" />
                         <span class="mock-count">{group.items.length}</span>
@@ -369,22 +385,14 @@ const shot = (name: string, theme: string) => `/previews/${name}-${lang}-${theme
   }
 
   .mock-node {
-    display: grid;
-    place-items: center;
     flex: none;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    border: 1.5px solid var(--accent);
-    background: var(--surface);
-    font: 600 10.5px var(--font-mono);
-    color: var(--accent-ink);
+    width: 34px;
+    height: 34px;
+    margin-left: -3px;
   }
 
   .mock-learn li:first-child .mock-node {
-    background: var(--accent);
-    color: #041015;
-    box-shadow: 0 0 12px var(--glow);
+    filter: drop-shadow(0 0 8px var(--glow));
   }
 
   .mock-stage {
@@ -412,11 +420,16 @@ const shot = (name: string, theme: string) => `/previews/${name}-${lang}-${theme
 
   .mock-resources li {
     display: grid;
-    grid-template-columns: 6.5em minmax(0, 1fr) 2em;
+    grid-template-columns: 20px 6.5em minmax(0, 1fr) 2em;
     align-items: center;
     gap: 10px;
     font-size: 12px;
     color: var(--muted);
+  }
+
+  .mock-icon {
+    width: 20px;
+    height: 20px;
   }
 
   .mock-label {

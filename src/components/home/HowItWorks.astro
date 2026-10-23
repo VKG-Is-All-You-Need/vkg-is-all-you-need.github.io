@@ -2,8 +2,12 @@
 import Icon from '../ui/Icon.astro';
 import SectionHeading from '../ui/SectionHeading.astro';
 import { langOf, type Lang } from '../../i18n';
+import { art } from '../../lib/art';
 
 const lang = langOf(Astro.url.pathname);
+
+/** 各步骤的插图，顺序与 steps 一致。 */
+const STEP_ART = ['step-source', 'step-mapping', 'step-ontology', 'step-sparql', 'step-sql'];
 
 const texts: Record<
   Lang,
@@ -153,6 +157,14 @@ const tables = [
               <span class="step-title">{step.title}</span>
               <span class="step-desc">{step.description}</span>
             </span>
+            <img
+              class="step-art"
+              src={art(STEP_ART[i])}
+              width="44"
+              height="44"
+              alt=""
+              loading="lazy"
+            />
             <span class="step-progress" aria-hidden="true" />
           </button>
         ))}
@@ -341,6 +353,31 @@ const tables = [
   .step-body {
     display: grid;
     gap: 4px;
+  }
+
+  .step-art {
+    flex: none;
+    align-self: flex-start;
+    width: 44px;
+    height: 44px;
+    margin: -6px -4px -6px auto;
+    opacity: 0.6;
+    filter: saturate(0.5);
+    transition:
+      opacity 0.3s,
+      filter 0.3s,
+      transform 0.5s var(--ease);
+  }
+
+  [role='tab']:hover .step-art {
+    opacity: 0.8;
+    filter: none;
+  }
+
+  [aria-selected='true'] .step-art {
+    opacity: 1;
+    filter: drop-shadow(0 0 10px var(--glow));
+    transform: scale(1.15);
   }
 
   .step-title {
@@ -665,6 +702,10 @@ const tables = [
       grid-auto-columns: minmax(150px, 1fr);
       overflow-x: auto;
       scrollbar-width: none;
+    }
+
+    .step-art {
+      display: none;
     }
 
     .demo[data-ready] [aria-selected='true'] .step-desc {

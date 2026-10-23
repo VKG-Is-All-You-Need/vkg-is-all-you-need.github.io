@@ -2,6 +2,7 @@
 import Icon from './Icon.astro';
 import { site } from '../../data/site';
 import { langOf, localize } from '../../i18n';
+import { art } from '../../lib/art';
 
 const lang = langOf(Astro.url.pathname);
 const t = {
@@ -24,6 +25,14 @@ const t = {
   <div class="container">
     <div class="banner" data-reveal>
       <div class="banner-glow" aria-hidden="true"></div>
+      <img
+        class="banner-art"
+        src={art('contribute')}
+        width="280"
+        height="194"
+        alt=""
+        loading="lazy"
+      />
       <div class="banner-copy">
         <span class="banner-icon">
           <Icon name="git-pull" size={22} />
@@ -80,6 +89,23 @@ const t = {
     background-size: 22px 22px;
     mask-image: linear-gradient(90deg, transparent 40%, #000);
     -webkit-mask-image: linear-gradient(90deg, transparent 40%, #000);
+  }
+
+  .banner-art {
+    position: absolute;
+    top: clamp(16px, 3vw, 32px);
+    right: clamp(16px, 5vw, 64px);
+    z-index: -1;
+    width: clamp(110px, 18vw, 220px);
+    height: auto;
+    filter: drop-shadow(0 18px 30px var(--glow));
+    animation: cb-float 6s var(--ease) infinite;
+  }
+
+  @keyframes cb-float {
+    50% {
+      transform: translateY(-8px);
+    }
   }
 
   .banner-icon {

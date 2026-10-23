@@ -2,6 +2,7 @@
 import ResourceCard from './ResourceCard.astro';
 import Icon from '../ui/Icon.astro';
 import { langOf, localize } from '../../i18n';
+import { art } from '../../lib/art';
 import { getResourceGroups } from '../../lib/resources';
 
 const lang = langOf(Astro.url.pathname);
@@ -72,6 +73,7 @@ const t = {
       >
         <header class="group-head" data-reveal>
           <h2 id={`group-${category.id}`}>
+            <img class="group-art" src={art(`cat-${category.id}`)} width="48" height="48" alt="" loading="lazy" />
             {category.label}
             <span>{items.length}</span>
           </h2>
@@ -225,6 +227,18 @@ const t = {
     font-size: 26px;
     font-weight: 700;
     letter-spacing: -0.02em;
+  }
+
+  .group-art {
+    align-self: center;
+    width: 48px;
+    height: 48px;
+    margin: -8px 2px -8px -4px;
+    transition: transform 0.5s var(--ease);
+  }
+
+  .group-head:hover .group-art {
+    transform: translateY(-3px) rotate(-4deg);
   }
 
   .group-head h2 span {

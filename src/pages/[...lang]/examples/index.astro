@@ -1,14 +1,15 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import PageHeader from '../../../components/ui/PageHeader.astro';
-import Icon, { type IconName } from '../../../components/ui/Icon.astro';
+import Icon from '../../../components/ui/Icon.astro';
 import { langOf, langPaths, localize, type Lang } from '../../../i18n';
+import { art } from '../../../lib/art';
 
 export const getStaticPaths = langPaths;
 
 const lang = langOf(Astro.url.pathname);
 
-type Example = { href: string; icon: IconName; title: string; text: string; tags: string[] };
+type Example = { href: string; art: string; title: string; text: string; tags: string[] };
 
 const texts: Record<
   Lang,
@@ -31,14 +32,14 @@ const texts: Record<
     examples: [
       {
         href: '/examples/geo/',
-        icon: 'map',
+        art: 'hero-geo',
         title: 'VKG × 地理信息',
         text: '一座虚构街区存储在 PostGIS 中。三条 GeoSPARQL 查询演示距离、拓扑关系以及本体推理与空间条件的组合；分层视图展示查询如何经过本体、映射到达数据库。',
         tags: ['GeoSPARQL', 'PostGIS', '本体推理'],
       },
       {
         href: '/examples/city/',
-        icon: 'layers',
+        art: 'hero-city',
         title: 'VKG × 城市数据融合',
         text: '八个独立数据源由一个本体统一描述：交通、出行、传感器、气象、商户、企业与社区。示例覆盖一周，每天天气不同；拖动时间轴查看动态数据，开关数据源比较融合与分离的结果。',
         tags: ['数据融合', '传感器与气象', 'SOSA/SSN'],
@@ -55,14 +56,14 @@ const texts: Record<
     examples: [
       {
         href: '/examples/geo/',
-        icon: 'map',
+        art: 'hero-geo',
         title: 'VKG × Geospatial',
         text: 'A fictional district is stored in PostGIS. Three GeoSPARQL queries demonstrate distance, topological relations, and ontology reasoning combined with spatial conditions; a layered view shows how a query passes through the ontology and mappings to the database.',
         tags: ['GeoSPARQL', 'PostGIS', 'Ontology reasoning'],
       },
       {
         href: '/examples/city/',
-        icon: 'layers',
+        art: 'hero-city',
         title: 'VKG × Urban data fusion',
         text: 'Eight independent data sources are described by a single ontology: traffic, mobility, sensors, weather, shops, companies and the residential community. The example covers one week with different weather each day; drag the timeline to view dynamic data, and switch sources on and off to compare fused and separate results.',
         tags: ['Data fusion', 'Sensors and weather', 'SOSA/SSN'],
@@ -74,14 +75,14 @@ const t = texts[lang];
 ---
 
 <BaseLayout title={t.title} description={t.meta}>
-  <PageHeader label={t.title} title={t.heading} description={t.description} />
+  <PageHeader label={t.title} title={t.heading} description={t.description} art="hero-examples" />
   <section class="container examples">
     <ul class="cards" role="list">
       {t.examples.map((example, i) => (
         <li data-reveal style={`--reveal-delay:${i * 90}ms`}>
           <a class="card spotlight" href={localize(example.href, lang)}>
-            <span class="card-icon">
-              <Icon name={example.icon} size={22} />
+            <span class="card-visual" aria-hidden="true">
+              <img src={art(example.art)} width="320" height="213" alt="" loading="lazy" />
             </span>
             <h2>{example.title}</h2>
             <p>{example.text}</p>
@@ -122,16 +123,30 @@ const t = texts[lang];
     transform: translateY(-3px);
   }
 
-  .card-icon {
+  .card-visual {
     display: grid;
     place-items: center;
-    width: 48px;
-    height: 48px;
-    margin-bottom: 32px;
-    border-radius: 14px;
-    border: 1px solid var(--line);
-    background: linear-gradient(140deg, var(--accent-soft), transparent);
-    color: var(--accent-ink);
+    height: 240px;
+    margin: -32px -30px 28px;
+    border-bottom: 1px solid var(--line);
+    border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0;
+    background:
+      radial-gradient(ellipse 70% 90% at 50% 0%, var(--accent-soft), transparent 70%),
+      radial-gradient(var(--dot) 1px, transparent 1px) 0 0 / 18px 18px;
+    overflow: hidden;
+  }
+
+  .card-visual img {
+    width: auto;
+    max-width: 82%;
+    height: 200px;
+    object-fit: contain;
+    filter: drop-shadow(0 18px 30px var(--glow));
+    transition: transform 0.6s var(--ease);
+  }
+
+  .card:hover .card-visual img {
+    transform: translateY(-6px) scale(1.04);
   }
 
   h2 {

@@ -2,9 +2,9 @@
 /**
  * 首页“与其他方案的区别”：直接查询各数据库、ETL 构建物化知识图谱与虚拟知识图谱的对比。
  */
-import Icon, { type IconName } from '../ui/Icon.astro';
 import SectionHeading from '../ui/SectionHeading.astro';
 import { langOf, type Lang } from '../../i18n';
+import { art } from '../../lib/art';
 
 const lang = langOf(Astro.url.pathname);
 
@@ -143,7 +143,7 @@ const texts: Record<
   },
 };
 const t = texts[lang];
-const icons: IconName[] = ['database', 'layers', 'sparkles'];
+const sprites = ['approach-direct', 'approach-etl', 'approach-vkg'];
 ---
 
 <section class="section section-rule" aria-labelledby="approaches-title">
@@ -159,9 +159,14 @@ const icons: IconName[] = ['database', 'layers', 'sparkles'];
             </th>
             {t.columns.map((column, i) => (
               <th scope="col" class:list={{ vkg: i === 2 }}>
-                <span class="col-icon">
-                  <Icon name={icons[i]} size={16} />
-                </span>
+                <img
+                  class="col-art"
+                  src={art(sprites[i])}
+                  width="72"
+                  height="72"
+                  alt=""
+                  loading="lazy"
+                />
                 {column}
               </th>
             ))}
@@ -216,6 +221,7 @@ const icons: IconName[] = ['database', 'layers', 'sparkles'];
   }
 
   thead th {
+    vertical-align: bottom;
     padding-block: 18px;
     border-bottom: 1px solid var(--line-strong);
     font-size: 15px;
@@ -224,17 +230,16 @@ const icons: IconName[] = ['database', 'layers', 'sparkles'];
     white-space: nowrap;
   }
 
-  .col-icon {
-    display: inline-grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    margin-right: 10px;
-    border-radius: 8px;
-    border: 1px solid var(--line);
-    background: var(--surface-2);
-    color: var(--muted);
-    vertical-align: middle;
+  .col-art {
+    display: block;
+    width: 72px;
+    height: 72px;
+    margin: 0 0 10px -4px;
+    transition: transform 0.5s var(--ease);
+  }
+
+  thead th:hover .col-art {
+    transform: translateY(-4px);
   }
 
   .aspect {
@@ -302,10 +307,15 @@ const icons: IconName[] = ['database', 'layers', 'sparkles'];
     box-shadow: 0 0 18px var(--glow);
   }
 
-  thead .vkg .col-icon {
-    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-    background: var(--accent-soft);
-    color: var(--accent-ink);
+  thead .vkg .col-art {
+    filter: drop-shadow(0 0 12px var(--glow));
+    animation: ap-float 4s var(--ease) infinite;
+  }
+
+  @keyframes ap-float {
+    50% {
+      transform: translateY(-4px);
+    }
   }
 
   td.vkg {

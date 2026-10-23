@@ -2,6 +2,7 @@
 import Icon from '../ui/Icon.astro';
 import { categoryOf } from '../../data/categories';
 import { langOf, localize, type Lang } from '../../i18n';
+import { LEARN_ART, art } from '../../lib/art';
 import { getResources, resourceText } from '../../lib/resources';
 
 interface Material {
@@ -118,6 +119,14 @@ const stages = STAGES[lang]();
         {String(i + 1).padStart(2, '0')}
       </span>
       <div class="stage-card spotlight" data-reveal>
+        <img
+          class="stage-art"
+          src={art(LEARN_ART[i])}
+          width="88"
+          height="88"
+          alt=""
+          loading="lazy"
+        />
         <h3>{stage.title}</h3>
         <p class="stage-goal">{stage.goal}</p>
         <ul class="materials" role="list">
@@ -207,6 +216,41 @@ const stages = STAGES[lang]();
     padding: 28px;
   }
 
+  .stage-art {
+    position: absolute;
+    top: 18px;
+    right: 22px;
+    width: 88px;
+    height: 88px;
+    opacity: 0.55;
+    filter: grayscale(0.6);
+    transition:
+      opacity 0.4s,
+      filter 0.4s,
+      transform 0.6s var(--ease);
+  }
+
+  .stage.is-active .stage-art {
+    opacity: 1;
+    filter: drop-shadow(0 0 14px var(--glow));
+    animation: lp-float 4.5s var(--ease) infinite;
+  }
+
+  .stage-card:hover .stage-art {
+    transform: translateY(-4px);
+  }
+
+  @keyframes lp-float {
+    50% {
+      transform: translateY(-5px);
+    }
+  }
+
+  h3,
+  .stage-goal {
+    padding-right: 104px;
+  }
+
   h3 {
     font-size: 24px;
     font-weight: 700;
@@ -278,6 +322,18 @@ const stages = STAGES[lang]();
 
     .stage-card {
       padding: 22px 20px;
+    }
+
+    .stage-art {
+      top: 14px;
+      right: 14px;
+      width: 56px;
+      height: 56px;
+    }
+
+    h3,
+    .stage-goal {
+      padding-right: 64px;
     }
   }
 </style>
