@@ -276,6 +276,7 @@
   year: 2020
   venue: ISWC
   url: https://doi.org/10.1007/978-3-030-62466-8_17
+  code: https://github.com/ontop/ontop
   summary: 介绍 Ontop 作为 VKG 系统的整体设计、查询转换流程、标准支持与应用情况。
   summary_en: Describes the overall design of Ontop as a VKG system, its query transformation pipeline, standards support and adoption.
 

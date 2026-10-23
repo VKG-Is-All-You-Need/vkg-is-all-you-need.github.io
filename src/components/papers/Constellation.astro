@@ -1,0 +1,1106 @@
+---
+/**
+ * 文献星图（文献页的动效版本）：横轴为年份，九条泳道对应论文主题，每篇论文一颗星。
+ * 连线取自发展历程页的传承关系；布局在构建时计算，扫描、悬停与筛选联动见 scripts/papers-fx.ts。
+ */
+import { ERAS, LINKS, MILESTONES, YEAR_FROM, YEAR_TO } from '../../data/history';
+import { PAPER_TOPICS, paperTopics } from '../../data/papers';
+import { langOf, localize } from '../../i18n';
+import { getPapers, getRepos, paperSummary } from '../../lib/papers';
+
+const lang = langOf(Astro.url.pathname);
+const papers = await getPapers();
+const repos = await getRepos();
+const topics = paperTopics(lang);
+
+const PX_PER_YEAR = 42;
+const PAD_X = 30;
+const AXIS_H = 44;
+const LANE_H = 38;
+const HIST_H = 46;
+
+const xOf = (year: number) => PAD_X + (year - YEAR_FROM) * PX_PER_YEAR;
+const width = xOf(YEAR_TO) + PAD_X;
+const lanesBottom = AXIS_H + PAPER_TOPICS.length * LANE_H;
+const height = lanesBottom + HIST_H;
+
+// 同一主题、同一年份的论文聚成一小簇
+const CLUSTER: [number, number][][] = [
+  [[0, 0]],
+  [
+    [-6, 0],
+    [6, 0],
+  ],
+  [
+    [0, -6],
+    [-7, 5],
+    [7, 5],
+  ],
+  [
+    [-6, -6],
+    [6, -6],
+    [-6, 6],
+    [6, 6],
+  ],
+];
+const cells = new Map<string, string[]>();
+for (const paper of papers) {
+  const key = `${paper.data.topic}:${paper.data.year}`;
+  cells.set(key, [...(cells.get(key) ?? []), paper.id]);
+}
+
+const reposByPaper = new Map<string, string[]>();
+for (const repo of repos) {
+  if (repo.data.paper) {
+    reposByPaper.set(repo.data.paper, [
+      ...(reposByPaper.get(repo.data.paper) ?? []),
+      repo.data.repo,
+    ]);
+  }
+}
+
+const stars = papers.map((paper) => {
+  const lane = PAPER_TOPICS.indexOf(paper.data.topic);
+  const cell = cells.get(`${paper.data.topic}:${paper.data.year}`)!;
+  const [dx, dy] = CLUSTER[Math.min(cell.length, 4) - 1][cell.indexOf(paper.id) % 4];
+  const code = Boolean(paper.data.code) || reposByPaper.has(paper.id);
+  return {
+    id: paper.id,
+    lane,
+    year: paper.data.year,
+    x: xOf(paper.data.year) + dx,
+    y: AXIS_H + lane * LANE_H + LANE_H / 2 + dy,
+    code,
+    title: paper.data.title,
+  };
+});
+const starById = new Map(stars.map((star) => [star.id, star]));
+
+// 历程页里程碑之间的传承关系，换算为论文之间的连线
+const paperOf = new Map(MILESTONES.filter((m) => m.paper).map((m) => [m.id, m.paper!]));
+const links = LINKS.flatMap(([from, to, kind]) => {
+  const a = starById.get(paperOf.get(from) ?? '');
+  const b = starById.get(paperOf.get(to) ?? '');
+  if (!a || !b || a === b) return [];
+  const dx = Math.max(Math.abs(b.x - a.x), 30) * 0.5;
+  const d = `M${a.x} ${a.y} C${a.x + dx} ${a.y} ${b.x - dx} ${b.y} ${b.x} ${b.y}`;
+  return [{ from: a.id, to: b.id, kind, d }];
+});
+
+// 每年的论文数，画在底部的柱状条
+const years = Array.from({ length: YEAR_TO - YEAR_FROM + 1 }, (_, i) => YEAR_FROM + i);
+const perYear = years.map((year) => papers.filter((p) => p.data.year === year).length);
+const maxPerYear = Math.max(...perYear);
+
+// 背景星点：固定种子的伪随机数，保证每次构建结果一致
+let seed = 20020611;
+const random = () => {
+  seed = (seed + 0x6d2b79f5) | 0;
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+const dust = Array.from({ length: 140 }, () => ({
+  x: random() * width,
+  y: random() * height,
+  r: 0.4 + random() * 0.9,
+  o: 0.15 + random() * 0.45,
+  d: (random() * 6).toFixed(2),
+}));
+
+// 泳道标签用短名，完整的主题名显示在提示卡片中
+const LANE_SHORT = {
+  zh: topics.map((topic) => topic.label),
+  en: [
+    'Surveys',
+    'Foundations',
+    'Systems',
+    'Construction',
+    'Evolution',
+    'Temporal',
+    'QA',
+    'Benchmarks',
+    'Applications',
+  ],
+}[lang];
+
+const ERA_SHORT = {
+  zh: ['前史与奠基', '系统化', '工业落地', '联邦与视图', '写回与大模型'],
+  en: ['Origins', 'Systems', 'Industry', 'Federation', 'Now'],
+}[lang];
+
+const withCode = stars.filter((star) => star.code).length;
+
+const t = {
+  zh: {
+    label:
+      '文献星图：横轴为年份，九条泳道对应论文主题，每颗星代表一篇论文，带光环的论文附有代码，连线表示发展历程页中的传承关系。',
+    title: '文献星图',
+    sub: `VKG / OBDA · ${YEAR_FROM}–${YEAR_TO}`,
+    papers: '论文',
+    code: '附代码',
+    repos: '仓库',
+    links: '传承',
+    keyPaper: '论文',
+    keyCode: '附有代码',
+    keyLink: '传承关系（取自发展历程）',
+    hint: '悬停或点击星点查看论文 · 搜索会同步点亮星图',
+    replay: '重放',
+    perYear: '每年论文数',
+  },
+  en: {
+    label:
+      'Paper constellation: years on the horizontal axis and one lane per topic; each star is a paper, a ring marks papers with code, and lines show lineage from the history page.',
+    title: 'Paper constellation',
+    sub: `VKG / OBDA · ${YEAR_FROM}–${YEAR_TO}`,
+    papers: 'papers',
+    code: 'with code',
+    repos: 'repos',
+    links: 'lineage',
+    keyPaper: 'Paper',
+    keyCode: 'With code',
+    keyLink: 'Lineage (from the history page)',
+    hint: 'Hover or tap a star for the paper · Search lights up matching stars',
+    replay: 'Replay',
+    perYear: 'Papers per year',
+  },
+}[lang];
+
+const stats = [
+  { value: papers.length, label: t.papers },
+  { value: withCode, label: t.code },
+  { value: repos.length, label: t.repos },
+  { value: links.length, label: t.links },
+];
+---
+
+<figure class="constellation" data-constellation>
+  <div class="sky">
+    <div class="nebula" aria-hidden="true"></div>
+    <div class="meteors" aria-hidden="true">
+      <i></i>
+      <i></i>
+      <i></i>
+    </div>
+
+    <header class="hud">
+      <div class="hud-title">
+        <span class="hud-pulse" aria-hidden="true"></span>
+        <strong>{t.title}</strong>
+        <span>{t.sub}</span>
+      </div>
+      <dl class="hud-stats">
+        {stats.map((stat) => (
+          <div>
+            <dt>{stat.label}</dt>
+            <dd data-count={stat.value}>{stat.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </header>
+
+    <div class="frame">
+      <ol class="lane-labels" aria-hidden="true">
+        {topics.map((topic, i) => (
+          <li style={`top:${AXIS_H + i * LANE_H}px;height:${LANE_H}px;--c:var(--t-${i})`}>
+            <span title={topic.label}>{LANE_SHORT[i]}</span>
+          </li>
+        ))}
+        <li class="hist-label" style={`top:${lanesBottom}px;height:${HIST_H}px`}>
+          <span>{t.perYear}</span>
+        </li>
+      </ol>
+      <div class="scroll" data-sky-scroll tabindex="0" aria-label={t.label}>
+        <svg
+          width={width}
+          height={height}
+          viewBox={`0 0 ${width} ${height}`}
+          role="img"
+          aria-label={t.label}
+          data-sky-svg
+        >
+          <defs>
+            <radialGradient id="star-glow">
+              <stop offset="0" stop-color="#fff" stop-opacity="0.9"></stop>
+              <stop offset="0.35" stop-color="currentColor" stop-opacity="0.55"></stop>
+              <stop offset="1" stop-color="currentColor" stop-opacity="0"></stop>
+            </radialGradient>
+            <linearGradient id="sweep-glow" x1="0" x2="1">
+              <stop offset="0" stop-color="#7fd3ec" stop-opacity="0"></stop>
+              <stop offset="1" stop-color="#7fd3ec" stop-opacity="0.18"></stop>
+            </linearGradient>
+          </defs>
+
+          <g class="dust" data-sky-dust>
+            {dust.map((p) => (
+              <circle
+                cx={p.x.toFixed(1)}
+                cy={p.y.toFixed(1)}
+                r={p.r.toFixed(2)}
+                style={`--o:${p.o.toFixed(2)};--d:${p.d}s`}
+              />
+            ))}
+          </g>
+
+          <g class="eras">
+            {ERAS.map((era, i) => {
+              const x0 = xOf(era.from) - PX_PER_YEAR / 2;
+              const x1 = xOf(era.to) + PX_PER_YEAR / 2;
+              return (
+                <g class:list={['era', { 'era-alt': i % 2 }]}>
+                  <rect x={x0} y={0} width={x1 - x0} height={lanesBottom} />
+                  <text x={x0 + 8} y={15}>
+                    {`${'①②③④⑤'[i]} ${ERA_SHORT[i]}`}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+
+          <g class="lanes">
+            {PAPER_TOPICS.map((_, i) => (
+              <line
+                x1="0"
+                x2={width}
+                y1={AXIS_H + (i + 1) * LANE_H}
+                y2={AXIS_H + (i + 1) * LANE_H}
+              />
+            ))}
+          </g>
+
+          <g class="axis">
+            {years.map((year) => (
+              <g class:list={['tick', { 'tick-major': year % 5 === 0 }]}>
+                <line x1={xOf(year)} x2={xOf(year)} y1={AXIS_H - 6} y2={lanesBottom} />
+                <text x={xOf(year)} y={AXIS_H - 12}>
+                  {year % 5 === 0 || year === YEAR_TO ? year : `'${String(year).slice(2)}`}
+                </text>
+              </g>
+            ))}
+          </g>
+
+          <g class="hist">
+            {years.map((year, i) => {
+              const h = perYear[i] ? 4 + (perYear[i] / maxPerYear) * (HIST_H - 18) : 0;
+              return (
+                perYear[i] > 0 && (
+                  <g class="bar" data-x={xOf(year)}>
+                    <rect x={xOf(year) - 7} y={height - 8 - h} width="14" height={h} rx="2" />
+                    <text x={xOf(year)} y={height - 12 - h}>
+                      {perYear[i]}
+                    </text>
+                  </g>
+                )
+              );
+            })}
+          </g>
+
+          <rect
+            class="sweep-trail"
+            x="0"
+            y="0"
+            width="0"
+            height={height}
+            fill="url(#sweep-glow)"
+            data-sweep-trail
+          />
+          <line class="sweep" x1="0" x2="0" y1="0" y2={height} data-sweep />
+
+          <g class="links">
+            {links.map((link) => (
+              <g class:list={['link', `link-${link.kind}`]} data-from={link.from} data-to={link.to}>
+                <path
+                  class="link-base"
+                  d={link.d}
+                  pathLength={link.kind === 'cite' ? 1 : undefined}
+                />
+                <path class="link-flow" d={link.d} />
+              </g>
+            ))}
+          </g>
+
+          <g class="stars">
+            {stars.map((star) => (
+              <g
+                class:list={['star', { 'has-code': star.code }]}
+                style={`--c:var(--t-${star.lane});--tw:${(2.6 + ((star.x * 7 + star.y * 3) % 23) / 10).toFixed(1)}s;--twd:${(((star.x * 13 + star.y) % 37) / 10).toFixed(1)}s`}
+                data-star={star.id}
+                data-x={star.x}
+                tabindex="0"
+                role="button"
+                aria-label={`${star.year} ${star.title}`}
+              >
+                <circle class="star-hit" cx={star.x} cy={star.y} r="10" />
+                <circle class="star-glow" cx={star.x} cy={star.y} r="13" fill="url(#star-glow)" />
+                {star.code && <circle class="star-ring" cx={star.x} cy={star.y} r="7.5" />}
+                <circle class="star-burst" cx={star.x} cy={star.y} r="9" />
+                <circle class="star-core" cx={star.x} cy={star.y} r="3.2" />
+              </g>
+            ))}
+          </g>
+        </svg>
+        <div class="tip" data-sky-tip hidden></div>
+      </div>
+    </div>
+
+    <figcaption class="legend">
+      <span>
+        <i class="key key-paper"></i>
+        {t.keyPaper}
+      </span>
+      <span>
+        <i class="key key-code"></i>
+        {t.keyCode}
+      </span>
+      <span>
+        <i class="key key-link"></i>
+        {t.keyLink}
+      </span>
+      <span class="legend-hint">{t.hint}</span>
+      <button type="button" class="replay" data-sky-replay>
+        {t.replay}
+      </button>
+    </figcaption>
+  </div>
+
+  <script
+    type="application/json"
+    data-sky-data
+    set:html={JSON.stringify(
+      Object.fromEntries(
+        papers.map((paper) => [
+          paper.id,
+          {
+            year: paper.data.year,
+            title: paper.data.title,
+            authors: paper.data.authors,
+            venue: paper.data.venue,
+            summary: paperSummary(paper, lang),
+            url: paper.data.url,
+            code: paper.data.code ?? null,
+            repos: reposByPaper.get(paper.id) ?? [],
+            topic: topics[PAPER_TOPICS.indexOf(paper.data.topic)].label,
+            history: MILESTONES.some((m) => m.paper === paper.id)
+              ? localize('/history/', lang)
+              : null,
+          },
+        ]),
+      ),
+    ).replaceAll('<', '\\u003c')}
+  />
+</figure>
+
+<style>
+  /* 星图始终使用深色画布，两种主题下观感一致 */
+  .constellation {
+    --sky-bg: #04060c;
+    --sky-ink: #e9eef5;
+    --sky-ink-2: #b9c2cd;
+    --sky-muted: #7f8a97;
+    --sky-faint: #4d5662;
+    --sky-line: rgb(160 190 230 / 0.09);
+    --sky-line-strong: rgb(160 190 230 / 0.18);
+    --t-0: #f5d77a;
+    --t-1: #9aa8ff;
+    --t-2: #49bbdd;
+    --t-3: #7fd38a;
+    --t-4: #f29fb8;
+    --t-5: #ffad6b;
+    --t-6: #c99bff;
+    --t-7: #6ee7d8;
+    --t-8: #ff8a8a;
+    margin: 0 0 8px;
+  }
+
+  .sky {
+    position: relative;
+    isolation: isolate;
+    border-radius: 20px;
+    border: 1px solid rgb(120 170 230 / 0.16);
+    background: var(--sky-bg);
+    color: var(--sky-ink);
+    overflow: hidden;
+    box-shadow:
+      0 40px 90px -40px rgb(20 80 140 / 0.55),
+      inset 0 1px 0 rgb(255 255 255 / 0.05);
+  }
+
+  /* 缓慢漂移的星云 */
+  .nebula {
+    position: absolute;
+    inset: -20%;
+    z-index: -1;
+    background:
+      radial-gradient(38% 42% at 22% 30%, rgb(73 140 221 / 0.22), transparent 70%),
+      radial-gradient(30% 36% at 78% 62%, rgb(170 110 240 / 0.16), transparent 70%),
+      radial-gradient(26% 30% at 60% 18%, rgb(73 221 200 / 0.1), transparent 70%);
+    filter: blur(20px);
+    animation: drift 28s ease-in-out infinite alternate;
+  }
+
+  @keyframes drift {
+    to {
+      transform: translate3d(4%, -3%, 0) rotate(6deg) scale(1.06);
+    }
+  }
+
+  /* 流星 */
+  .meteors i {
+    position: absolute;
+    z-index: -1;
+    top: 0;
+    width: 140px;
+    height: 1px;
+    background: linear-gradient(90deg, rgb(255 255 255 / 0.9), transparent);
+    transform: rotate(-24deg) translateX(0);
+    opacity: 0;
+    animation: meteor 9s linear infinite;
+  }
+
+  .meteors i:nth-child(1) {
+    top: 18%;
+    left: 70%;
+  }
+
+  .meteors i:nth-child(2) {
+    top: 8%;
+    left: 40%;
+    animation-delay: 3.4s;
+    animation-duration: 11s;
+  }
+
+  .meteors i:nth-child(3) {
+    top: 30%;
+    left: 92%;
+    animation-delay: 6.8s;
+    animation-duration: 13s;
+  }
+
+  @keyframes meteor {
+    0% {
+      opacity: 0;
+      transform: rotate(-24deg) translateX(0);
+    }
+    2% {
+      opacity: 1;
+    }
+    9% {
+      opacity: 0;
+      transform: rotate(-24deg) translateX(-520px);
+    }
+    100% {
+      opacity: 0;
+      transform: rotate(-24deg) translateX(-520px);
+    }
+  }
+
+  /* 顶栏 */
+  .hud {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 24px;
+    padding: 16px 20px 6px;
+  }
+
+  .hud-title {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 15px;
+  }
+
+  .hud-title strong {
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+
+  .hud-title > span:last-child {
+    font: 12px var(--font-mono);
+    color: var(--sky-muted);
+  }
+
+  .hud-pulse {
+    align-self: center;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #7fd3ec;
+    box-shadow: 0 0 0 0 rgb(127 211 236 / 0.6);
+    animation: pulse 2.2s ease-out infinite;
+  }
+
+  @keyframes pulse {
+    to {
+      box-shadow: 0 0 0 10px rgb(127 211 236 / 0);
+    }
+  }
+
+  .hud-stats {
+    display: flex;
+    gap: 22px;
+  }
+
+  .hud-stats div {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: flex-end;
+  }
+
+  .hud-stats dd {
+    font: 600 22px/1.1 var(--font-mono);
+    color: var(--sky-ink);
+    text-shadow: 0 0 18px rgb(127 211 236 / 0.45);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hud-stats dt {
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--sky-muted);
+  }
+
+  /* 画布 */
+  .frame {
+    position: relative;
+    display: grid;
+    grid-template-columns: 124px minmax(0, 1fr);
+  }
+
+  .lane-labels {
+    position: relative;
+    border-right: 1px solid var(--sky-line);
+  }
+
+  .lane-labels li {
+    position: absolute;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px 0 18px;
+    font-size: 12px;
+    line-height: 1.3;
+    color: var(--sky-ink-2);
+  }
+
+  .lane-labels li::before {
+    content: '';
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: 0 0 10px var(--c);
+  }
+
+  .lane-labels .hist-label {
+    font-size: 11px;
+    color: var(--sky-faint);
+  }
+
+  .lane-labels .hist-label::before {
+    display: none;
+  }
+
+  .scroll {
+    position: relative;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--sky-line-strong) transparent;
+    outline: none;
+  }
+
+  .scroll:focus-visible {
+    box-shadow: inset 0 0 0 2px #7fd3ec;
+  }
+
+  svg {
+    display: block;
+    max-width: none;
+    height: auto;
+    user-select: none;
+  }
+
+  .dust {
+    transform: translate(var(--px, 0), var(--py, 0));
+    transition: transform 0.8s var(--ease);
+  }
+
+  .dust circle {
+    fill: #cfe3ff;
+    opacity: var(--o);
+    animation: dust 5s ease-in-out var(--d) infinite alternate;
+  }
+
+  @keyframes dust {
+    to {
+      opacity: 0.05;
+    }
+  }
+
+  .era rect {
+    fill: transparent;
+  }
+
+  .era-alt rect {
+    fill: rgb(150 190 255 / 0.025);
+  }
+
+  .era text {
+    font: 600 11px var(--font-sans);
+    fill: var(--sky-faint);
+    letter-spacing: 0.02em;
+  }
+
+  .lanes line {
+    stroke: var(--sky-line);
+  }
+
+  .tick line {
+    stroke: var(--sky-line);
+    stroke-dasharray: 2 6;
+  }
+
+  .tick-major line {
+    stroke: var(--sky-line-strong);
+    stroke-dasharray: none;
+  }
+
+  .tick text {
+    font: 10.5px var(--font-mono);
+    fill: var(--sky-faint);
+    text-anchor: middle;
+  }
+
+  .tick-major text {
+    fill: var(--sky-muted);
+  }
+
+  /* 每年论文数 */
+  .bar rect {
+    fill: rgb(127 211 236 / 0.28);
+    transform-box: fill-box;
+    transform-origin: bottom;
+    transform: scaleY(0);
+    transition: transform 0.6s var(--ease);
+  }
+
+  .bar text {
+    font: 9.5px var(--font-mono);
+    fill: var(--sky-muted);
+    text-anchor: middle;
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  .bar.is-on rect {
+    transform: none;
+  }
+
+  .bar.is-on text {
+    opacity: 1;
+  }
+
+  /* 扫描线 */
+  .sweep {
+    stroke: #7fd3ec;
+    stroke-width: 1.5;
+    opacity: 0;
+    filter: drop-shadow(0 0 6px #7fd3ec);
+  }
+
+  .sweep-trail {
+    opacity: 0;
+    transition: opacity 0.6s;
+  }
+
+  .is-sweeping .sweep,
+  .is-sweeping .sweep-trail {
+    opacity: 1;
+  }
+
+  /* 传承连线 */
+  .link path {
+    fill: none;
+  }
+
+  .link-base {
+    stroke: rgb(190 215 255 / 0.28);
+    stroke-width: 1.1;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    transition:
+      stroke-dashoffset 1s var(--ease),
+      stroke 0.25s,
+      opacity 0.25s;
+  }
+
+  /* 同一问题线：固定长度的虚线，淡入而不是描绘 */
+  .link-thread .link-base {
+    stroke-dasharray: 2 5;
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+
+  .link.is-on .link-base {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+
+  .link-thread .link-flow {
+    display: none;
+  }
+
+  .link-flow {
+    stroke: #bfeaff;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-dasharray: 2 40;
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  .is-done .link.is-on .link-flow {
+    opacity: 0.8;
+    animation: flow 3s linear infinite;
+  }
+
+  @keyframes flow {
+    to {
+      stroke-dashoffset: -42;
+    }
+  }
+
+  /* 星点 */
+  .star {
+    color: var(--c);
+    cursor: pointer;
+    outline: none;
+    transition: opacity 0.3s;
+  }
+
+  .star-hit {
+    fill: transparent;
+  }
+
+  .star circle:not(.star-hit) {
+    transform-box: fill-box;
+    transform-origin: center;
+    pointer-events: none;
+  }
+
+  .star-core {
+    fill: var(--c);
+    filter: drop-shadow(0 0 3px var(--c));
+    opacity: 0;
+    transform: scale(0);
+    transition:
+      opacity 0.3s,
+      transform 0.5s cubic-bezier(0.34, 1.8, 0.5, 1);
+  }
+
+  .star-glow {
+    opacity: 0;
+    transition: opacity 0.6s;
+  }
+
+  .star-ring {
+    fill: none;
+    stroke: var(--c);
+    stroke-width: 1.1;
+    stroke-dasharray: 3 2.6;
+    opacity: 0;
+    transition: opacity 0.6s 0.2s;
+  }
+
+  .star-burst {
+    fill: none;
+    stroke: var(--c);
+    stroke-width: 1.5;
+    opacity: 0;
+  }
+
+  .star.is-on .star-core {
+    opacity: 1;
+    transform: none;
+  }
+
+  .star.is-on .star-glow {
+    opacity: 0.7;
+  }
+
+  .star.is-on .star-ring {
+    opacity: 0.85;
+  }
+
+  .star.is-pop .star-burst {
+    animation: burst 0.9s var(--ease) forwards;
+  }
+
+  @keyframes burst {
+    0% {
+      opacity: 0.9;
+      transform: scale(0.3);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(2.4);
+    }
+  }
+
+  .is-done .star.is-on .star-glow {
+    animation: twinkle var(--tw) ease-in-out var(--twd) infinite alternate;
+  }
+
+  .is-done .star-ring {
+    animation: spin 10s linear infinite;
+  }
+
+  @keyframes twinkle {
+    to {
+      opacity: 0.25;
+    }
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .star:hover .star-core,
+  .star:focus-visible .star-core,
+  .star.is-focus .star-core {
+    transform: scale(1.6);
+  }
+
+  /* 悬停：高亮整条传承链 */
+  .has-focus .star:not(.is-related) {
+    opacity: 0.18;
+  }
+
+  .has-focus .link:not(.is-related) {
+    opacity: 0.1;
+  }
+
+  .has-focus .link.is-related .link-base {
+    stroke: #bfeaff;
+    stroke-width: 1.8;
+  }
+
+  /* 筛选：不匹配的星点变暗 */
+  .is-filtered .star.is-off {
+    opacity: 0.1;
+  }
+
+  .is-filtered .star:not(.is-off) .star-glow {
+    opacity: 1;
+  }
+
+  .is-filtered .link {
+    opacity: 0.25;
+  }
+
+  /* 提示卡片 */
+  .tip {
+    position: absolute;
+    z-index: 3;
+    width: min(320px, calc(100% - 16px));
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid rgb(140 190 240 / 0.25);
+    background: rgb(10 16 28 / 0.92);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow:
+      0 20px 50px -20px rgb(0 0 0 / 0.9),
+      0 0 30px -10px rgb(127 211 236 / 0.4);
+    animation: tip-in 0.22s var(--ease);
+  }
+
+  @keyframes tip-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px) scale(0.98);
+    }
+  }
+
+  .tip :global(.tip-meta) {
+    display: flex;
+    gap: 8px;
+    font: 600 11.5px var(--font-mono);
+    color: #7fd3ec;
+  }
+
+  .tip :global(.tip-meta span:last-child) {
+    color: var(--sky-muted);
+    font-weight: 500;
+  }
+
+  .tip :global(.tip-title) {
+    margin-top: 4px;
+    font-size: 14.5px;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--sky-ink);
+  }
+
+  .tip :global(.tip-authors) {
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--sky-muted);
+  }
+
+  .tip :global(.tip-text) {
+    margin-top: 6px;
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--sky-ink-2);
+  }
+
+  .tip :global(.tip-links) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin-top: 8px;
+    font-size: 12px;
+  }
+
+  .tip :global(.tip-links a) {
+    color: #7fd3ec;
+  }
+
+  .tip :global(.tip-links a:hover) {
+    text-decoration: underline;
+  }
+
+  /* 图例 */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 18px;
+    padding: 6px 20px 14px;
+    font-size: 12px;
+    color: var(--sky-muted);
+  }
+
+  .legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .key {
+    display: inline-block;
+  }
+
+  .key-paper {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #7fd3ec;
+    box-shadow: 0 0 8px #7fd3ec;
+  }
+
+  .key-code {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    border: 1px dashed #7fd3ec;
+  }
+
+  .key-link {
+    width: 24px;
+    border-top: 1.2px solid rgb(190 215 255 / 0.5);
+  }
+
+  .legend-hint {
+    margin-left: auto;
+    color: var(--sky-faint);
+  }
+
+  .replay {
+    height: 26px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid var(--sky-line-strong);
+    font-size: 12px;
+    color: var(--sky-ink-2);
+    transition:
+      color 0.2s,
+      border-color 0.2s;
+  }
+
+  .replay:hover {
+    color: var(--sky-ink);
+    border-color: rgb(127 211 236 / 0.5);
+  }
+
+  @media (max-width: 720px) {
+    .hud {
+      padding: 14px 14px 4px;
+    }
+
+    .hud-stats {
+      gap: 16px;
+    }
+
+    .hud-stats dd {
+      font-size: 18px;
+    }
+
+    .frame {
+      grid-template-columns: 84px minmax(0, 1fr);
+    }
+
+    .lane-labels li {
+      padding: 0 6px 0 10px;
+      font-size: 10.5px;
+    }
+
+    .lane-labels li::before {
+      display: none;
+    }
+
+    .legend {
+      padding: 6px 14px 12px;
+    }
+
+    .legend-hint {
+      margin-left: 0;
+      width: 100%;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nebula,
+    .meteors,
+    .dust circle,
+    .hud-pulse {
+      animation: none;
+    }
+
+    .meteors,
+    .link-flow {
+      display: none;
+    }
+
+    .star-glow,
+    .star-ring {
+      animation: none !important;
+    }
+
+    .star-core,
+    .star-glow,
+    .star-ring,
+    .link-base,
+    .bar rect {
+      transition: none;
+    }
+  }
+</style>

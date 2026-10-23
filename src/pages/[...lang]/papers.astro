@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PageHeader from '../../components/ui/PageHeader.astro';
 import Icon from '../../components/ui/Icon.astro';
+import Constellation from '../../components/papers/Constellation.astro';
 import { paperTopics, repoGroups } from '../../data/papers';
 import { langOf, langPaths } from '../../i18n';
 import { getPapers, getRepos, paperSummary, shortTitle } from '../../lib/papers';
@@ -38,6 +39,9 @@ const t = {
     code: '代码',
     relatedPaper: '论文：',
     count: (n: number) => `${n} 篇论文`,
+    view: '显示模式',
+    standard: '标准',
+    fx: '炫酷',
     empty: '无匹配结果。请尝试更短的关键词，或关闭“只看有代码”。',
   },
   en: {
@@ -56,139 +60,241 @@ const t = {
     code: 'Code',
     relatedPaper: 'Paper: ',
     count: (n: number) => `${n} papers`,
+    view: 'Display mode',
+    standard: 'Standard',
+    fx: 'Fancy',
     empty: 'No matches. Try a shorter keyword or turn off "With code only".',
   },
 }[lang];
 ---
 
 <BaseLayout title={t.title} description={t.meta}>
-  <PageHeader label={t.title} title={t.heading} description={t.description} />
+  <div class="papers-page" data-papers-page>
+    <!-- 在首次绘制前按本地记录切换到动效模式，避免页面跳动 -->
+    <script is:inline>
+      try {
+        if (localStorage.getItem('papers-view') === 'fx') {
+          document.currentScript.parentElement.setAttribute('data-fx', '');
+        }
+      } catch {}
+    </script>
+    <PageHeader label={t.title} title={t.heading} description={t.description} />
 
-  <div class="container page-body" data-papers>
-    <div class="toolbar">
-      <label class="search">
-        <Icon name="search" size={16} />
-        <span class="visually-hidden">{t.search}</span>
-        <input
-          type="search"
-          placeholder={t.placeholder}
-          autocomplete="off"
-          spellcheck="false"
-          data-papers-search
-        />
-      </label>
-      <button type="button" class="code-toggle" aria-pressed="false" data-papers-code>
-        <Icon name="github" size={14} />
-        {t.codeOnly}
-      </button>
-      <p class="count" role="status" aria-live="polite" data-papers-count>
-        {t.count(papers.length)}
-      </p>
-      <nav class="jump" aria-label={t.sections}>
-        {topics.map((topic) => (
-          <a href={`#${topic.id}`}>
-            {topic.label}
-            <span>{topic.items.length}</span>
-          </a>
-        ))}
-        <a href="#repos">
-          {t.repos}
-          <span>{repos.length}</span>
-        </a>
-      </nav>
+    <div class="container fx-only">
+      <Constellation />
     </div>
 
-    {topics.map((topic) => (
-      <section class="topic" id={topic.id} data-topic aria-labelledby={`${topic.id}-title`}>
-        <header class="topic-head">
-          <h2 id={`${topic.id}-title`}>
-            {topic.label}
-            <span>{topic.items.length}</span>
-          </h2>
-          <p>{topic.description}</p>
-        </header>
-        <ol class="papers" role="list">
-          {topic.items.map((paper) => (
-            <li class="paper" id={paper.id} data-paper data-code={paper.data.code ? '' : undefined}>
-              <span class="paper-year">{paper.data.year}</span>
-              <div class="paper-body">
-                <h3>
-                  <a href={paper.data.url} target="_blank" rel="noopener">
-                    {paper.data.title}
-                  </a>
-                </h3>
-                <p class="paper-meta">
-                  {paper.data.authors} · <em>{paper.data.venue}</em>
-                </p>
-                <p class="paper-summary">{paperSummary(paper, lang)}</p>
-              </div>
-              <div class="paper-links">
-                <a href={paper.data.url} target="_blank" rel="noopener">
-                  {t.paper}
-                  <Icon name="arrow-up-right" size={12} />
-                </a>
-                {paper.data.code && (
-                  <a class="is-code" href={paper.data.code} target="_blank" rel="noopener">
-                    <Icon name="github" size={12} />
-                    {t.code}
-                  </a>
-                )}
-              </div>
-            </li>
+    <div class="container page-body" data-papers>
+      <div class="toolbar">
+        <label class="search">
+          <Icon name="search" size={16} />
+          <span class="visually-hidden">{t.search}</span>
+          <input
+            type="search"
+            placeholder={t.placeholder}
+            autocomplete="off"
+            spellcheck="false"
+            data-papers-search
+          />
+        </label>
+        <button type="button" class="code-toggle" aria-pressed="false" data-papers-code>
+          <Icon name="github" size={14} />
+          {t.codeOnly}
+        </button>
+        <p class="count" role="status" aria-live="polite" data-papers-count>
+          {t.count(papers.length)}
+        </p>
+        <div class="view-switch" role="group" aria-label={t.view}>
+          <button type="button" data-papers-view="standard" aria-pressed="true">
+            {t.standard}
+          </button>
+          <button type="button" data-papers-view="fx" aria-pressed="false">
+            <Icon name="sparkles" size={14} />
+            {t.fx}
+          </button>
+        </div>
+        <nav class="jump" aria-label={t.sections}>
+          {topics.map((topic) => (
+            <a href={`#${topic.id}`}>
+              {topic.label}
+              <span>{topic.items.length}</span>
+            </a>
           ))}
-        </ol>
-      </section>
-    ))}
+          <a href="#repos">
+            {t.repos}
+            <span>{repos.length}</span>
+          </a>
+        </nav>
+      </div>
 
-    <p class="empty" data-papers-empty hidden>
-      {t.empty}
-    </p>
-
-    <section class="topic" id="repos" data-topic aria-labelledby="repos-title">
-      <header class="topic-head">
-        <h2 id="repos-title">
-          {t.repos}
-          <span>{repos.length}</span>
-        </h2>
-        <p>{t.reposDescription}</p>
-      </header>
-      {groups.map((group) => (
-        <div class="repo-group" data-repo-group>
-          <h3 class="repo-group-title">{group.label}</h3>
-          <ul class="repos" role="list">
-            {group.items.map((repo) => {
-              const paper = repo.data.paper ? paperById.get(repo.data.paper) : undefined;
-              return (
-                <li class="repo" data-repo>
-                  <a
-                    class="repo-name"
-                    href={`https://github.com/${repo.data.repo}`}
-                    target="_blank"
-                    rel="noopener"
-                  >
-                    <Icon name="github" size={14} />
-                    <span>{repo.data.repo}</span>
+      {topics.map((topic) => (
+        <section class="topic" id={topic.id} data-topic aria-labelledby={`${topic.id}-title`}>
+          <header class="topic-head">
+            <h2 id={`${topic.id}-title`}>
+              {topic.label}
+              <span>{topic.items.length}</span>
+            </h2>
+            <p>{topic.description}</p>
+          </header>
+          <ol class="papers" role="list">
+            {topic.items.map((paper) => (
+              <li
+                class="paper"
+                id={paper.id}
+                data-paper
+                data-code={paper.data.code ? '' : undefined}
+              >
+                <span class="paper-year">{paper.data.year}</span>
+                <div class="paper-body">
+                  <h3>
+                    <a href={paper.data.url} target="_blank" rel="noopener">
+                      {paper.data.title}
+                    </a>
+                  </h3>
+                  <p class="paper-meta">
+                    {paper.data.authors} · <em>{paper.data.venue}</em>
+                  </p>
+                  <p class="paper-summary">{paperSummary(paper, lang)}</p>
+                </div>
+                <div class="paper-links">
+                  <a href={paper.data.url} target="_blank" rel="noopener">
+                    {t.paper}
+                    <Icon name="arrow-up-right" size={12} />
                   </a>
-                  <p class="repo-summary">{paperSummary(repo, lang)}</p>
-                  {paper && (
-                    <a class="repo-paper" href={`#${paper.id}`}>
-                      {t.relatedPaper}
-                      {shortTitle(paper.data.title)}
+                  {paper.data.code && (
+                    <a class="is-code" href={paper.data.code} target="_blank" rel="noopener">
+                      <Icon name="github" size={12} />
+                      {t.code}
                     </a>
                   )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
       ))}
-    </section>
+
+      <p class="empty" data-papers-empty hidden>
+        {t.empty}
+      </p>
+
+      <section class="topic" id="repos" data-topic aria-labelledby="repos-title">
+        <header class="topic-head">
+          <h2 id="repos-title">
+            {t.repos}
+            <span>{repos.length}</span>
+          </h2>
+          <p>{t.reposDescription}</p>
+        </header>
+        {groups.map((group) => (
+          <div class="repo-group" data-repo-group>
+            <h3 class="repo-group-title">{group.label}</h3>
+            <ul class="repos" role="list">
+              {group.items.map((repo) => {
+                const paper = repo.data.paper ? paperById.get(repo.data.paper) : undefined;
+                return (
+                  <li class="repo" data-repo>
+                    <a
+                      class="repo-name"
+                      href={`https://github.com/${repo.data.repo}`}
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      <Icon name="github" size={14} />
+                      <span>{repo.data.repo}</span>
+                    </a>
+                    <p class="repo-summary">{paperSummary(repo, lang)}</p>
+                    {paper && (
+                      <a class="repo-paper" href={`#${paper.id}`}>
+                        {t.relatedPaper}
+                        {shortTitle(paper.data.title)}
+                      </a>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </section>
+    </div>
   </div>
 </BaseLayout>
 
 <style>
   .page-body {
     padding-bottom: clamp(72px, 10vw, 128px);
+  }
+
+  /* 显示模式：动效模式下显示星图 */
+  .fx-only {
+    display: none;
+  }
+
+  .papers-page[data-fx] .fx-only {
+    display: block;
+    margin-bottom: 28px;
+  }
+
+  .papers-page[data-fx] :global(.page-header) {
+    padding-bottom: clamp(28px, 4vw, 40px);
+  }
+
+  .papers-page[data-fx] :global(.page-header .backdrop)::after {
+    animation: aurora 14s ease-in-out infinite alternate;
+  }
+
+  @keyframes aurora {
+    0% {
+      transform: translate3d(0, 0, 0) scale(1);
+      opacity: 0.35;
+    }
+    50% {
+      transform: translate3d(-18%, 10%, 0) scale(1.15);
+      opacity: 0.55;
+    }
+    100% {
+      transform: translate3d(-36%, 0, 0) scale(0.95);
+      opacity: 0.4;
+    }
+  }
+
+  .view-switch {
+    display: inline-flex;
+    padding: 3px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .view-switch button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    color: var(--muted);
+    transition:
+      color 0.2s,
+      background-color 0.2s,
+      box-shadow 0.2s;
+  }
+
+  .view-switch button:hover {
+    color: var(--ink);
+  }
+
+  .view-switch button[aria-pressed='true'] {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+
+  .view-switch button[data-papers-view='fx'][aria-pressed='true'] {
+    background: linear-gradient(120deg, #2a6fdb, #49bbdd 55%, #8f6bff);
+    color: #fff;
+    box-shadow: 0 0 18px -4px rgb(73 187 221 / 0.8);
   }
 
   /* 工具栏 */
