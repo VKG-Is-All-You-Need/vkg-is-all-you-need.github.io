@@ -190,6 +190,14 @@ const t = {
                         {m.cite}
                         <Icon name="arrow-up-right" size={12} />
                       </a>
+                      {m.also?.map((extra) => (
+                        <a href={extra.url} target="_blank" rel="noopener">
+                          {extra.label[lang]}
+                          {lang === 'zh' ? '：' : ': '}
+                          {extra.cite}
+                          <Icon name="arrow-up-right" size={12} />
+                        </a>
+                      ))}
                       {m.paper && (
                         <a class="m-paper" href={localize(`/papers/#${m.paper}`, lang)}>
                           {t.paperLink}

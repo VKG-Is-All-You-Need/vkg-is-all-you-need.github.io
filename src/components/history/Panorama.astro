@@ -222,6 +222,10 @@ const t = {
             cite: m.cite,
             href: m.paper ? localize(`/papers/#${m.paper}`, lang) : m.url,
             external: !m.paper,
+            also: (m.also ?? []).map((extra) => ({
+              cite: `${extra.label[lang]}${lang === 'zh' ? '：' : ': '}${extra.cite}`,
+              href: extra.url,
+            })),
           },
         ]),
       ),
@@ -581,11 +585,16 @@ const t = {
   }
 
   .tip :global(.tip-cite) {
-    display: inline-flex;
+    display: flex;
+    width: fit-content;
     gap: 4px;
     margin-top: 8px;
     font-size: 12px;
     color: var(--accent-ink);
+  }
+
+  .tip :global(.tip-cite + .tip-cite) {
+    margin-top: 4px;
   }
 
   .tip :global(.tip-cite:hover) {

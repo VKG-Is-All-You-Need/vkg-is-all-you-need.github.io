@@ -93,6 +93,8 @@ export interface Milestone {
   /** 出处的简短写法，如 “Lenzerini, PODS 2002”。 */
   cite: string;
   url: string;
+  /** 另外的出处，如名称首次见于另一篇文献时，label 说明它的作用（如“名称”）。 */
+  also?: { label: Text; cite: string; url: string }[];
   /** 文献页中对应论文的 id。 */
   paper?: string;
   /** 主要节点：在全景图中以较大的节点显示，标签始终可见。 */
@@ -147,15 +149,22 @@ export const MILESTONES: Milestone[] = [
   },
   {
     id: 'omqa',
-    year: 2014,
+    year: 2013,
     lane: 'paradigm',
     label: same('OMQA'),
     text: {
-      zh: '理论界把（本体, 查询）对作为研究对象，称为本体中介查询，研究更具表达力的本体下查询回答的复杂度。',
-      en: 'Theory takes the (ontology, query) pair as its object of study, the ontology-mediated query, and analyzes the complexity of query answering under more expressive ontologies.',
+      zh: '提出本体中介查询，即数据库查询与本体组成的对，并借助析取 Datalog、CSP 与 MMSNP 研究其表达能力、可改写性与 P/NP 二分。此后理论界把这类查询的回答问题称为本体中介查询回答（OMQA）。',
+      en: 'Introduces the ontology-mediated query, a database query coupled with an ontology, and studies its expressive power, rewritability and P/NP dichotomies through disjunctive datalog, CSP and MMSNP. The theory community later named the problem of answering such queries ontology-mediated query answering (OMQA).',
     },
-    cite: 'M. Bienvenu, B. ten Cate, C. Lutz, F. Wolter, ACM TODS 2014',
-    url: 'https://doi.org/10.1145/2661643',
+    cite: 'M. Bienvenu, B. ten Cate, C. Lutz, F. Wolter, PODS 2013',
+    url: 'https://doi.org/10.1145/2463664.2465223',
+    also: [
+      {
+        label: { zh: '名称', en: 'Name' },
+        cite: 'M. Bienvenu, M. Ortiz, Reasoning Web 2015',
+        url: 'https://doi.org/10.1007/978-3-319-21768-0_9',
+      },
+    ],
   },
   {
     id: 'obdi',
@@ -833,7 +842,7 @@ export const NAMES: { term: Text; year: string; focus: Text; milestone: string }
   },
   {
     term: same('OMQA'),
-    year: '2014',
+    year: '2013',
     focus: { zh: '理论侧：本体中介查询', en: 'Theory: ontology-mediated queries' },
     milestone: 'omqa',
   },

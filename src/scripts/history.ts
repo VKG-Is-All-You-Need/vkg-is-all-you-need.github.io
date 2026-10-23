@@ -10,6 +10,7 @@ interface MilestoneInfo {
   cite: string;
   href: string;
   external: boolean;
+  also: { cite: string; href: string }[];
 }
 
 const escapeHtml = (text: string) =>
@@ -197,7 +198,12 @@ function initPanorama(root: HTMLElement, signal: AbortSignal) {
     const x = Number(dot.getAttribute('cx'));
     const y = Number(dot.getAttribute('cy'));
     const target = item.external ? ' target="_blank" rel="noopener"' : '';
-    tip.innerHTML = `<p class="tip-year">${item.year}</p><p class="tip-title">${escapeHtml(item.label)}</p><p class="tip-text">${escapeHtml(item.text)}</p><a class="tip-cite" href="${escapeHtml(item.href)}"${target}>${escapeHtml(item.cite)} ${item.external ? '↗' : en ? '→ Papers' : '→ 文献页'}</a>`;
+    tip.innerHTML = `<p class="tip-year">${item.year}</p><p class="tip-title">${escapeHtml(item.label)}</p><p class="tip-text">${escapeHtml(item.text)}</p><a class="tip-cite" href="${escapeHtml(item.href)}"${target}>${escapeHtml(item.cite)} ${item.external ? '↗' : en ? '→ Papers' : '→ 文献页'}</a>${item.also
+      .map(
+        (extra) =>
+          `<a class="tip-cite" href="${escapeHtml(extra.href)}" target="_blank" rel="noopener">${escapeHtml(extra.cite)} ↗</a>`,
+      )
+      .join('')}`;
     tip.hidden = false;
     placeTip(tip, scroller, x, y, 300);
   };
