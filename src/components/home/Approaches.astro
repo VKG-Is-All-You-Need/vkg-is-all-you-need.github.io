@@ -1,0 +1,337 @@
+---
+/**
+ * 首页“与其他方案的区别”：直接查询各数据库、ETL 构建物化知识图谱与虚拟知识图谱的对比。
+ */
+import Icon, { type IconName } from '../ui/Icon.astro';
+import SectionHeading from '../ui/SectionHeading.astro';
+import { langOf, type Lang } from '../../i18n';
+
+const lang = langOf(Astro.url.pathname);
+
+/** 单元格：文字与倾向，good 为优势，weak 为不足，省略为中性。 */
+type Cell = [text: string, tone?: 'good' | 'weak'];
+type Row = { label: string; cells: [Cell, Cell, Cell] };
+
+const texts: Record<
+  Lang,
+  { title: string; description: string; aspect: string; columns: string[]; rows: Row[] }
+> = {
+  zh: {
+    title: '与其他方案的区别',
+    description: '访问多个关系数据库的三种常见方式，各有适用场景。',
+    aspect: '对比项',
+    columns: ['直接查询各数据库', 'ETL 构建物化知识图谱', '虚拟知识图谱'],
+    rows: [
+      {
+        label: '数据时效',
+        cells: [
+          ['实时', 'good'],
+          ['取决于 ETL 的执行周期', 'weak'],
+          ['实时，查询在源数据库上执行', 'good'],
+        ],
+      },
+      {
+        label: '数据副本',
+        cells: [
+          ['无', 'good'],
+          ['在三元组库中另存一份', 'weak'],
+          ['无', 'good'],
+        ],
+      },
+      {
+        label: '查询语言',
+        cells: [
+          ['各数据库的 SQL 方言', 'weak'],
+          ['SPARQL', 'good'],
+          ['SPARQL', 'good'],
+        ],
+      },
+      {
+        label: '跨库集成',
+        cells: [
+          ['在应用代码中完成', 'weak'],
+          ['在 ETL 流程中完成'],
+          ['由映射与联邦引擎完成', 'good'],
+        ],
+      },
+      {
+        label: '表结构变化时',
+        cells: [
+          ['修改所有相关查询', 'weak'],
+          ['修改 ETL 并重新加载数据', 'weak'],
+          ['修改映射', 'good'],
+        ],
+      },
+      {
+        label: '本体推理',
+        cells: [['不支持', 'weak'], ['加载时物化推理结果'], ['在查询改写阶段完成', 'good']],
+      },
+      {
+        label: '适用场景',
+        cells: [
+          ['单个数据库，查询固定'],
+          ['需要图算法或频繁的多跳遍历，且允许复制数据'],
+          ['数据量大、更新频繁，或数据不便复制'],
+        ],
+      },
+    ],
+  },
+  en: {
+    title: 'Compared with other approaches',
+    description:
+      'Three common ways to access several relational databases, each suited to different situations.',
+    aspect: 'Aspect',
+    columns: ['Query each database', 'Materialized graph via ETL', 'Virtual knowledge graph'],
+    rows: [
+      {
+        label: 'Freshness',
+        cells: [
+          ['Live', 'good'],
+          ['Depends on the ETL schedule', 'weak'],
+          ['Live; queries run on the sources', 'good'],
+        ],
+      },
+      {
+        label: 'Data copies',
+        cells: [
+          ['None', 'good'],
+          ['A second copy in a triple store', 'weak'],
+          ['None', 'good'],
+        ],
+      },
+      {
+        label: 'Query language',
+        cells: [
+          ['The SQL dialect of each database', 'weak'],
+          ['SPARQL', 'good'],
+          ['SPARQL', 'good'],
+        ],
+      },
+      {
+        label: 'Integration',
+        cells: [
+          ['In application code', 'weak'],
+          ['In the ETL pipeline'],
+          ['By mappings and a federation engine', 'good'],
+        ],
+      },
+      {
+        label: 'Schema changes',
+        cells: [
+          ['Update every affected query', 'weak'],
+          ['Update the ETL and reload', 'weak'],
+          ['Update the mappings', 'good'],
+        ],
+      },
+      {
+        label: 'Reasoning',
+        cells: [
+          ['Not supported', 'weak'],
+          ['Materialized at load time'],
+          ['During query rewriting', 'good'],
+        ],
+      },
+      {
+        label: 'Best suited to',
+        cells: [
+          ['A single database with fixed queries'],
+          ['Graph algorithms or frequent multi-hop traversals, where copying data is acceptable'],
+          ['Large or frequently updated data, or data that cannot easily be copied'],
+        ],
+      },
+    ],
+  },
+};
+const t = texts[lang];
+const icons: IconName[] = ['database', 'layers', 'sparkles'];
+---
+
+<section class="section section-rule" aria-labelledby="approaches-title">
+  <div class="container">
+    <SectionHeading id="approaches-title" title={t.title} description={t.description} />
+
+    <div class="scroller" data-reveal>
+      <table class="approaches">
+        <thead>
+          <tr>
+            <th scope="col" class="aspect">
+              {t.aspect}
+            </th>
+            {t.columns.map((column, i) => (
+              <th scope="col" class:list={{ vkg: i === 2 }}>
+                <span class="col-icon">
+                  <Icon name={icons[i]} size={16} />
+                </span>
+                {column}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {t.rows.map((row, r) => (
+            <tr style={`--r:${r}`}>
+              <th scope="row" class="aspect">
+                {row.label}
+              </th>
+              {row.cells.map(([text, tone], i) => (
+                <td class:list={[tone, { vkg: i === 2 }]}>
+                  <span class="mark" aria-hidden="true" />
+                  {text}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<style>
+  .scroller {
+    overflow-x: auto;
+    border-radius: 18px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .approaches {
+    width: 100%;
+    min-width: 760px;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 14.5px;
+  }
+
+  th,
+  td {
+    padding: 15px 20px;
+    text-align: left;
+    vertical-align: top;
+    line-height: 1.6;
+  }
+
+  tbody tr + tr > * {
+    border-top: 1px solid var(--line);
+  }
+
+  thead th {
+    padding-block: 18px;
+    border-bottom: 1px solid var(--line-strong);
+    font-size: 15px;
+    font-weight: 650;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  .col-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    margin-right: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--muted);
+    vertical-align: middle;
+  }
+
+  .aspect {
+    width: 16%;
+    font-weight: 500;
+    color: var(--faint);
+  }
+
+  thead .aspect {
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--faint);
+  }
+
+  td {
+    width: 28%;
+    color: var(--ink-2);
+  }
+
+  td.weak {
+    color: var(--muted);
+  }
+
+  .mark {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: 9px;
+    border-radius: 50%;
+    vertical-align: 0.1em;
+    border: 1.5px solid var(--faint);
+    opacity: 0.6;
+  }
+
+  .weak .mark {
+    border: 0;
+    background: var(--faint);
+  }
+
+  .good .mark {
+    border: 0;
+    background: var(--accent);
+    opacity: 1;
+    box-shadow: 0 0 8px var(--glow);
+  }
+
+  /* 虚拟知识图谱一列 */
+  .vkg {
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+  }
+
+  thead .vkg {
+    position: relative;
+    color: var(--accent-ink);
+  }
+
+  thead .vkg::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 3px;
+    background: var(--accent);
+    box-shadow: 0 0 18px var(--glow);
+  }
+
+  thead .vkg .col-icon {
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+  }
+
+  td.vkg {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* 行依次出现 */
+  .scroller.is-revealed tbody tr {
+    animation: ap-row 0.6s var(--ease) both;
+    animation-delay: calc(200ms + var(--r) * 70ms);
+  }
+
+  @keyframes ap-row {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+
+  @media (max-width: 820px) {
+    .aspect {
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      background: var(--surface);
+    }
+  }
+</style>

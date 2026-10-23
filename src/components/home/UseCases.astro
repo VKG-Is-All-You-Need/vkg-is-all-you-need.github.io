@@ -1,0 +1,956 @@
+---
+/**
+ * 首页“应用场景”：六类已有论文或本站示例的应用，每张卡片配一幅循环的小动画（纯 CSS）。
+ */
+import Icon from '../ui/Icon.astro';
+import SectionHeading from '../ui/SectionHeading.astro';
+import { langOf, localize, type Lang } from '../../i18n';
+
+const lang = langOf(Astro.url.pathname);
+
+type Link = { label: string; href: string };
+type Case = { id: string; tag: string; title: string; text: string; links: Link[] };
+
+const paper = (id: string) => `${localize('/papers/', lang)}#${id}`;
+
+const texts: Record<
+  Lang,
+  {
+    title: string;
+    description: string;
+    cases: Case[];
+    layers: [string, string, string];
+    question: string;
+    check: string;
+    stream: string;
+    static: string;
+  }
+> = {
+  zh: {
+    title: '应用场景',
+    description:
+      'VKG 已用于能源、制造、生命科学、医疗与地理信息等领域。以下各类应用均附有论文或本站的交互示例。',
+    cases: [
+      {
+        id: 'industry',
+        tag: '数据集成',
+        title: '工业数据集成',
+        text: '欧盟 Optique 项目在 Statoil 部署 OBDA，工程师通过可视化界面构建查询，访问多个勘探数据库。Bosch 以本体与映射整合表面贴装生产线的异构数据，支持产品质量查询。',
+        links: [
+          { label: 'Statoil, 2017', href: paper('statoil') },
+          { label: 'Bosch, 2020', href: paper('bosch') },
+        ],
+      },
+      {
+        id: 'stream',
+        tag: '流数据',
+        title: '流数据与设备诊断',
+        text: 'Siemens 通过 Optique 平台统一访问涡轮机的传感器流数据与静态数据。SDRL 规则语言借助本体抽象传感器信号，简化列车与涡轮机诊断规则的编写与维护。',
+        links: [
+          { label: 'Siemens, 2017', href: paper('siemens') },
+          { label: 'SDRL, 2019', href: paper('sdrl') },
+        ],
+      },
+      {
+        id: 'geo',
+        tag: '地理空间',
+        title: '地理空间查询',
+        text: 'LinkedGeoData 借助 Ontop 在 PostGIS 中的 OpenStreetMap 数据上直接提供 GeoSPARQL 查询。',
+        links: [
+          { label: 'LinkedGeoData, 2021', href: paper('linkedgeodata') },
+          { label: '示例：VKG × 地理信息', href: localize('/examples/geo/', lang) },
+        ],
+      },
+      {
+        id: 'fusion',
+        tag: '多源融合',
+        title: '城市数据融合',
+        text: 'CityGML-KG 把 3DCityDB 中的三维城市数据发布为知识图谱，并与 OpenStreetMap 等数据源集成。',
+        links: [
+          { label: 'CityGML-KG, 2025', href: paper('citygml-kg') },
+          { label: '示例：城市数据融合', href: localize('/examples/city/', lang) },
+        ],
+      },
+      {
+        id: 'publish',
+        tag: '数据发布',
+        title: '科学与临床数据发布',
+        text: 'Bgee 用 Ontop 把基因表达数据库发布为知识图谱，并与其他生物医学资源关联。FHIR-Ontop-OMOP 把 OMOP 临床数据库发布为 FHIR RDF。',
+        links: [
+          { label: 'Bgee, 2021', href: paper('ontop-patterns') },
+          { label: 'FHIR-Ontop-OMOP, 2022', href: paper('fhir-ontop-omop') },
+        ],
+      },
+      {
+        id: 'qa',
+        tag: '问答',
+        title: '自然语言问答',
+        text: '大语言模型把自然语言问题翻译为 SPARQL，本体提供统一的词汇，并用于检查和修复生成的查询。在 Allemang 与 Sequeda 的实验中，依据本体修复查询使问答准确率提升到 72.55%。',
+        links: [
+          { label: 'Ontologies to the Rescue, 2024', href: paper('ontologies-to-the-rescue') },
+          { label: 'GeoQA, 2025', href: paper('geoqa') },
+        ],
+      },
+    ],
+    layers: ['建筑', '交通', '天气'],
+    question: '2010 年以后完钻的井有哪些？',
+    check: '符合本体',
+    stream: '传感器流',
+    static: '设备台账',
+  },
+  en: {
+    title: 'Applications',
+    description:
+      'VKGs are used in energy, manufacturing, life sciences, healthcare and geographic information. Each application below comes with papers or an interactive example on this site.',
+    cases: [
+      {
+        id: 'industry',
+        tag: 'Integration',
+        title: 'Industrial data integration',
+        text: 'The EU Optique project deployed OBDA at Statoil, where engineers build queries in a visual interface over several exploration databases. Bosch integrates heterogeneous data from its surface-mount production lines with an ontology and mappings to support product quality queries.',
+        links: [
+          { label: 'Statoil, 2017', href: paper('statoil') },
+          { label: 'Bosch, 2020', href: paper('bosch') },
+        ],
+      },
+      {
+        id: 'stream',
+        tag: 'Streams',
+        title: 'Streaming data and diagnostics',
+        text: 'Siemens uses the Optique platform for unified access to streaming sensor data and static data on its turbines. The SDRL rule language abstracts sensor signals through an ontology, simplifying diagnostic rules for trains and turbines.',
+        links: [
+          { label: 'Siemens, 2017', href: paper('siemens') },
+          { label: 'SDRL, 2019', href: paper('sdrl') },
+        ],
+      },
+      {
+        id: 'geo',
+        tag: 'Geospatial',
+        title: 'Geospatial queries',
+        text: 'LinkedGeoData uses Ontop to serve GeoSPARQL queries directly over OpenStreetMap data in PostGIS.',
+        links: [
+          { label: 'LinkedGeoData, 2021', href: paper('linkedgeodata') },
+          { label: 'Example: VKG × GIS', href: localize('/examples/geo/', lang) },
+        ],
+      },
+      {
+        id: 'fusion',
+        tag: 'Fusion',
+        title: 'City data fusion',
+        text: 'CityGML-KG publishes 3D city data stored in 3DCityDB as a knowledge graph and integrates it with sources such as OpenStreetMap.',
+        links: [
+          { label: 'CityGML-KG, 2025', href: paper('citygml-kg') },
+          { label: 'Example: city data fusion', href: localize('/examples/city/', lang) },
+        ],
+      },
+      {
+        id: 'publish',
+        tag: 'Publishing',
+        title: 'Scientific and clinical data',
+        text: 'Bgee publishes its gene expression database as a knowledge graph with Ontop and links it to other biomedical resources. FHIR-Ontop-OMOP publishes OMOP clinical databases as FHIR RDF.',
+        links: [
+          { label: 'Bgee, 2021', href: paper('ontop-patterns') },
+          { label: 'FHIR-Ontop-OMOP, 2022', href: paper('fhir-ontop-omop') },
+        ],
+      },
+      {
+        id: 'qa',
+        tag: 'QA',
+        title: 'Natural language questions',
+        text: 'Large language models translate natural language questions into SPARQL, while the ontology provides a shared vocabulary and is used to check and repair the generated queries. In experiments by Allemang and Sequeda, ontology-based repair raised accuracy to 72.55%.',
+        links: [
+          { label: 'Ontologies to the Rescue, 2024', href: paper('ontologies-to-the-rescue') },
+          { label: 'GeoQA, 2025', href: paper('geoqa') },
+        ],
+      },
+    ],
+    layers: ['Buildings', 'Traffic', 'Weather'],
+    question: 'Which wells were completed after 2010?',
+    check: 'Valid in ontology',
+    stream: 'Sensor stream',
+    static: 'Asset registry',
+  },
+};
+const t = texts[lang];
+
+/** 流数据卡片的波形：两段相同的折线首尾相接，平移一个周期即可无缝循环。 */
+const WAVE = [62, 58, 66, 54, 60, 40, 30, 52, 64, 58, 70, 56, 62, 48, 60, 66, 58, 62];
+const wavePoints = [...WAVE, ...WAVE, WAVE[0]]
+  .map((y, i) => `${(i * 260) / WAVE.length},${y}`)
+  .join(' ');
+
+/** 地理卡片的建筑：hit 为缓冲区内的建筑。 */
+const BUILDINGS = [
+  { x: 30, y: 22, w: 34, h: 22 },
+  { x: 74, y: 18, w: 24, h: 30, hit: true },
+  { x: 150, y: 20, w: 40, h: 24, hit: true },
+  { x: 204, y: 26, w: 30, h: 20 },
+  { x: 26, y: 92, w: 30, h: 34 },
+  { x: 86, y: 96, w: 36, h: 26, hit: true },
+  { x: 148, y: 98, w: 26, h: 30, hit: true },
+  { x: 196, y: 92, w: 40, h: 30 },
+];
+
+/** 数据发布卡片：环绕知识图谱的资源。 */
+const SPOKES = ['Bgee', 'FHIR', 'OMOP', 'SPARQL', 'RDF', 'IRI'].map((label, i) => {
+  const angle = (i / 6) * Math.PI * 2 - Math.PI / 2;
+  return { label, x: 130 + Math.cos(angle) * 92, y: 78 + Math.sin(angle) * 56 };
+});
+---
+
+<section class="section section-rule" id="cases" aria-labelledby="cases-title">
+  <div class="container">
+    <SectionHeading id="cases-title" title={t.title} description={t.description} />
+
+    <ul class="cases" role="list">
+      {t.cases.map((item, i) => (
+        <li
+          class:list={['case', 'spotlight', `case-${item.id}`]}
+          data-reveal
+          style={`--reveal-delay:${(i % 3) * 80}ms`}
+        >
+          <div class="visual" aria-hidden="true">
+            {item.id === 'industry' && (
+              <svg viewBox="0 0 520 150">
+                {[24, 62, 100].map((y, k) => (
+                  <g class="cyl" style={`--k:${k}`} transform={`translate(30 ${y})`}>
+                    <path d="M0 5v18c0 2.8 7 5 16 5s16-2.2 16-5V5" />
+                    <ellipse cx="16" cy="5" rx="16" ry="5" />
+                  </g>
+                ))}
+                {[38, 76, 114].map((y, k) => (
+                  <path class="flow" style={`--k:${k}`} d={`M70 ${y} C160 ${y} 170 76 250 76`} />
+                ))}
+                <circle class="hub" cx="262" cy="76" r="12" />
+                {[
+                  [262, 76, 340, 34],
+                  [262, 76, 352, 116],
+                  [340, 34, 420, 50],
+                  [352, 116, 420, 50],
+                  [420, 50, 486, 26],
+                  [420, 50, 470, 118],
+                  [352, 116, 470, 118],
+                ].map(([x1, y1, x2, y2]) => (
+                  <line class="edge" x1={x1} y1={y1} x2={x2} y2={y2} />
+                ))}
+                {[
+                  [340, 34],
+                  [352, 116],
+                  [420, 50],
+                  [486, 26],
+                  [470, 118],
+                ].map(([cx, cy], k) => (
+                  <circle class="node" style={`--k:${k}`} cx={cx} cy={cy} r="7" />
+                ))}
+              </svg>
+            )}
+            {item.id === 'stream' && (
+              <svg viewBox="0 0 260 300">
+                <text class="label" x="0" y="14">
+                  {t.stream}
+                </text>
+                <line class="threshold" x1="0" x2="260" y1="42" y2="42" />
+                <clipPath id="uc-wave-clip">
+                  <rect x="0" y="0" width="260" height="100" />
+                </clipPath>
+                <g clip-path="url(#uc-wave-clip)">
+                  <polyline class="wave" points={wavePoints} />
+                </g>
+                <circle class="alert" cx="130" cy="34" r="5" />
+                <path class="join" d="M130 96 V150" />
+                <circle class="join-dot" cx="130" cy="150" r="4" />
+                <text class="label" x="0" y="184">
+                  {t.static}
+                </text>
+                {['T-101 · SGT-800', 'T-102 · SGT-800', 'T-207 · SGT-400'].map((row, k) => (
+                  <g class="row" style={`--k:${k}`}>
+                    <rect x="0" y={196 + k * 34} width="260" height="28" rx="6" />
+                    <text x="12" y={214 + k * 34}>
+                      {row}
+                    </text>
+                  </g>
+                ))}
+              </svg>
+            )}
+            {item.id === 'geo' && (
+              <svg viewBox="0 0 260 150">
+                <path class="street" d="M0 70 H260 M120 0 V150 M0 140 L260 6" />
+                {BUILDINGS.map((b) => (
+                  <rect
+                    class:list={['bldg', { hit: b.hit }]}
+                    x={b.x}
+                    y={b.y}
+                    width={b.w}
+                    height={b.h}
+                    rx="3"
+                  />
+                ))}
+                <circle class="buffer" cx="122" cy="70" r="56" />
+                <circle class="pin" cx="122" cy="70" r="5" />
+              </svg>
+            )}
+            {item.id === 'fusion' && (
+              <svg viewBox="0 0 260 150">
+                {t.layers.map((label, k) => (
+                  <g class="layer" style={`--k:${k}`}>
+                    <path
+                      d="M130 20 L230 52 L130 84 L30 52 Z"
+                      transform={`translate(0 ${k * 22})`}
+                    />
+                    <text x="236" y={56 + k * 22}>
+                      {label}
+                    </text>
+                  </g>
+                ))}
+              </svg>
+            )}
+            {item.id === 'publish' && (
+              <svg viewBox="0 0 260 156">
+                <g class="spin">
+                  <ellipse class="orbit" cx="130" cy="78" rx="92" ry="56" />
+                </g>
+                {SPOKES.map((s, k) => (
+                  <g class="spoke" style={`--k:${k}`}>
+                    <line x1="130" y1="78" x2={s.x} y2={s.y} />
+                    <circle cx={s.x} cy={s.y} r="4" />
+                    <text x={s.x} y={s.y + (s.y > 78 ? 16 : -9)} text-anchor="middle">
+                      {s.label}
+                    </text>
+                  </g>
+                ))}
+                <circle class="kg" cx="130" cy="78" r="17" />
+                <text class="kg-text" x="130" y="82" text-anchor="middle">
+                  KG
+                </text>
+              </svg>
+            )}
+            {item.id === 'qa' && (
+              <div class="qa">
+                <p class="bubble">
+                  <span class="typing">{t.question}</span>
+                </p>
+                <span class="llm">LLM</span>
+                <div class="qa-code">
+                  <div class="qa-lines">
+                    {[
+                      ['SELECT ?w WHERE {', 'k'],
+                      ['  ?w a :Wellbore ;', 't'],
+                      ['     :completionYear ?y .', 't'],
+                      ['  FILTER (?y > 2010) }', 'k'],
+                    ].map(([line, cls], k) => (
+                      <span class:list={['code-line', cls]} style={`--k:${k}`} set:text={line} />
+                    ))}
+                  </div>
+                  <span class="check">✓ {t.check}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div class="body">
+            <span class="tag">{item.tag}</span>
+            <h3>{item.title}</h3>
+            <p>{item.text}</p>
+            <div class="links">
+              {item.links.map((link) => (
+                <a href={link.href}>
+                  {link.label}
+                  <Icon name="arrow-right" size={13} />
+                </a>
+              ))}
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  </div>
+</section>
+
+<style>
+  .cases {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-areas:
+      'industry industry stream'
+      'geo fusion stream'
+      'publish qa qa';
+    gap: 16px;
+  }
+
+  .case {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .case-industry {
+    grid-area: industry;
+  }
+
+  .case-stream {
+    grid-area: stream;
+  }
+
+  .case-geo {
+    grid-area: geo;
+  }
+
+  .case-fusion {
+    grid-area: fusion;
+  }
+
+  .case-publish {
+    grid-area: publish;
+  }
+
+  .case-qa {
+    grid-area: qa;
+  }
+
+  .visual {
+    display: grid;
+    place-items: center;
+    padding: 26px 26px 6px;
+    background:
+      radial-gradient(ellipse 70% 90% at 50% 0%, var(--accent-soft), transparent 70%),
+      radial-gradient(var(--dot) 1px, transparent 1px) 0 0 / 18px 18px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .visual svg {
+    display: block;
+    width: 100%;
+    max-height: 170px;
+    overflow: visible;
+    font-family: var(--font-mono);
+  }
+
+  .case-stream .visual {
+    flex: 1;
+  }
+
+  .case-stream .visual svg {
+    max-height: 320px;
+  }
+
+  .body {
+    display: flex;
+    flex-direction: column;
+    flex: none;
+    padding: 22px 26px 24px;
+  }
+
+  .tag {
+    align-self: flex-start;
+    padding: 2px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  h3 {
+    margin-top: 12px;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .body p {
+    margin-top: 8px;
+    font-size: 14.5px;
+    line-height: 1.75;
+    color: var(--muted);
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    margin-top: 16px;
+  }
+
+  .links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13.5px;
+    color: var(--accent-ink);
+  }
+
+  .links a :global(svg) {
+    transition: transform 0.25s var(--ease);
+  }
+
+  .links a:hover :global(svg) {
+    transform: translateX(3px);
+  }
+
+  /* 卡片进入视口之前暂停动画 */
+  .case:not(.is-revealed) .visual :global(*) {
+    animation-play-state: paused;
+  }
+
+  /* ── 工业数据集成 ── */
+  .cyl path,
+  .cyl ellipse {
+    fill: color-mix(in srgb, var(--accent) 10%, var(--surface));
+    stroke: var(--accent);
+    stroke-width: 1.4;
+  }
+
+  .flow {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.6;
+    stroke-dasharray: 4 8;
+    opacity: 0.7;
+    animation: uc-dash 1.4s linear infinite;
+    animation-delay: calc(var(--k) * -0.4s);
+  }
+
+  .hub {
+    fill: var(--accent);
+    filter: drop-shadow(0 0 8px var(--glow));
+    animation: uc-breathe 2.4s var(--ease) infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .edge {
+    stroke: var(--line-strong);
+    stroke-width: 1.4;
+  }
+
+  .node {
+    fill: var(--surface);
+    stroke: var(--accent);
+    stroke-width: 1.6;
+    animation: uc-light 3s var(--ease) infinite;
+    animation-delay: calc(var(--k) * 0.35s);
+  }
+
+  /* ── 流数据 ── */
+  .label {
+    font: 500 11.5px var(--font-sans);
+    fill: var(--faint);
+  }
+
+  .threshold {
+    stroke: var(--warn);
+    stroke-dasharray: 3 4;
+    opacity: 0.7;
+  }
+
+  .wave {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    animation: uc-scroll 6s linear infinite;
+  }
+
+  .alert {
+    fill: var(--warn);
+    opacity: 0;
+    animation: uc-alert 3s steps(1) infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .join {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.4;
+    stroke-dasharray: 3 5;
+    animation: uc-dash 1.2s linear infinite;
+  }
+
+  .join-dot {
+    fill: var(--accent);
+  }
+
+  .row rect {
+    fill: var(--surface-2);
+    stroke: var(--line);
+    animation: uc-row 3s var(--ease) infinite;
+    animation-delay: calc(var(--k) * 0.2s);
+  }
+
+  .row text {
+    font-size: 11.5px;
+    fill: var(--ink-2);
+  }
+
+  /* ── 地理空间 ── */
+  .street {
+    fill: none;
+    stroke: var(--line-strong);
+    stroke-width: 6;
+    stroke-linecap: round;
+    opacity: 0.6;
+  }
+
+  .bldg {
+    fill: var(--surface-2);
+    stroke: var(--line-strong);
+  }
+
+  .bldg.hit {
+    animation: uc-hit 4s var(--ease) infinite;
+  }
+
+  .buffer {
+    fill: color-mix(in srgb, var(--accent) 10%, transparent);
+    stroke: var(--accent);
+    stroke-dasharray: 4 4;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: uc-buffer 4s var(--ease) infinite;
+  }
+
+  .pin {
+    fill: var(--accent);
+    filter: drop-shadow(0 0 6px var(--glow));
+  }
+
+  /* ── 城市数据融合 ── */
+  .layer path {
+    fill: color-mix(in srgb, var(--accent) 7%, var(--surface));
+    stroke: var(--accent);
+    stroke-width: 1.2;
+  }
+
+  .layer text {
+    font: 11px var(--font-sans);
+    fill: var(--muted);
+  }
+
+  .layer {
+    animation: uc-merge 4.5s var(--ease) infinite;
+  }
+
+  .layer:nth-child(1) {
+    --dy: -12px;
+  }
+
+  .layer:nth-child(3) {
+    --dy: 12px;
+  }
+
+  /* ── 数据发布 ── */
+  .orbit {
+    fill: none;
+    stroke: var(--line-strong);
+    stroke-dasharray: 2 6;
+  }
+
+  .spin {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: uc-orbit 20s linear infinite;
+  }
+
+  .spoke line {
+    stroke: color-mix(in srgb, var(--accent) 35%, transparent);
+    stroke-dasharray: 3 4;
+    animation: uc-dash 1.6s linear infinite reverse;
+  }
+
+  .spoke circle {
+    fill: var(--surface);
+    stroke: var(--accent);
+    stroke-width: 1.4;
+    animation: uc-light 3.6s var(--ease) infinite;
+    animation-delay: calc(var(--k) * 0.6s);
+  }
+
+  .spoke text {
+    font-size: 10.5px;
+    fill: var(--muted);
+  }
+
+  .kg {
+    fill: var(--accent);
+    filter: drop-shadow(0 0 10px var(--glow));
+  }
+
+  .kg-text {
+    font: 700 11px var(--font-sans);
+    fill: #041015;
+  }
+
+  /* ── 自然语言问答 ── */
+  .qa {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 14px 0;
+    width: 100%;
+    padding-bottom: 30px;
+  }
+
+  .bubble {
+    padding: 10px 16px;
+    border-radius: 14px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface-2);
+    font-size: 14px;
+    color: var(--ink);
+  }
+
+  .typing {
+    display: inline-block;
+    animation: uc-type 6s steps(24) infinite;
+  }
+
+  .llm {
+    position: relative;
+    margin-inline: 22px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--accent);
+    font: 700 11px/1.6 var(--font-sans);
+    color: #041015;
+  }
+
+  .llm::before,
+  .llm::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 18px;
+    border-top: 1.4px solid var(--line-strong);
+  }
+
+  .llm::before {
+    right: 100%;
+  }
+
+  .llm::after {
+    left: 100%;
+  }
+
+  .qa-code {
+    position: relative;
+  }
+
+  .qa-lines {
+    display: grid;
+    margin: 0;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--code-bg);
+    font: 12px/1.6 var(--font-mono);
+    color: var(--code-ink);
+  }
+
+  .code-line {
+    white-space: pre;
+    opacity: 0;
+    animation: uc-code 6s var(--ease) infinite;
+    animation-delay: calc(var(--k) * 0.15s);
+  }
+
+  .code-line.k {
+    color: var(--code-kw);
+  }
+
+  .code-line.t {
+    color: var(--code-var);
+  }
+
+  .check {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    padding: 1px 10px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--code-str) 60%, transparent);
+    background: color-mix(in srgb, var(--code-str) 18%, transparent);
+    font: 600 11px/1.6 var(--font-sans);
+    color: var(--ink-2);
+    white-space: nowrap;
+    opacity: 0;
+    animation: uc-check 6s var(--ease) infinite;
+  }
+
+  @media (max-width: 640px) {
+    .llm {
+      margin-inline: 12px 0;
+    }
+
+    .llm::before {
+      width: 10px;
+    }
+
+    .llm::after {
+      display: none;
+    }
+  }
+
+  /* ── 关键帧 ── */
+  @keyframes uc-dash {
+    to {
+      stroke-dashoffset: -24;
+    }
+  }
+
+  @keyframes uc-breathe {
+    50% {
+      transform: scale(1.25);
+    }
+  }
+
+  @keyframes uc-light {
+    0%,
+    60%,
+    100% {
+      fill: var(--surface);
+    }
+    20% {
+      fill: var(--accent);
+    }
+  }
+
+  @keyframes uc-scroll {
+    to {
+      transform: translateX(-260px);
+    }
+  }
+
+  @keyframes uc-alert {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    48% {
+      opacity: 1;
+    }
+    62% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes uc-row {
+    0%,
+    40%,
+    100% {
+      fill: var(--surface-2);
+    }
+    55% {
+      fill: var(--accent-soft);
+    }
+  }
+
+  @keyframes uc-hit {
+    0%,
+    25%,
+    95%,
+    100% {
+      fill: var(--surface-2);
+      stroke: var(--line-strong);
+    }
+    45%,
+    80% {
+      fill: color-mix(in srgb, var(--accent) 30%, var(--surface));
+      stroke: var(--accent);
+    }
+  }
+
+  @keyframes uc-buffer {
+    0% {
+      transform: scale(0);
+      opacity: 0;
+    }
+    35%,
+    80% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 0;
+    }
+  }
+
+  @keyframes uc-merge {
+    0%,
+    100% {
+      transform: translateY(var(--dy, 0));
+    }
+    45%,
+    60% {
+      transform: none;
+    }
+  }
+
+  @keyframes uc-orbit {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes uc-type {
+    0% {
+      clip-path: inset(0 100% 0 0);
+    }
+    25%,
+    100% {
+      clip-path: inset(0 0 0 0);
+    }
+  }
+
+  @keyframes uc-code {
+    0%,
+    28% {
+      opacity: 0;
+    }
+    36%,
+    92% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes uc-check {
+    0%,
+    48% {
+      opacity: 0;
+    }
+    56%,
+    92% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @media (max-width: 980px) {
+    .cases {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-areas:
+        'industry industry'
+        'geo stream'
+        'fusion stream'
+        'qa qa'
+        'publish publish';
+    }
+  }
+
+  @media (max-width: 640px) {
+    .cases {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: 'industry' 'stream' 'geo' 'fusion' 'publish' 'qa';
+    }
+
+    .case-stream .visual svg {
+      max-height: 220px;
+    }
+  }
+</style>

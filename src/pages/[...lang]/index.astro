@@ -1,6 +1,9 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Hero from '../../components/home/Hero.astro';
+import WhatItDoes from '../../components/home/WhatItDoes.astro';
+import UseCases from '../../components/home/UseCases.astro';
+import Approaches from '../../components/home/Approaches.astro';
 import HowItWorks from '../../components/home/HowItWorks.astro';
 import EntryPoints from '../../components/home/EntryPoints.astro';
 import FeaturedResources from '../../components/home/FeaturedResources.astro';
@@ -12,6 +15,9 @@ export const getStaticPaths = langPaths;
 
 <BaseLayout>
   <Hero />
+  <WhatItDoes />
+  <UseCases />
+  <Approaches />
   <HowItWorks />
   <EntryPoints />
   <FeaturedResources />

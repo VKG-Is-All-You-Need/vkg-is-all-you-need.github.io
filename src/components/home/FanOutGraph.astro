@@ -1,0 +1,801 @@
+---
+/**
+ * 首页主视觉：一条只用本体词汇写成的 SPARQL 查询经 Ontop 改写为 SQL，由联邦引擎分发到
+ * 涉及的数据源，结果再按本体词汇汇总。未涉及的数据源（产量数据）不被访问。
+ * 动画与交互见 scripts/fanout.ts。
+ */
+
+import { langOf } from '../../i18n';
+import { SAMPLE_ROWS } from './sample';
+
+const lang = langOf(Astro.url.pathname);
+const t = {
+  zh: {
+    figure:
+      '示意图：一条 SPARQL 查询经 Ontop 改写为 SQL，联邦引擎把它拆分到 wellbore、field、company 三个数据源执行，结果汇总为 4 行；产量数据源未被访问。',
+    query: 'SPARQL 查询',
+    rewrite: '改写与分发',
+    sources: '数据源',
+    mapping: '本体 · 映射',
+    federation: '联邦引擎',
+    result: '结果',
+    rows: (n: number) => `${n} 行`,
+    head: ['井', '油田', '完钻年份'],
+    tag: '查询',
+    console: '用本体词汇描述问题，与各数据源的表结构无关',
+    columns: '列',
+    skipped: '查询不涉及产量数据，此数据源不被访问。',
+    lake: '数据湖',
+  },
+  en: {
+    figure:
+      'Diagram: a SPARQL query is rewritten into SQL by Ontop, and a federation engine splits it across the wellbore, field and company sources; the results are combined into 4 rows. The production source is not accessed.',
+    query: 'SPARQL query',
+    rewrite: 'Rewriting',
+    sources: 'Data sources',
+    mapping: 'Ontology · mappings',
+    federation: 'Federation',
+    result: 'Result',
+    rows: (n: number) => (n === 1 ? '1 row' : `${n} rows`),
+    head: ['Well', 'Field', 'Completed'],
+    tag: 'Query',
+    console: 'The question is stated in ontology terms, independent of the table structures',
+    columns: 'Columns',
+    skipped: 'The query does not involve production data, so this source is not accessed.',
+    lake: 'Data lake',
+  },
+}[lang];
+
+const QUERY_X = 8;
+const QUERY_W = 236;
+const ONTOP = { x: 268, y: 78, w: 84, h: 56 };
+const FED = { x: 380, y: 86, w: 60, h: 40 };
+const MID = 106;
+const SRC_X = 496;
+const SRC_W = 136;
+const SRC_H = 72;
+const RESULT = { x: 8, y: 214, w: 420, h: 152 };
+const VIEW_W = 640;
+const VIEW_H = 384;
+
+/** SPARQL 各行，每段为 [类别, 文字]，类别对应语法高亮。 */
+const QUERY: [string, string][][] = [
+  [
+    ['k', 'SELECT'],
+    ['v', ' ?well ?field ?year'],
+  ],
+  [
+    ['k', 'WHERE'],
+    ['', ' {'],
+  ],
+  [
+    ['v', '  ?w'],
+    ['t', ' :name'],
+    ['v', ' ?well'],
+    ['', ' ;'],
+  ],
+  [
+    ['t', '     :completionYear'],
+    ['v', ' ?year'],
+    ['', ' ;'],
+  ],
+  [
+    ['t', '     :inField'],
+    ['v', ' ?f'],
+    ['', ' .'],
+  ],
+  [
+    ['v', '  ?f'],
+    ['t', ' :name'],
+    ['v', ' ?field'],
+    ['', ' ;'],
+  ],
+  [
+    ['t', '     :operator :Equinor'],
+    ['', ' .'],
+  ],
+  [
+    ['k', '  FILTER'],
+    ['', ' ('],
+    ['v', '?year'],
+    ['', ' >= 2010)'],
+  ],
+  [['', '}']],
+];
+
+const sources = [
+  {
+    key: 'wellbore',
+    engine: 'PostgreSQL',
+    columns: ['wlb_name', 'wlb_compl_year', 'fld_id', 'wlb_purpose'],
+    sql: 'SELECT wlb_name, wlb_compl_year, fld_id FROM wellbore WHERE wlb_compl_year >= 2010',
+    rows: 37,
+  },
+  {
+    key: 'FIELD',
+    engine: 'Oracle',
+    columns: ['FLD_NPDID', 'FLD_NAME', 'CMP_ID', 'FLD_STATUS'],
+    sql: 'SELECT FLD_NPDID, FLD_NAME, CMP_ID FROM FIELD',
+    rows: 9,
+  },
+  {
+    key: 'company',
+    engine: 'MySQL',
+    columns: ['cmp_id', 'cmp_long_name', 'cmp_country'],
+    sql: "SELECT cmp_id FROM company WHERE cmp_long_name = 'Equinor Energy AS'",
+    rows: 1,
+  },
+  {
+    key: 'production',
+    engine: `Iceberg · ${t.lake}`,
+    columns: ['fld_id', 'prf_year', 'prf_oil', 'prf_gas'],
+    sql: '',
+    rows: 0,
+  },
+].map((source, i) => ({ ...source, y: 30 + i * 88, cy: 30 + i * 88 + SRC_H / 2 }));
+
+const fedRight = FED.x + FED.w;
+const srcPath = (cy: number) =>
+  `M${fedRight} ${MID} C${fedRight + 30} ${MID} ${SRC_X - 30} ${cy} ${SRC_X} ${cy}`;
+const queryPath = `M${QUERY_X + QUERY_W} ${MID} L${ONTOP.x} ${MID}`;
+const ontopPath = `M${ONTOP.x + ONTOP.w} ${MID} L${FED.x} ${MID}`;
+const resultX = ONTOP.x + ONTOP.w / 2;
+const resultPath = `M${resultX} ${ONTOP.y + ONTOP.h} L${resultX} ${RESULT.y}`;
+
+const COLS = [RESULT.x + 18, RESULT.x + 148, RESULT.x + 320];
+const pct = (value: number, total: number) => `${((value / total) * 100).toFixed(2)}%`;
+---
+
+<figure class="fanout" data-fanout>
+  <div class="frame">
+    <div class="canvas">
+      <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} role="img" aria-label={t.figure} data-phase="idle">
+        <g class="col-labels" aria-hidden="true">
+          <text x={QUERY_X} y="18">
+            {t.query}
+          </text>
+          <text x={(ONTOP.x + fedRight) / 2} y="18" text-anchor="middle">
+            {t.rewrite}
+          </text>
+          <text x={SRC_X} y="18">
+            {t.sources}
+          </text>
+        </g>
+
+        <!-- 连线：底线 + 流动虚线 -->
+        <g class="edges">
+          <path class="edge draw" d={queryPath} pathLength="1" style="--d:500ms" />
+          <path class="edge-flow" d={queryPath} data-edge="query" />
+          <path class="edge draw" d={ontopPath} pathLength="1" style="--d:700ms" />
+          <path class="edge-flow" d={ontopPath} data-edge="ontop" />
+          {sources.map((source, i) => (
+            <>
+              {source.sql ? (
+                <path
+                  class="edge draw"
+                  d={srcPath(source.cy)}
+                  pathLength="1"
+                  style={`--d:${850 + i * 110}ms`}
+                />
+              ) : (
+                <path class="edge edge-idle pop" d={srcPath(source.cy)} style="--d:1200ms" />
+              )}
+              <path class="edge-flow" d={srcPath(source.cy)} data-edge={source.key} />
+            </>
+          ))}
+          <path class="edge draw" d={resultPath} pathLength="1" style="--d:1300ms" />
+          <path class="edge-flow" d={resultPath} data-edge="result" />
+        </g>
+
+        <!-- 查询 -->
+        <g class="query-card pop" style="--d:0ms">
+          <rect x={QUERY_X} y="30" width={QUERY_W} height="162" rx="12" />
+          <text class="code">
+            {QUERY.map((line, i) => (
+              <tspan x={QUERY_X + 14} y={52 + i * 15.6} class="code-line" style={`--i:${i}`}>
+                {line.map(([cls, text]) => (
+                  <tspan class={cls || undefined}>{text}</tspan>
+                ))}
+              </tspan>
+            ))}
+          </text>
+        </g>
+
+        <!-- 改写：Ontop 与联邦引擎 -->
+        <g class="engine engine-ontop pop" style="--d:600ms">
+          <rect x={ONTOP.x} y={ONTOP.y} width={ONTOP.w} height={ONTOP.h} rx="12" />
+          <text class="engine-name" x={ONTOP.x + ONTOP.w / 2} y={ONTOP.y + 25} text-anchor="middle">
+            Ontop
+          </text>
+          <text class="engine-sub" x={ONTOP.x + ONTOP.w / 2} y={ONTOP.y + 42} text-anchor="middle">
+            {t.mapping}
+          </text>
+        </g>
+        <circle class="engine-ring" cx={ONTOP.x + ONTOP.w / 2} cy={MID} r="30"></circle>
+        <g class="engine engine-fed pop" style="--d:750ms">
+          <rect x={FED.x} y={FED.y} width={FED.w} height={FED.h} rx="10" />
+          <text class="engine-name small" x={FED.x + FED.w / 2} y={FED.y + 18} text-anchor="middle">
+            Trino
+          </text>
+          <text class="engine-sub" x={FED.x + FED.w / 2} y={FED.y + 31} text-anchor="middle">
+            {t.federation}
+          </text>
+        </g>
+
+        <!-- 数据源 -->
+        {sources.map((source, i) => (
+          <g
+            class:list={['source', 'pop', { 'source-idle': !source.sql }]}
+            data-source={source.key}
+            tabindex="0"
+            style={`--d:${900 + i * 110}ms`}
+          >
+            <rect class="source-card" x={SRC_X} y={source.y} width={SRC_W} height={SRC_H} rx="11" />
+            <g class="cylinder" transform={`translate(${SRC_X + 12} ${source.y + 14})`}>
+              <path d="M0 3.5v11c0 1.9 4 3.5 9 3.5s9-1.6 9-3.5v-11" />
+              <ellipse cx="9" cy="3.5" rx="9" ry="3.5" />
+            </g>
+            <text class="source-name" x={SRC_X + 38} y={source.y + 24}>
+              {source.key}
+            </text>
+            <text class="source-engine" x={SRC_X + 38} y={source.y + 39}>
+              {source.engine}
+            </text>
+            <text class="source-cols" x={SRC_X + 12} y={source.y + 59}>
+              {source.columns[0]}, …
+            </text>
+            {source.rows > 0 && (
+              <text class="source-badge" x={SRC_X + SRC_W - 10} y={source.y + 59} text-anchor="end">
+                {t.rows(source.rows)}
+              </text>
+            )}
+          </g>
+        ))}
+
+        <!-- 结果 -->
+        <g class="result pop" style="--d:1200ms">
+          <rect x={RESULT.x} y={RESULT.y} width={RESULT.w} height={RESULT.h} rx="12" />
+          <text class="result-title" x={COLS[0]} y={RESULT.y + 22}>
+            {t.result}
+          </text>
+          <text
+            class="result-count"
+            x={RESULT.x + RESULT.w - 16}
+            y={RESULT.y + 22}
+            text-anchor="end"
+          >
+            {t.rows(SAMPLE_ROWS.length)}
+          </text>
+          {t.head.map((label, i) => (
+            <text class="result-head" x={COLS[i]} y={RESULT.y + 46}>
+              {label}
+            </text>
+          ))}
+          <line
+            class="result-rule"
+            x1={RESULT.x + 12}
+            x2={RESULT.x + RESULT.w - 12}
+            y1={RESULT.y + 54}
+            y2={RESULT.y + 54}
+          />
+          {SAMPLE_ROWS.map((row, r) => (
+            <g class="result-row" style={`--i:${r}`}>
+              {row.map((cell, i) => (
+                <text x={COLS[i]} y={RESULT.y + 76 + r * 22}>
+                  {cell}
+                </text>
+              ))}
+            </g>
+          ))}
+        </g>
+
+        <g data-particles></g>
+      </svg>
+
+      {sources.map((source) => (
+        <div
+          class="source-tip"
+          data-tip={source.key}
+          style={`right:${pct(VIEW_W - SRC_X + 10, VIEW_W)};top:${pct(source.cy, VIEW_H)}`}
+          aria-hidden="true"
+        >
+          <p class="tip-title">
+            {source.key} <span>{source.engine}</span>
+          </p>
+          <p class="tip-cols">
+            <span>{t.columns}</span>
+            {source.columns.join(', ')}
+          </p>
+          {source.sql ? <code>{source.sql}</code> : <p class="tip-skip">{t.skipped}</p>}
+        </div>
+      ))}
+    </div>
+
+    <div class="console" aria-live="off">
+      <span class="console-tag" data-console-tag>
+        {t.tag}
+      </span>
+      <span class="console-text" data-console-text>
+        {t.console}
+      </span>
+      <span class="console-caret" aria-hidden="true"></span>
+    </div>
+  </div>
+</figure>
+
+<style>
+  .fanout {
+    position: relative;
+  }
+
+  .frame {
+    position: relative;
+    padding: 18px 18px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface) 88%, transparent),
+      color-mix(in srgb, var(--bg-elev) 70%, transparent)
+    );
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(8px);
+  }
+
+  .frame::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(140deg, var(--glow), transparent 35%, transparent 70%, var(--glow));
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  .canvas {
+    position: relative;
+  }
+
+  svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    font-family: var(--font-mono);
+  }
+
+  /* 窄屏下保持可读尺寸，横向滑动查看 */
+  @media (max-width: 600px) {
+    .canvas {
+      margin-inline: -18px;
+      padding-inline: 18px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .canvas svg {
+      min-width: 560px;
+    }
+
+    .source-tip {
+      display: none;
+    }
+  }
+
+  .col-labels text {
+    font: 500 11.5px var(--font-sans);
+    fill: var(--faint);
+    letter-spacing: 0.02em;
+  }
+
+  /* 连线 */
+  .edge {
+    fill: none;
+    stroke: color-mix(in srgb, var(--accent) 24%, transparent);
+    stroke-width: 1.2;
+  }
+
+  .edge-idle {
+    stroke: var(--line-strong);
+    stroke-dasharray: 2 4;
+  }
+
+  .edge-flow {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.6;
+    stroke-dasharray: 3 7;
+    opacity: 0;
+    animation: fo-flow 1.4s linear infinite;
+    transition: opacity 0.4s;
+  }
+
+  .edge-flow.is-hot {
+    opacity: 0.9;
+  }
+
+  @keyframes fo-flow {
+    to {
+      stroke-dashoffset: -20;
+    }
+  }
+
+  /* 查询卡片：深色代码底 */
+  .query-card rect {
+    fill: var(--code-bg);
+    stroke: var(--line-strong);
+    transition: stroke 0.4s;
+  }
+
+  svg[data-phase='query'] .query-card rect {
+    stroke: var(--accent);
+  }
+
+  .code {
+    font-size: 11px;
+    fill: var(--code-ink);
+    white-space: pre;
+  }
+
+  .code .k {
+    fill: var(--code-kw);
+  }
+
+  .code .v {
+    fill: var(--code-faint);
+  }
+
+  .code .t {
+    fill: var(--code-var);
+  }
+
+  svg[data-phase='query'] .code-line {
+    animation: fo-line-in 0.5s var(--ease) both;
+    animation-delay: calc(var(--i) * 70ms);
+  }
+
+  @keyframes fo-line-in {
+    from {
+      opacity: 0.15;
+    }
+  }
+
+  /* 引擎 */
+  .engine rect {
+    fill: var(--surface-2);
+    stroke: var(--line-strong);
+    transition:
+      stroke 0.4s,
+      fill 0.4s;
+  }
+
+  .engine-name {
+    font: 650 14px var(--font-sans);
+    fill: var(--ink);
+  }
+
+  .engine-name.small {
+    font-size: 12px;
+  }
+
+  .engine-sub {
+    font: 9.5px var(--font-sans);
+    fill: var(--muted);
+  }
+
+  svg[data-phase='rewrite'] .engine rect,
+  svg[data-phase='result'] .engine-ontop rect {
+    stroke: var(--accent);
+    fill: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+  }
+
+  .engine-ring {
+    fill: none;
+    stroke: var(--accent);
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  svg[data-phase='rewrite'] .engine-ring {
+    animation: fo-ring 1.3s var(--ease) infinite;
+  }
+
+  @keyframes fo-ring {
+    from {
+      opacity: 0.7;
+      transform: scale(0.8);
+    }
+    to {
+      opacity: 0;
+      transform: scale(1.9);
+    }
+  }
+
+  /* 数据源 */
+  .source {
+    cursor: pointer;
+    outline: none;
+  }
+
+  .source-card {
+    fill: var(--surface);
+    stroke: var(--line-strong);
+    transition:
+      stroke 0.4s,
+      fill 0.4s;
+  }
+
+  .cylinder path,
+  .cylinder ellipse {
+    fill: color-mix(in srgb, var(--accent) 10%, transparent);
+    stroke: var(--accent);
+    stroke-width: 1.2;
+    transition:
+      stroke 0.4s,
+      fill 0.4s;
+  }
+
+  .source-name {
+    font-size: 12px;
+    font-weight: 600;
+    fill: var(--ink);
+  }
+
+  .source-engine {
+    font: 10.5px var(--font-sans);
+    fill: var(--muted);
+  }
+
+  .source-cols {
+    font-size: 9.5px;
+    fill: var(--faint);
+  }
+
+  .source-badge {
+    font: 600 10px var(--font-sans);
+    fill: var(--accent-ink);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  .source.is-hot .source-card,
+  .source:focus-visible .source-card {
+    stroke: var(--accent);
+    fill: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  }
+
+  .source.is-done .source-badge {
+    opacity: 1;
+  }
+
+  .source-idle .cylinder path,
+  .source-idle .cylinder ellipse {
+    stroke: var(--faint);
+    fill: transparent;
+  }
+
+  svg[data-phase='execute'] .source-idle,
+  svg[data-phase='result'] .source-idle {
+    opacity: 0.45;
+    transition: opacity 0.5s;
+  }
+
+  /* 结果 */
+  .result rect {
+    fill: var(--surface);
+    stroke: var(--line-strong);
+    transition: stroke 0.4s;
+  }
+
+  svg[data-phase='result'] .result rect {
+    stroke: var(--accent);
+  }
+
+  .result-title {
+    font: 600 12px var(--font-sans);
+    fill: var(--ink-2);
+  }
+
+  .result-count {
+    font: 600 10.5px var(--font-sans);
+    fill: var(--accent-ink);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  .result-head {
+    font: 10.5px var(--font-sans);
+    fill: var(--faint);
+  }
+
+  .result-rule {
+    stroke: var(--line);
+  }
+
+  .result-row text {
+    font-size: 11.5px;
+    fill: var(--ink-2);
+  }
+
+  /* 动画运行时，结果行在 result 阶段逐行出现；脚本未运行时全部显示 */
+  svg:not([data-phase='idle']) .result-row {
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  svg[data-phase='result'] .result-row {
+    animation: fo-row-in 0.5s var(--ease) forwards;
+    animation-delay: calc(700ms + var(--i) * 160ms);
+  }
+
+  svg[data-phase='result'] .result-count {
+    opacity: 1;
+    transition-delay: 1.4s;
+  }
+
+  @keyframes fo-row-in {
+    from {
+      opacity: 0;
+      transform: translateX(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  :global(.fanout .particle) {
+    fill: var(--accent);
+    filter: drop-shadow(0 0 4px var(--accent));
+  }
+
+  /* 入场动画（脚本加载前即可播放） */
+  .draw {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: fo-draw 0.9s var(--ease) forwards;
+    animation-delay: var(--d, 0ms);
+  }
+
+  .pop {
+    opacity: 0;
+    animation: fo-pop 0.7s var(--ease) forwards;
+    animation-delay: var(--d, 0ms);
+  }
+
+  @keyframes fo-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes fo-pop {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* 数据源提示 */
+  .source-tip {
+    position: absolute;
+    z-index: 2;
+    width: min(300px, 56%);
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--line-strong);
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
+    font-size: 12px;
+    color: var(--ink-2);
+    opacity: 0;
+    transform: translate(6px, -50%);
+    pointer-events: none;
+    transition:
+      opacity 0.25s,
+      transform 0.25s var(--ease);
+  }
+
+  .source-tip.is-open {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+
+  .tip-title {
+    font: 600 13px var(--font-mono);
+    color: var(--ink);
+  }
+
+  .tip-title span {
+    margin-left: 6px;
+    font: 400 11.5px var(--font-sans);
+    color: var(--muted);
+  }
+
+  .tip-cols {
+    margin-top: 6px;
+    font: 11.5px/1.6 var(--font-mono);
+    color: var(--muted);
+  }
+
+  .tip-cols span {
+    margin-right: 8px;
+    font-family: var(--font-sans);
+    color: var(--faint);
+  }
+
+  .source-tip code {
+    display: block;
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--code-bg);
+    color: var(--code-kw);
+    font: 11px/1.6 var(--font-mono);
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .tip-skip {
+    margin-top: 8px;
+    color: var(--muted);
+  }
+
+  /* 控制台 */
+  .console {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    margin-top: 12px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    font: 12px/1.5 var(--font-mono);
+    color: var(--code-ink);
+    overflow: hidden;
+  }
+
+  .console-tag {
+    flex: none;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    color: var(--code-kw);
+    font: 600 11px/1.6 var(--font-sans);
+  }
+
+  .console-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .console-caret {
+    flex: none;
+    width: 7px;
+    height: 14px;
+    margin-left: -6px;
+    background: var(--code-kw);
+    animation: fo-blink 1s steps(1) infinite;
+  }
+
+  @keyframes fo-blink {
+    50% {
+      opacity: 0;
+    }
+  }
+</style>

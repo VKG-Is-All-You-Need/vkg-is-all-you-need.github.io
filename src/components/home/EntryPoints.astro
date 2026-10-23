@@ -1,100 +1,148 @@
 ---
+/**
+ * 首页“从这里开始”：各页面入口，每张卡片带一幅预览。
+ * 示例、文献、历程三页用截图（public/previews/，按语言与主题区分）；
+ * 学习路径与资源索引以文字为主，截图缩小后难以辨认，改用由站内数据绘制的示意图。
+ */
 import Icon, { type IconName } from '../ui/Icon.astro';
 import SectionHeading from '../ui/SectionHeading.astro';
 import { langOf, localize, type Lang } from '../../i18n';
-import { getResources } from '../../lib/resources';
+import { getResourceGroups, getResources } from '../../lib/resources';
 
 const lang = langOf(Astro.url.pathname);
 const total = (await getResources()).length;
+const groups = await getResourceGroups(lang);
+const maxCount = Math.max(...groups.map((group) => group.items.length));
 
-type Entry = { icon: IconName; title: string; text: string; href: string; cta: string };
+type Preview = { kind: 'shot'; name: string; themed: boolean } | { kind: 'learn' | 'resources' };
+type Entry = {
+  id: string;
+  icon: IconName;
+  title: string;
+  text: string;
+  href: string;
+  cta: string;
+  preview: Preview;
+};
 
-const texts: Record<Lang, { title: string; description: string; entries: Entry[] }> = {
+const texts: Record<
+  Lang,
+  { title: string; description: string; stages: string[]; entries: Entry[] }
+> = {
   zh: {
     title: '从这里开始',
-    description: '根据当前阶段选择入口：系统学习、按需查找、动手示例，或直接阅读文献。',
+    description: '根据当前阶段选择入口：动手示例、阅读文献、了解历史、系统学习或按需查找。',
+    // 与学习路径页的四个阶段标题一致
+    stages: ['建立概念', '完成官方教程', '调整映射', '深入专题'],
     entries: [
       {
-        icon: 'route',
-        title: '学习路径',
-        text: '按四个阶段，从核心概念过渡到映射工程与研究专题。',
-        href: '/learn/',
-        cta: '查看路径',
-      },
-      {
-        icon: 'grid',
-        title: '资源索引',
-        text: `${total} 项资源，按标准规范、工具、教程与案例、基准测试、论文和相关生态分类。`,
-        href: '/resources/',
-        cta: '浏览资源',
-      },
-      {
+        id: 'examples',
         icon: 'map',
         title: '交互示例',
         text: '在三维街区中运行 GeoSPARQL 查询，或开关八个数据源，比较融合与分离的结果。',
         href: '/examples/',
         cta: '打开示例',
+        preview: { kind: 'shot', name: 'examples', themed: true },
       },
       {
+        id: 'papers',
+        icon: 'file',
+        title: '论文与代码',
+        text: '讲义、综述、理论基础与应用案例论文，以及相关的开源仓库；可切换为按年份与主题排布的文献星图。',
+        href: '/papers/',
+        cta: '浏览文献',
+        preview: { kind: 'shot', name: 'papers', themed: false },
+      },
+      {
+        id: 'history',
         icon: 'rotate',
         title: '发展历程',
         text: '从数据集成理论到 OBDA、OBDM、VKG 与 OBDF，五个时期的里程碑与传承关系。',
         href: '/history/',
         cta: '查看时间线',
+        preview: { kind: 'shot', name: 'history', themed: true },
       },
       {
-        icon: 'file',
-        title: '论文与代码',
-        text: '讲义、综述、理论基础与应用案例论文，以及相关的开源仓库。',
-        href: '/papers/',
-        cta: '浏览文献',
+        id: 'learn',
+        icon: 'route',
+        title: '学习路径',
+        text: '按四个阶段，从核心概念过渡到映射工程与研究专题。',
+        href: '/learn/',
+        cta: '查看路径',
+        preview: { kind: 'learn' },
+      },
+      {
+        id: 'resources',
+        icon: 'grid',
+        title: '资源索引',
+        text: `${total} 项资源，按标准规范、工具、教程与案例、基准测试、论文和相关生态分类。`,
+        href: '/resources/',
+        cta: '浏览资源',
+        preview: { kind: 'resources' },
       },
     ],
   },
   en: {
     title: 'Where to start',
     description:
-      'Choose an entry point for your current stage: structured learning, looking up resources, hands-on examples or the research literature.',
+      'Choose an entry point for your current stage: hands-on examples, the literature, the history, structured learning or looking up resources.',
+    stages: [
+      'Learn the concepts',
+      'Complete the official tutorial',
+      'Refine the mappings',
+      'Explore research topics',
+    ],
     entries: [
       {
-        icon: 'route',
-        title: 'Learning path',
-        text: 'Four stages that lead from the core concepts to mapping engineering and research topics.',
-        href: '/learn/',
-        cta: 'View the path',
-      },
-      {
-        icon: 'grid',
-        title: 'Resources',
-        text: `${total} resources in six categories: standards, tools, tutorials and case studies, benchmarks, papers and the related ecosystem.`,
-        href: '/resources/',
-        cta: 'Browse resources',
-      },
-      {
+        id: 'examples',
         icon: 'map',
         title: 'Interactive examples',
         text: 'Run GeoSPARQL queries over a 3D city district, or switch eight data sources on and off to compare fused and separate results.',
         href: '/examples/',
         cta: 'Open the examples',
+        preview: { kind: 'shot', name: 'examples', themed: true },
       },
       {
+        id: 'papers',
+        icon: 'file',
+        title: 'Papers and code',
+        text: 'Lectures, surveys, foundational and application papers, and related open-source repositories, also shown as a star map by year and topic.',
+        href: '/papers/',
+        cta: 'Browse papers',
+        preview: { kind: 'shot', name: 'papers', themed: false },
+      },
+      {
+        id: 'history',
         icon: 'rotate',
         title: 'History',
         text: 'From data integration theory to OBDA, OBDM, VKG and OBDF: milestones and lineages across five eras.',
         href: '/history/',
         cta: 'View the timeline',
+        preview: { kind: 'shot', name: 'history', themed: true },
       },
       {
-        icon: 'file',
-        title: 'Papers and code',
-        text: 'Lectures, surveys, foundational and application papers, and related open-source repositories.',
-        href: '/papers/',
-        cta: 'Browse papers',
+        id: 'learn',
+        icon: 'route',
+        title: 'Learning path',
+        text: 'Four stages that lead from the core concepts to mapping engineering and research topics.',
+        href: '/learn/',
+        cta: 'View the path',
+        preview: { kind: 'learn' },
+      },
+      {
+        id: 'resources',
+        icon: 'grid',
+        title: 'Resources',
+        text: `${total} resources in six categories: standards, tools, tutorials and case studies, benchmarks, papers and the related ecosystem.`,
+        href: '/resources/',
+        cta: 'Browse resources',
+        preview: { kind: 'resources' },
       },
     ],
   },
 };
 const t = texts[lang];
+const shot = (name: string, theme: string) => `/previews/${name}-${lang}-${theme}.webp`;
 ---
 
 <section class="section section-rule" aria-labelledby="entry-title">
@@ -102,17 +150,79 @@ const t = texts[lang];
     <SectionHeading id="entry-title" title={t.title} description={t.description} />
     <ul class="entries" role="list">
       {t.entries.map((entry, i) => (
-        <li data-reveal style={`--reveal-delay:${i * 90}ms`}>
+        <li class={`entry-${entry.id}`} data-reveal style={`--reveal-delay:${(i % 3) * 90}ms`}>
           <a class="entry spotlight" href={localize(entry.href, lang)}>
-            <span class="entry-icon">
-              <Icon name={entry.icon} size={22} />
-            </span>
-            <h3>{entry.title}</h3>
-            <p>{entry.text}</p>
-            <span class="entry-cta">
-              {entry.cta}
-              <Icon name="arrow-right" size={16} />
-            </span>
+            <div class="window" aria-hidden="true">
+              <div class="window-bar">
+                <span class="dots">
+                  <i></i>
+                  <i></i>
+                  <i></i>
+                </span>
+                <span class="url">{localize(entry.href, lang)}</span>
+              </div>
+              <div class="window-body">
+                {entry.preview.kind === 'shot' &&
+                  (entry.preview.themed ? (
+                    <>
+                      <img
+                        class="shot shot-dark"
+                        src={shot(entry.preview.name, 'dark')}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      <img
+                        class="shot shot-light"
+                        src={shot(entry.preview.name, 'light')}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </>
+                  ) : (
+                    <img
+                      class="shot"
+                      src={shot(entry.preview.name, 'dark')}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  ))}
+                {entry.preview.kind === 'learn' && (
+                  <ol class="mock-learn">
+                    {t.stages.map((stage, k) => (
+                      <li style={`--k:${k}`}>
+                        <span class="mock-node">{String(k + 1).padStart(2, '0')}</span>
+                        <span class="mock-stage">{stage}</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {entry.preview.kind === 'resources' && (
+                  <ul class="mock-resources">
+                    {groups.map((group, k) => (
+                      <li style={`--k:${k};--w:${group.items.length / maxCount}`}>
+                        <span class="mock-label">{group.category.label}</span>
+                        <span class="mock-bar" />
+                        <span class="mock-count">{group.items.length}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <div class="entry-body">
+              <h3>
+                <Icon name={entry.icon} size={18} />
+                {entry.title}
+              </h3>
+              <p>{entry.text}</p>
+              <span class="entry-cta">
+                {entry.cta}
+                <Icon name="arrow-right" size={16} />
+              </span>
+            </div>
           </a>
         </li>
       ))}
@@ -123,43 +233,248 @@ const t = texts[lang];
 <style>
   .entries {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 16px;
+  }
+
+  .entries > li {
+    grid-column: span 2;
+  }
+
+  .entries > .entry-examples,
+  .entries > .entry-papers {
+    grid-column: span 3;
   }
 
   .entry {
     display: flex;
     flex-direction: column;
     height: 100%;
-    padding: 30px 24px 26px;
+    overflow: hidden;
   }
 
   .entry:hover {
-    transform: translateY(-3px);
+    transform: translateY(-4px);
   }
 
-  .entry-icon {
+  /* 预览：仿浏览器窗口 */
+  .window {
+    margin: 14px 14px 0;
+    border-radius: 10px 10px 0 0;
+    border: 1px solid var(--line);
+    border-bottom: 0;
+    background: var(--bg-elev);
+    overflow: hidden;
+  }
+
+  .window-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 28px;
+    padding: 0 10px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface-2);
+  }
+
+  .dots {
+    display: flex;
+    gap: 5px;
+  }
+
+  .dots i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--line-strong);
+  }
+
+  .url {
+    flex: 1;
+    min-width: 0;
+    padding: 1px 10px;
+    border-radius: 999px;
+    background: var(--surface);
+    font: 11px/1.6 var(--font-mono);
+    color: var(--faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .window-body {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+  }
+
+  .entry-history .window-body,
+  .entry-learn .window-body,
+  .entry-resources .window-body {
+    aspect-ratio: 16 / 10;
+  }
+
+  .shot {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top left;
+    transition: transform 1.2s var(--ease);
+  }
+
+  .entry:hover .shot {
+    transform: scale(1.06) translate(-1%, -1%);
+  }
+
+  .shot-light,
+  :global([data-theme='light']) .shot-dark {
+    display: none;
+  }
+
+  :global([data-theme='light']) .shot-light {
+    display: block;
+  }
+
+  /* 学习路径示意 */
+  .mock-learn {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    align-content: center;
+    gap: 10px;
+    padding: 16px 22px;
+    background: radial-gradient(ellipse 80% 70% at 30% 50%, var(--accent-soft), transparent);
+  }
+
+  .mock-learn::before {
+    content: '';
+    position: absolute;
+    top: 20%;
+    bottom: 20%;
+    left: 35px;
+    border-left: 1.5px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+
+  .mock-learn li {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: transform 0.5s var(--ease);
+    transition-delay: calc(var(--k) * 50ms);
+  }
+
+  .entry:hover .mock-learn li {
+    transform: translateX(6px);
+  }
+
+  .mock-node {
     display: grid;
     place-items: center;
-    width: 48px;
-    height: 48px;
-    margin-bottom: 40px;
-    border-radius: 14px;
-    background: linear-gradient(140deg, var(--accent-soft), transparent);
-    border: 1px solid var(--line);
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1.5px solid var(--accent);
+    background: var(--surface);
+    font: 600 10.5px var(--font-mono);
     color: var(--accent-ink);
   }
 
+  .mock-learn li:first-child .mock-node {
+    background: var(--accent);
+    color: #041015;
+    box-shadow: 0 0 12px var(--glow);
+  }
+
+  .mock-stage {
+    padding: 4px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    font-size: 12.5px;
+    color: var(--ink-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* 资源索引示意：各分类的数量 */
+  .mock-resources {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    align-content: center;
+    gap: 9px;
+    padding: 16px 22px;
+    background: radial-gradient(ellipse 80% 70% at 70% 50%, var(--accent-soft), transparent);
+  }
+
+  .mock-resources li {
+    display: grid;
+    grid-template-columns: 6.5em minmax(0, 1fr) 2em;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .mock-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mock-bar {
+    height: 10px;
+    border-radius: 999px;
+    background: linear-gradient(
+      90deg,
+      var(--accent),
+      color-mix(in srgb, var(--accent) 50%, transparent)
+    );
+    transform: scaleX(calc(var(--w) * 0.85 + 0.15));
+    transform-origin: left;
+    transition: transform 0.6s var(--ease);
+    transition-delay: calc(var(--k) * 40ms);
+  }
+
+  .entry:hover .mock-bar {
+    transform: scaleX(1);
+  }
+
+  .mock-count {
+    font: 600 12px var(--font-mono);
+    color: var(--ink-2);
+    text-align: right;
+  }
+
+  /* 文字 */
+  .entry-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    padding: 20px 24px 22px;
+    border-top: 1px solid var(--line);
+  }
+
   h3 {
-    font-size: 22px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 20px;
     font-weight: 700;
     letter-spacing: -0.015em;
   }
 
-  p {
-    margin-top: 10px;
+  h3 :global(svg) {
+    color: var(--accent-ink);
+  }
+
+  .entry-body p {
+    margin-top: 8px;
     color: var(--muted);
-    font-size: 15px;
+    font-size: 14.5px;
   }
 
   .entry-cta {
@@ -167,7 +482,7 @@ const t = texts[lang];
     align-items: center;
     gap: 6px;
     margin-top: auto;
-    padding-top: 28px;
+    padding-top: 18px;
     font-size: 14px;
     color: var(--accent-ink);
   }
@@ -180,25 +495,37 @@ const t = texts[lang];
     transform: translateX(4px);
   }
 
-  @media (max-width: 1180px) {
-    .entries {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-  }
-
-  @media (max-width: 860px) {
+  @media (max-width: 980px) {
     .entries {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .entries > li,
+    .entries > .entry-examples,
+    .entries > .entry-papers {
+      grid-column: span 1;
+    }
+
+    .entries > .entry-resources {
+      grid-column: span 2;
+    }
+
+    .entry-resources .window-body {
+      aspect-ratio: 3 / 1;
     }
   }
 
   @media (max-width: 640px) {
     .entries {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
 
-    .entry-icon {
-      margin-bottom: 24px;
+    .entries > .entry-resources {
+      grid-column: span 1;
+    }
+
+    .entry-resources .window-body {
+      aspect-ratio: 16 / 10;
     }
   }
 </style>

@@ -1,5 +1,5 @@
 ---
-import ProjectionGraph from './ProjectionGraph.astro';
+import FanOutGraph from './FanOutGraph.astro';
 import Icon from '../ui/Icon.astro';
 import { categoriesOf } from '../../data/categories';
 import { site } from '../../data/site';
@@ -13,7 +13,7 @@ const t = {
   zh: {
     label: '虚拟知识图谱 · OBDA · 资源索引',
     browse: '浏览资源',
-    how: '了解工作原理',
+    what: '能做什么',
     resources: '收录资源',
     resourceCount: `${total} 项`,
     categories: '资源分类',
@@ -23,7 +23,7 @@ const t = {
   en: {
     label: 'Virtual knowledge graphs · OBDA · Resources',
     browse: 'Browse resources',
-    how: 'How it works',
+    what: 'What it does',
     resources: 'Resources',
     resourceCount: String(total),
     categories: 'Categories',
@@ -53,22 +53,23 @@ const t = {
       {lang === 'zh' ? (
         <p class="hero-lede">
           虚拟知识图谱（Virtual Knowledge
-          Graph，VKG）以本体和映射为桥梁，将关系数据库中的数据呈现为知识图谱。数据保留在原始数据源中，SPARQL
-          查询在执行时被改写为 SQL。
+          Graph，VKG）用一套业务词汇查询分散在多个数据库中的数据。本体定义词汇，映射把词汇关联到各数据源的表与列，SPARQL
+          查询在执行时改写为 SQL，数据保留在原始数据源中，无需迁移或复制。
         </p>
       ) : (
         <p class="hero-lede">
-          A virtual knowledge graph (VKG) presents the data in relational databases as a knowledge
-          graph, using an ontology and mappings as the bridge. The data stays in the original
-          sources, and SPARQL queries are rewritten into SQL at query time.
+          A virtual knowledge graph (VKG) lets you query data spread across many databases in one
+          business vocabulary. An ontology defines the vocabulary, mappings tie it to the tables and
+          columns of each source, and SPARQL queries are rewritten into SQL at query time. The data
+          stays in the original sources, with no migration or copying.
         </p>
       )}
       <div class="hero-actions">
         <a class="btn btn-primary" href={localize('/resources/', lang)}>
           {t.browse} <Icon name="arrow-right" />
         </a>
-        <a class="btn" href="#how">
-          {t.how}
+        <a class="btn" href="#what">
+          {t.what}
         </a>
       </div>
       <dl class="hero-facts">
@@ -90,7 +91,7 @@ const t = {
     </div>
 
     <div class="hero-visual" data-tilt>
-      <ProjectionGraph />
+      <FanOutGraph />
     </div>
   </div>
 </section>

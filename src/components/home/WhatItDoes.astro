@@ -1,0 +1,1086 @@
+---
+/**
+ * 首页“能做什么”：同一个业务问题，分别用直接查询各数据库与虚拟知识图谱两种方式回答。
+ * 两种方式共用左侧的三个数据库；连线由 scripts/compare.ts 按元素位置绘制。
+ */
+import Icon from '../ui/Icon.astro';
+import SectionHeading from '../ui/SectionHeading.astro';
+import { langOf, type Lang } from '../../i18n';
+import { SAMPLE_ROWS } from './sample';
+
+const lang = langOf(Astro.url.pathname);
+
+interface Texts {
+  title: string;
+  description: string;
+  question: string;
+  questionText: string;
+  modes: { sql: string; vkg: string };
+  modesLabel: string;
+  steps: [string, string, string, string];
+  ontopSub: string;
+  manual: string;
+  hover: string;
+  result: string;
+  rows: (n: number) => string;
+  head: [string, string, string];
+  metrics: { label: string; sql: string; vkg: string }[];
+  foot: string;
+}
+
+const texts: Record<Lang, Texts> = {
+  zh: {
+    title: '能做什么',
+    description:
+      '企业数据通常分散在多个数据库中，各库的表结构与命名规则各不相同。以油气勘探数据为例，下面用两种方式回答同一个业务问题。',
+    question: '业务问题',
+    questionText: '列出 2010 年以后完钻、由 Equinor 作业的油田中的井，以及所属油田与完钻年份。',
+    modes: { sql: '直接查询各数据库', vkg: '虚拟知识图谱' },
+    modesLabel: '查询方式',
+    steps: [
+      '在 company 库中查出 Equinor 的公司编号',
+      '在 FIELD 库中按公司编号查出油田',
+      '在 wellbore 库中查出 2010 年以后完钻的井',
+      '在应用代码中按油田编号合并结果',
+    ],
+    ontopSub: '本体 · 映射',
+    manual: '跨库关联须人工对照编号',
+    hover: '悬停高亮的词汇，查看它映射到的列。',
+    result: '结果',
+    rows: (n) => `${n} 行`,
+    head: ['井', '油田', '完钻年份'],
+    metrics: [
+      { label: '需要了解的表结构', sql: '3 张表、8 列', vkg: '无，只用本体词汇' },
+      { label: '查询代码', sql: '3 段 SQL 与合并代码', vkg: '1 条 SPARQL' },
+      { label: '跨库关联', sql: '人工编写', vkg: '由映射与引擎完成' },
+      { label: '表结构变化时', sql: '修改所有相关查询', vkg: '只修改映射' },
+    ],
+    foot: '三个数据库经联邦引擎（如 Trino、Dremio）作为一个数据源接入 Ontop。示例中的表与数据为简化形式。',
+  },
+  en: {
+    title: 'What it does',
+    description:
+      'Enterprise data is usually spread across several databases, each with its own table structures and naming rules. Using oil and gas exploration data as an example, the same business question is answered in two ways below.',
+    question: 'Business question',
+    questionText:
+      'List the wells completed since 2010 in fields operated by Equinor, with their field and completion year.',
+    modes: { sql: 'Query each database', vkg: 'Virtual knowledge graph' },
+    modesLabel: 'Approach',
+    steps: [
+      "Look up Equinor's company ID in the company database",
+      'Find its fields in the FIELD database by company ID',
+      'Find the wells completed since 2010 in the wellbore database',
+      'Join the results by field ID in application code',
+    ],
+    ontopSub: 'Ontology · mappings',
+    manual: 'Cross-database joins require matching IDs by hand',
+    hover: 'Hover a highlighted term to see the columns it maps to.',
+    result: 'Result',
+    rows: (n) => (n === 1 ? '1 row' : `${n} rows`),
+    head: ['Well', 'Field', 'Completed'],
+    metrics: [
+      { label: 'Schemas to know', sql: '3 tables, 8 columns', vkg: 'None, only ontology terms' },
+      { label: 'Query code', sql: '3 SQL queries and join code', vkg: '1 SPARQL query' },
+      {
+        label: 'Cross-database joins',
+        sql: 'Written by hand',
+        vkg: 'Handled by mappings and the engine',
+      },
+      {
+        label: 'When a schema changes',
+        sql: 'Update every affected query',
+        vkg: 'Update the mappings only',
+      },
+    ],
+    foot: 'The three databases are connected to Ontop as a single source through a federation engine such as Trino or Dremio. Tables and data are simplified.',
+  },
+};
+const t = texts[lang];
+
+/** 数据库与列；term 为映射到该列的本体词汇，link 为跨库关联时需对照的列。 */
+const databases = [
+  {
+    key: 'wellbore',
+    engine: 'PostgreSQL',
+    columns: [
+      { name: 'wlb_name', type: 'text', term: 'wellName' },
+      { name: 'wlb_compl_year', type: 'int', term: 'completionYear' },
+      { name: 'fld_id', type: 'int', term: 'inField', link: 'field' },
+      { name: 'wlb_purpose', type: 'text' },
+    ],
+  },
+  {
+    key: 'FIELD',
+    engine: 'Oracle',
+    columns: [
+      { name: 'FLD_NPDID', type: 'NUMBER', term: 'inField', link: 'field' },
+      { name: 'FLD_NAME', type: 'VARCHAR2', term: 'fieldName' },
+      { name: 'CMP_ID', type: 'VARCHAR2', term: 'operator', link: 'company' },
+      { name: 'FLD_STATUS', type: 'VARCHAR2' },
+    ],
+  },
+  {
+    key: 'company',
+    engine: 'MySQL',
+    columns: [
+      { name: 'cmp_id', type: 'varchar', term: 'operator', link: 'company' },
+      { name: 'cmp_long_name', type: 'varchar', term: 'Equinor' },
+      { name: 'cmp_country', type: 'char(2)' },
+    ],
+  },
+];
+
+/** SPARQL 各行，每段为 [类别, 文字, 词汇]。 */
+const SPARQL: [string, string, string?][][] = [
+  [
+    ['k', 'SELECT'],
+    ['v', ' ?well ?field ?year'],
+    ['k', ' WHERE'],
+    ['', ' {'],
+  ],
+  [
+    ['v', '  ?w'],
+    ['', ' '],
+    ['t', ':name', 'wellName'],
+    ['v', ' ?well'],
+    ['', ' ;'],
+  ],
+  [
+    ['', '     '],
+    ['t', ':completionYear', 'completionYear'],
+    ['v', ' ?year'],
+    ['', ' ;'],
+  ],
+  [
+    ['', '     '],
+    ['t', ':inField', 'inField'],
+    ['v', ' ?f'],
+    ['', ' .'],
+  ],
+  [
+    ['v', '  ?f'],
+    ['', ' '],
+    ['t', ':name', 'fieldName'],
+    ['v', ' ?field'],
+    ['', ' ;'],
+  ],
+  [
+    ['', '     '],
+    ['t', ':operator', 'operator'],
+    ['', ' '],
+    ['t', ':Equinor', 'Equinor'],
+    ['', ' .'],
+  ],
+  [
+    ['k', '  FILTER'],
+    ['', ' ('],
+    ['v', '?year'],
+    ['', ' >= 2010)'],
+  ],
+  [['', '}']],
+];
+
+/** 直接查询时的步骤：按执行顺序排列，与左侧数据库的顺序不同。 */
+const queries = [
+  {
+    db: 'company',
+    code: [
+      [
+        ['k', 'SELECT'],
+        ['', ' cmp_id '],
+        ['k', 'FROM'],
+        ['', ' company'],
+      ],
+      [
+        ['k', 'WHERE'],
+        ['', ' cmp_long_name = '],
+        ['s', "'Equinor Energy AS'"],
+        ['', ';'],
+      ],
+    ],
+  },
+  {
+    db: 'FIELD',
+    code: [
+      [
+        ['k', 'SELECT'],
+        ['', ' FLD_NPDID, FLD_NAME '],
+        ['k', 'FROM'],
+        ['', ' FIELD'],
+      ],
+      [
+        ['k', 'WHERE'],
+        ['', ' CMP_ID = '],
+        ['s', "'C0179'"],
+        ['', ';'],
+      ],
+    ],
+  },
+  {
+    db: 'wellbore',
+    code: [
+      [
+        ['k', 'SELECT'],
+        ['', ' wlb_name, wlb_compl_year, fld_id'],
+      ],
+      [
+        ['k', 'FROM'],
+        ['', ' wellbore '],
+        ['k', 'WHERE'],
+        ['', ' wlb_compl_year >= 2010;'],
+      ],
+    ],
+  },
+  {
+    db: 'app',
+    code: [
+      [
+        ['', 'fields = {f.FLD_NPDID: f '],
+        ['k', 'for'],
+        ['', ' f '],
+        ['k', 'in'],
+        ['', ' q2}'],
+      ],
+      [['', 'rows = [(w.wlb_name, fields[w.fld_id].FLD_NAME, ...)']],
+      [
+        ['', '        '],
+        ['k', 'for'],
+        ['', ' w '],
+        ['k', 'in'],
+        ['', ' q3 '],
+        ['k', 'if'],
+        ['', ' w.fld_id '],
+        ['k', 'in'],
+        ['', ' fields]'],
+      ],
+    ],
+  },
+] as { db: string; code: [string, string][][] }[];
+
+const escape = (text: string) =>
+  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** 把按行分段的代码渲染为 HTML；带词汇的片段渲染为可悬停的按钮。 */
+const highlight = (lines: [string, string, string?][][]) =>
+  lines
+    .map((line) =>
+      line
+        .map(([cls, text, term]) =>
+          term
+            ? `<button type="button" class="term" data-term="${term}">${escape(text)}</button>`
+            : cls
+              ? `<span class="${cls}">${escape(text)}</span>`
+              : escape(text),
+        )
+        .join(''),
+    )
+    .join('\n');
+---
+
+<section class="what section" id="what" aria-labelledby="what-title">
+  <div class="what-glow" aria-hidden="true"></div>
+  <div class="container">
+    <SectionHeading id="what-title" title={t.title} description={t.description} />
+
+    <div class="compare" data-compare data-mode="sql" data-reveal>
+      <div class="compare-top">
+        <p class="question">
+          <span class="question-label">{t.question}</span>
+          <span class="question-text">{t.questionText}</span>
+        </p>
+        <div class="modes" role="group" aria-label={t.modesLabel}>
+          <span class="modes-thumb" aria-hidden="true"></span>
+          <button type="button" data-mode-button="sql" aria-pressed="true">
+            {t.modes.sql}
+          </button>
+          <button type="button" data-mode-button="vkg" aria-pressed="false">
+            <Icon name="sparkles" size={15} />
+            {t.modes.vkg}
+          </button>
+        </div>
+      </div>
+
+      <div class="stage" data-stage>
+        <svg class="wires" aria-hidden="true" data-wires></svg>
+
+        <!-- 数据库 -->
+        <div class="dbs">
+          {databases.map((db) => (
+            <div class="db" data-anchor={`db-${db.key}`}>
+              <p class="db-head">
+                <Icon name="database" size={15} />
+                <span class="db-name">{db.key}</span>
+                <span class="db-engine">{db.engine}</span>
+              </p>
+              <ul role="list">
+                {db.columns.map((col) => (
+                  <li
+                    data-term={col.term}
+                    data-link={col.link}
+                    data-anchor={col.link ? `col-${db.key}-${col.name}` : undefined}
+                  >
+                    <span class="col-name">{col.name}</span>
+                    <span class="col-type">{col.type}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <!-- 中间：VKG 方式下的 Ontop -->
+        <div class="hub">
+          <div class="ontop" data-anchor="ontop">
+            <span class="ontop-name">Ontop</span>
+            <span class="ontop-sub">{t.ontopSub}</span>
+          </div>
+        </div>
+
+        <!-- 右侧：两种方式各自的工作区，叠放在同一格中 -->
+        <div class="work">
+          <div class="pane pane-sql" aria-hidden="false" data-pane="sql">
+            {queries.map((query, i) => (
+              <div
+                class:list={['step', { 'step-app': query.db === 'app' }]}
+                data-anchor={`q-${query.db}`}
+              >
+                <p class="step-head">
+                  <span class="step-no">{i + 1}</span>
+                  <span>{t.steps[i]}</span>
+                </p>
+                <pre class="code"><code set:html={highlight(query.code)} /></pre>
+              </div>
+            ))}
+            <p class="manual">
+              <span class="manual-dash" aria-hidden="true"></span>
+              {t.manual}
+            </p>
+          </div>
+
+          <div class="pane pane-vkg" aria-hidden="true" data-pane="vkg">
+            <div class="sparql" data-anchor="sparql">
+              <p class="sparql-head">query.rq</p>
+              <pre class="code"><code set:html={highlight(SPARQL)} /></pre>
+              <p class="sparql-hint">{t.hover}</p>
+            </div>
+            <div class="answer">
+              <p class="answer-head">
+                {t.result} <span>{t.rows(SAMPLE_ROWS.length)}</span>
+              </p>
+              <table>
+                <thead>
+                  <tr>
+                    {t.head.map((label) => (
+                      <th>{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {SAMPLE_ROWS.map((row, i) => (
+                    <tr style={`--i:${i}`}>
+                      {row.map((cell) => (
+                        <td>{cell}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <dl class="metrics">
+        {t.metrics.map((metric, i) => (
+          <div class="metric" style={`--i:${i}`}>
+            <dt>{metric.label}</dt>
+            <dd>
+              <span class="metric-sql">{metric.sql}</span>
+              <span class="metric-vkg">{metric.vkg}</span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+
+    <p class="what-foot" data-reveal>
+      {t.foot}
+    </p>
+  </div>
+</section>
+
+<style>
+  .what {
+    position: relative;
+    overflow: clip;
+  }
+
+  .what-glow {
+    position: absolute;
+    top: 18%;
+    left: 50%;
+    width: min(1100px, 90vw);
+    height: 520px;
+    transform: translateX(-50%);
+    background: radial-gradient(closest-side, var(--accent-soft), transparent);
+    filter: blur(40px);
+    opacity: 0;
+    transition: opacity 1s;
+    pointer-events: none;
+  }
+
+  .what:has([data-mode='vkg']) .what-glow {
+    opacity: 1;
+  }
+
+  .compare {
+    position: relative;
+    border-radius: 22px;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, var(--surface) 70%, transparent);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(6px);
+  }
+
+  /* 顶部：问题与切换 */
+  .compare-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px 32px;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .question {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex: 1 1 420px;
+    min-width: 0;
+  }
+
+  .question-label {
+    flex: none;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+
+  .question-text {
+    font-size: 16px;
+    font-weight: 550;
+    color: var(--ink);
+  }
+
+  .modes {
+    position: relative;
+    display: inline-grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 4px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface-2);
+  }
+
+  .modes button {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 16px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--muted);
+    white-space: nowrap;
+    transition: color 0.3s;
+  }
+
+  .modes button[aria-pressed='true'] {
+    color: var(--ink);
+  }
+
+  [data-mode='vkg'] .modes button[aria-pressed='true'] {
+    color: #041015;
+  }
+
+  .modes-thumb {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 4px;
+    width: calc(50% - 4px);
+    border-radius: 999px;
+    background: var(--surface);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+    transition:
+      transform 0.5s var(--ease),
+      background-color 0.5s;
+  }
+
+  [data-mode='vkg'] .modes-thumb {
+    transform: translateX(100%);
+    background: var(--accent);
+    box-shadow: 0 6px 24px -6px var(--glow);
+  }
+
+  /* 未切换过时，提示可以切换 */
+  .compare:not([data-touched]) [data-mode-button='vkg']::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: inherit;
+    border: 1px solid var(--accent);
+    animation: cmp-hint 2.4s var(--ease) infinite;
+  }
+
+  @keyframes cmp-hint {
+    0% {
+      opacity: 0.8;
+      transform: scale(0.96);
+    }
+    70%,
+    100% {
+      opacity: 0;
+      transform: scale(1.08);
+    }
+  }
+
+  /* 舞台：数据库 | 中间 | 工作区 */
+  .stage {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 0.78fr) clamp(150px, 16vw, 210px) minmax(0, 1.22fr);
+    padding: 32px 28px 32px 56px;
+  }
+
+  .wires {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  :global(.wire) {
+    fill: none;
+    stroke-width: 1.4;
+    transition:
+      opacity 0.5s,
+      stroke 0.3s;
+  }
+
+  :global(.wire-sql) {
+    stroke: var(--line-strong);
+    stroke-dasharray: 4 5;
+  }
+
+  :global(.wire-link) {
+    stroke: var(--warn);
+    stroke-width: 1.5;
+    stroke-dasharray: 2 4;
+    animation: cmp-wire-flow 1.2s linear infinite;
+  }
+
+  :global(.wire-vkg) {
+    stroke: var(--accent);
+    stroke-dasharray: 3 7;
+    animation: cmp-wire-flow 1.2s linear infinite;
+  }
+
+  :global(.wire-vkg-base) {
+    stroke: color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+
+  :global(.wire.is-hot) {
+    stroke-width: 2.4;
+    stroke-dasharray: none;
+    filter: drop-shadow(0 0 4px var(--glow));
+  }
+
+  @keyframes cmp-wire-flow {
+    to {
+      stroke-dashoffset: -20;
+    }
+  }
+
+  /* 数据库卡片 */
+  .dbs {
+    display: grid;
+    align-content: center;
+    gap: 22px;
+  }
+
+  .db {
+    position: relative;
+    z-index: 1;
+    border-radius: 12px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .db-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--accent-ink);
+  }
+
+  .db-name {
+    font: 600 13px var(--font-mono);
+    color: var(--ink);
+  }
+
+  .db-engine {
+    margin-left: auto;
+    font-size: 11.5px;
+    color: var(--faint);
+  }
+
+  .db li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 12px;
+    font: 12px/1.6 var(--font-mono);
+    transition:
+      background-color 0.3s,
+      color 0.3s;
+  }
+
+  .db li + li {
+    border-top: 1px solid var(--line);
+  }
+
+  .col-name {
+    color: var(--ink-2);
+  }
+
+  .col-type {
+    color: var(--faint);
+    font-size: 11px;
+  }
+
+  /* 直接查询：需对照的列标为警示色 */
+  [data-mode='sql'] .db li[data-link] {
+    background: color-mix(in srgb, var(--warn) 9%, transparent);
+  }
+
+  [data-mode='sql'] .db li[data-link] .col-name {
+    color: var(--warn);
+  }
+
+  /* VKG：映射到本体词汇的列标为主题色，悬停词汇时高亮 */
+  [data-mode='vkg'] .db li[data-term] .col-name {
+    color: var(--accent-ink);
+  }
+
+  .db li.is-hot {
+    background: var(--accent-soft);
+  }
+
+  .db li.is-hot .col-name {
+    font-weight: 600;
+  }
+
+  /* 中间 */
+  .hub {
+    position: relative;
+    display: grid;
+    place-items: center;
+  }
+
+  .ontop {
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    padding: 14px 10px;
+    width: 116px;
+    border-radius: 14px;
+    border: 1px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    box-shadow: 0 0 0 0 var(--glow);
+    opacity: 0;
+    transform: scale(0.85);
+    transition:
+      opacity 0.5s var(--ease),
+      transform 0.6s var(--ease);
+  }
+
+  [data-mode='vkg'] .ontop {
+    opacity: 1;
+    transform: none;
+    animation: cmp-hub-pulse 2.4s var(--ease) infinite 0.6s;
+  }
+
+  @keyframes cmp-hub-pulse {
+    0% {
+      box-shadow: 0 0 0 0 var(--glow);
+    }
+    70%,
+    100% {
+      box-shadow: 0 0 0 14px transparent;
+    }
+  }
+
+  .ontop-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .ontop-sub {
+    font-size: 11.5px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  /* 工作区：两个面板叠放在同一格，高度取两者较大者 */
+  .work {
+    display: grid;
+  }
+
+  .pane {
+    grid-area: 1 / 1;
+    display: grid;
+    align-content: center;
+    gap: 12px;
+    transition:
+      opacity 0.45s var(--ease),
+      transform 0.6s var(--ease),
+      filter 0.45s;
+  }
+
+  .pane[aria-hidden='true'] {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(4px);
+    visibility: hidden;
+    transition:
+      opacity 0.3s,
+      transform 0.3s,
+      filter 0.3s,
+      visibility 0s 0.3s;
+  }
+
+  .step,
+  .sparql,
+  .answer {
+    position: relative;
+    z-index: 1;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--code-bg);
+    overflow: hidden;
+  }
+
+  .step-head,
+  .sparql-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 12px;
+    border-bottom: 1px solid rgb(255 255 255 / 0.07);
+    font-size: 12.5px;
+    color: #c8ccd1;
+  }
+
+  .sparql-head {
+    font-family: var(--font-mono);
+    color: var(--code-faint);
+  }
+
+  .step-no {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgb(255 255 255 / 0.08);
+    font: 600 11px var(--font-mono);
+    color: var(--code-ink);
+  }
+
+  .step-app .step-no {
+    background: color-mix(in srgb, var(--warn) 30%, transparent);
+  }
+
+  .code {
+    margin: 0;
+    padding: 10px 14px;
+    font: 12.5px/1.75 var(--font-mono);
+    color: var(--code-ink);
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .code code {
+    font: inherit;
+  }
+
+  .code :global(.k) {
+    color: var(--code-kw);
+  }
+
+  .code :global(.v) {
+    color: var(--code-faint);
+  }
+
+  .code :global(.s) {
+    color: var(--code-str);
+  }
+
+  .code :global(.term) {
+    padding: 0 2px;
+    margin: 0 -2px;
+    border-radius: 4px;
+    font: inherit;
+    color: var(--code-var);
+    cursor: help;
+    transition:
+      background-color 0.2s,
+      color 0.2s;
+  }
+
+  .code :global(.term:hover),
+  .code :global(.term.is-hot) {
+    background: color-mix(in srgb, var(--code-var) 20%, transparent);
+  }
+
+  .sparql .code {
+    padding-block: 14px;
+    font-size: 13px;
+  }
+
+  .sparql-hint {
+    padding: 0 14px 12px;
+    font-size: 12px;
+    color: var(--code-faint);
+  }
+
+  .manual {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--warn);
+  }
+
+  .manual-dash {
+    width: 26px;
+    border-top: 1.5px dashed var(--warn);
+  }
+
+  /* 依次出现：直接查询的步骤、VKG 的结果行 */
+  [data-mode='sql'] .step {
+    animation: cmp-step-in 0.5s var(--ease) both;
+  }
+
+  [data-mode='sql'] .step:nth-child(2) {
+    animation-delay: 0.08s;
+  }
+
+  [data-mode='sql'] .step:nth-child(3) {
+    animation-delay: 0.16s;
+  }
+
+  [data-mode='sql'] .step:nth-child(4) {
+    animation-delay: 0.24s;
+  }
+
+  @keyframes cmp-step-in {
+    from {
+      opacity: 0;
+      transform: translateX(10px);
+    }
+  }
+
+  .answer {
+    background: var(--surface);
+    border-color: var(--line-strong);
+  }
+
+  .answer-head {
+    padding: 9px 14px 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+
+  .answer-head span {
+    margin-left: 8px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    font-size: 12px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font: 12.5px/1.6 var(--font-mono);
+  }
+
+  th {
+    padding: 6px 14px;
+    text-align: left;
+    font: 400 12px var(--font-sans);
+    color: var(--faint);
+    border-bottom: 1px solid var(--line);
+  }
+
+  td {
+    padding: 6px 14px;
+    color: var(--ink-2);
+  }
+
+  tbody tr + tr td {
+    border-top: 1px solid var(--line);
+  }
+
+  [data-mode='vkg'] tbody tr {
+    animation: cmp-row-in 0.5s var(--ease) both;
+    animation-delay: calc(500ms + var(--i) * 120ms);
+  }
+
+  @keyframes cmp-row-in {
+    from {
+      opacity: 0;
+      transform: translateX(-8px);
+    }
+  }
+
+  /* 对比指标 */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-top: 1px solid var(--line);
+  }
+
+  .metric {
+    padding: 18px 24px 20px;
+  }
+
+  .metric + .metric {
+    border-left: 1px solid var(--line);
+  }
+
+  .metric dt {
+    font-size: 12.5px;
+    color: var(--faint);
+  }
+
+  .metric dd {
+    display: grid;
+    margin-top: 6px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .metric dd span {
+    grid-area: 1 / 1;
+    transition:
+      opacity 0.4s,
+      transform 0.5s var(--ease);
+    transition-delay: calc(var(--i) * 60ms);
+  }
+
+  .metric-sql {
+    color: var(--ink-2);
+  }
+
+  .metric-vkg {
+    color: var(--accent-ink);
+  }
+
+  [data-mode='sql'] .metric-vkg,
+  [data-mode='vkg'] .metric-sql {
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+  }
+
+  .what-foot {
+    margin-top: 20px;
+    font-size: 14px;
+    color: var(--faint);
+  }
+
+  /* 窄屏：纵向排列，不画连线 */
+  @media (max-width: 900px) {
+    .stage {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 20px;
+      padding: 20px 16px;
+    }
+
+    .wires {
+      display: none;
+    }
+
+    .dbs {
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .hub {
+      display: none;
+    }
+
+    .metrics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .metric:nth-child(3) {
+      border-left: 0;
+    }
+
+    .metric:nth-child(n + 3) {
+      border-top: 1px solid var(--line);
+    }
+  }
+
+  @media (max-width: 560px) {
+    .compare-top {
+      padding: 16px;
+    }
+
+    .question {
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .modes {
+      width: 100%;
+    }
+
+    .modes button {
+      padding: 0 8px;
+      font-size: 13px;
+    }
+
+    .metrics {
+      grid-template-columns: 1fr;
+    }
+
+    .metric + .metric {
+      border-left: 0;
+      border-top: 1px solid var(--line);
+    }
+  }
+</style>

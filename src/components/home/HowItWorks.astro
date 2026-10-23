@@ -1,11 +1,9 @@
 ---
-import Icon, { type IconName } from '../ui/Icon.astro';
+import Icon from '../ui/Icon.astro';
 import SectionHeading from '../ui/SectionHeading.astro';
 import { langOf, type Lang } from '../../i18n';
 
 const lang = langOf(Astro.url.pathname);
-
-type Principle = { icon: IconName; title: string; text: string };
 
 const texts: Record<
   Lang,
@@ -17,7 +15,6 @@ const texts: Record<
     ontologyOff: string;
     steps: { title: string; file: string; description: string }[];
     names: [string, string, string];
-    principles: Principle[];
     simplified: string;
     noInstances: string;
     emptyResult: string;
@@ -64,23 +61,6 @@ const texts: Record<
       },
     ],
     names: ['林晓', '周宁', '陈老师'],
-    principles: [
-      {
-        icon: 'database',
-        title: '数据不迁移',
-        text: '查询直接在源数据库上执行，结果与源数据保持一致。',
-      },
-      {
-        icon: 'layers',
-        title: '查询与模式解耦',
-        text: 'SPARQL 只依赖本体词汇；表结构变化时，调整映射即可。',
-      },
-      {
-        icon: 'hierarchy',
-        title: '本体扩展答案',
-        text: '类与属性之间的关系在查询改写阶段生效，无需预先物化推理结果。',
-      },
-    ],
     simplified: '-- 简化形式',
     noInstances: '-- 没有映射或公理能推出 :Person 的实例',
     emptyResult: '-- 查询结果为空',
@@ -128,23 +108,6 @@ const texts: Record<
       },
     ],
     names: ['Lin Xiao', 'Zhou Ning', 'Prof. Chen'],
-    principles: [
-      {
-        icon: 'database',
-        title: 'No data migration',
-        text: 'Queries run directly on the source database, so results always match the source data.',
-      },
-      {
-        icon: 'layers',
-        title: 'Queries decoupled from schemas',
-        text: 'SPARQL depends only on the ontology vocabulary; when table structures change, only the mappings need adjusting.',
-      },
-      {
-        icon: 'hierarchy',
-        title: 'Ontologies extend answers',
-        text: 'Relations between classes and properties take effect during query rewriting, without materializing inferences in advance.',
-      },
-    ],
     simplified: '-- simplified',
     noInstances: '-- no mapping or axiom yields instances of :Person',
     emptyResult: '-- the query returns no results',
@@ -168,7 +131,7 @@ const tables = [
 ];
 ---
 
-<section class="how section" id="how" aria-labelledby="how-title">
+<section class="how section section-rule" id="how" aria-labelledby="how-title">
   <div class="container">
     <SectionHeading id="how-title" title={t.title} description={t.description} />
 
@@ -305,18 +268,6 @@ const tables = [
       </div>
     </div>
 
-    <ul class="principles" role="list">
-      {t.principles.map((item, i) => (
-        <li class="principle spotlight" data-reveal style={`--reveal-delay:${i * 90}ms`}>
-          <span class="principle-icon">
-            <Icon name={item.icon} size={20} />
-          </span>
-          <h3>{item.title}</h3>
-          <p>{item.text}</p>
-        </li>
-      ))}
-    </ul>
-
     {lang === 'zh' ? (
       <p class="how-foot" data-reveal>
         示例中的 SQL 为简化形式。实际生成的 SQL 包含表别名与标识符引号，并可能附加{' '}
@@ -340,10 +291,6 @@ const tables = [
 </section>
 
 <style>
-  .how {
-    padding-top: clamp(40px, 5vw, 72px);
-  }
-
   .demo {
     --step-duration: 6s;
     display: grid;
@@ -698,41 +645,6 @@ const tables = [
     color: var(--code-faint);
   }
 
-  /* 三个特点 */
-  .principles {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
-    margin-top: clamp(40px, 6vw, 72px);
-  }
-
-  .principle {
-    padding: 28px;
-  }
-
-  .principle-icon {
-    display: grid;
-    place-items: center;
-    width: 44px;
-    height: 44px;
-    margin-bottom: 20px;
-    border-radius: 12px;
-    border: 1px solid var(--line);
-    background: var(--surface-2);
-    color: var(--accent-ink);
-  }
-
-  .principle h3 {
-    font-size: 18px;
-    font-weight: 650;
-  }
-
-  .principle p {
-    margin-top: 8px;
-    font-size: 15px;
-    color: var(--muted);
-  }
-
   .how-foot {
     margin-top: 32px;
     font-size: 14px;
@@ -758,10 +670,6 @@ const tables = [
     .demo[data-ready] [aria-selected='true'] .step-desc {
       max-height: 0;
       opacity: 0;
-    }
-
-    .principles {
-      grid-template-columns: 1fr;
     }
   }
 
