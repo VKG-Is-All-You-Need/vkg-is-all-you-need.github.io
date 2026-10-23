@@ -368,6 +368,7 @@ function initEras(root: HTMLElement, signal: AbortSignal) {
     if (current.dataset.eraSection !== active) {
       active = current.dataset.eraSection!;
       navLinks.forEach((a, id) => a.classList.toggle('is-active', id === active));
+      sections.forEach((s) => s.classList.toggle('is-current', s === current));
       countTo(Number(current.dataset.from));
     }
     if (progress) {
