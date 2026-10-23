@@ -1,53 +1,19 @@
 ---
 /**
- * 文献星图（文献页的动效版本）：横轴为年份，九条泳道对应论文主题，每篇论文一颗星。
- * 连线取自发展历程页的传承关系；布局在构建时计算，扫描、悬停与筛选联动见 scripts/papers-fx.ts。
+ * 文献星图（文献页的动效版本）：每篇论文一颗星，连线取自发展历程页的传承关系。
+ * 布局由 lib/constellation 中的注册表提供，各布局的坐标与背景都在构建时计算；
+ * 扫描、布局切换、悬停与筛选联动见 scripts/papers-fx.ts。
  */
-import { ERAS, LINKS, MILESTONES, YEAR_FROM, YEAR_TO } from '../../data/history';
-import { PAPER_TOPICS, paperTopics } from '../../data/papers';
+import { LINKS, MILESTONES } from '../../data/history';
+import { PAPER_TOPICS } from '../../data/papers';
 import { langOf, localize } from '../../i18n';
+import { buildContext, buildLayouts } from '../../lib/constellation';
 import { getPapers, getRepos, paperSummary } from '../../lib/papers';
 
 const lang = langOf(Astro.url.pathname);
 const papers = await getPapers();
 const repos = await getRepos();
-const topics = paperTopics(lang);
-
-const PX_PER_YEAR = 42;
-const PAD_X = 30;
-const AXIS_H = 44;
-const LANE_H = 38;
-const HIST_H = 46;
-
-const xOf = (year: number) => PAD_X + (year - YEAR_FROM) * PX_PER_YEAR;
-const width = xOf(YEAR_TO) + PAD_X;
-const lanesBottom = AXIS_H + PAPER_TOPICS.length * LANE_H;
-const height = lanesBottom + HIST_H;
-
-// 同一主题、同一年份的论文聚成一小簇
-const CLUSTER: [number, number][][] = [
-  [[0, 0]],
-  [
-    [-6, 0],
-    [6, 0],
-  ],
-  [
-    [0, -6],
-    [-7, 5],
-    [7, 5],
-  ],
-  [
-    [-6, -6],
-    [6, -6],
-    [-6, 6],
-    [6, 6],
-  ],
-];
-const cells = new Map<string, string[]>();
-for (const paper of papers) {
-  const key = `${paper.data.topic}:${paper.data.year}`;
-  cells.set(key, [...(cells.get(key) ?? []), paper.id]);
-}
+const ctx = buildContext(papers, repos, lang);
 
 const reposByPaper = new Map<string, string[]>();
 for (const repo of repos) {
@@ -59,38 +25,19 @@ for (const repo of repos) {
   }
 }
 
-const stars = papers.map((paper) => {
-  const lane = PAPER_TOPICS.indexOf(paper.data.topic);
-  const cell = cells.get(`${paper.data.topic}:${paper.data.year}`)!;
-  const [dx, dy] = CLUSTER[Math.min(cell.length, 4) - 1][cell.indexOf(paper.id) % 4];
-  const code = Boolean(paper.data.code) || reposByPaper.has(paper.id);
-  return {
-    id: paper.id,
-    lane,
-    year: paper.data.year,
-    x: xOf(paper.data.year) + dx,
-    y: AXIS_H + lane * LANE_H + LANE_H / 2 + dy,
-    code,
-    title: paper.data.title,
-  };
-});
-const starById = new Map(stars.map((star) => [star.id, star]));
-
 // 历程页里程碑之间的传承关系，换算为论文之间的连线
+const paperIds = new Set(papers.map((paper) => paper.id));
 const paperOf = new Map(MILESTONES.filter((m) => m.paper).map((m) => [m.id, m.paper!]));
 const links = LINKS.flatMap(([from, to, kind]) => {
-  const a = starById.get(paperOf.get(from) ?? '');
-  const b = starById.get(paperOf.get(to) ?? '');
-  if (!a || !b || a === b) return [];
-  const dx = Math.max(Math.abs(b.x - a.x), 30) * 0.5;
-  const d = `M${a.x} ${a.y} C${a.x + dx} ${a.y} ${b.x - dx} ${b.y} ${b.x} ${b.y}`;
-  return [{ from: a.id, to: b.id, kind, d }];
+  const a = paperOf.get(from);
+  const b = paperOf.get(to);
+  return a && b && a !== b && paperIds.has(a) && paperIds.has(b) ? [{ from: a, to: b, kind }] : [];
 });
 
-// 每年的论文数，画在底部的柱状条
-const years = Array.from({ length: YEAR_TO - YEAR_FROM + 1 }, (_, i) => YEAR_FROM + i);
-const perYear = years.map((year) => papers.filter((p) => p.data.year === year).length);
-const maxPerYear = Math.max(...perYear);
+const layouts = buildLayouts(ctx, links);
+const initial = layouts[0];
+const maxHeight = Math.max(...layouts.map((layout) => layout.height));
+const maxWidth = Math.max(...layouts.map((layout) => layout.width));
 
 // 背景星点：固定种子的伪随机数，保证每次构建结果一致
 let seed = 20020611;
@@ -100,43 +47,22 @@ const random = () => {
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
-const dust = Array.from({ length: 140 }, () => ({
-  x: random() * width,
-  y: random() * height,
+const dust = Array.from({ length: Math.round((maxWidth * maxHeight) / 4200) }, () => ({
+  x: random() * maxWidth,
+  y: random() * maxHeight,
   r: 0.4 + random() * 0.9,
   o: 0.15 + random() * 0.45,
   d: (random() * 6).toFixed(2),
 }));
 
-// 泳道标签用短名，完整的主题名显示在提示卡片中
-const LANE_SHORT = {
-  zh: topics.map((topic) => topic.label),
-  en: [
-    'Surveys',
-    'Foundations',
-    'Systems',
-    'Construction',
-    'Evolution',
-    'Temporal',
-    'QA',
-    'Benchmarks',
-    'Applications',
-  ],
-}[lang];
-
-const ERA_SHORT = {
-  zh: ['前史与奠基', '系统化', '工业落地', '联邦与视图', '写回与大模型'],
-  en: ['Origins', 'Systems', 'Industry', 'Federation', 'Now'],
-}[lang];
-
-const withCode = stars.filter((star) => star.code).length;
+const withCode = ctx.stars.filter((star) => star.code).length;
+const layoutNames = layouts.map((layout) => layout.label).join(lang === 'zh' ? '、' : ', ');
 
 const t = {
   zh: {
-    label:
-      '文献星图：横轴为年份，九条泳道对应论文主题，每颗星代表一篇论文，带光环的论文附有代码，连线表示发展历程页中的传承关系。',
+    label: `文献星图：每颗星代表一篇论文，带光环的论文附有代码，连线表示发展历程页中的传承关系。可选布局：${layoutNames}。`,
     title: '文献星图',
-    sub: `VKG / OBDA · ${YEAR_FROM}–${YEAR_TO}`,
+    sub: `VKG / OBDA · ${ctx.from}–${ctx.to}`,
     papers: '论文',
     code: '附代码',
     repos: '仓库',
@@ -146,13 +72,12 @@ const t = {
     keyLink: '传承关系（取自发展历程）',
     hint: '悬停或点击星点查看论文 · 搜索会同步点亮星图',
     replay: '重放',
-    perYear: '每年论文数',
+    layout: '布局',
   },
   en: {
-    label:
-      'Paper constellation: years on the horizontal axis and one lane per topic; each star is a paper, a ring marks papers with code, and lines show lineage from the history page.',
+    label: `Paper constellation: each star is a paper, a ring marks papers with code, and lines show lineage from the history page. Layouts: ${layoutNames}.`,
     title: 'Paper constellation',
-    sub: `VKG / OBDA · ${YEAR_FROM}–${YEAR_TO}`,
+    sub: `VKG / OBDA · ${ctx.from}–${ctx.to}`,
     papers: 'papers',
     code: 'with code',
     repos: 'repos',
@@ -162,7 +87,7 @@ const t = {
     keyLink: 'Lineage (from the history page)',
     hint: 'Hover or tap a star for the paper · Search lights up matching stars',
     replay: 'Replay',
-    perYear: 'Papers per year',
+    layout: 'Layout',
   },
 }[lang];
 
@@ -172,9 +97,21 @@ const stats = [
   { value: repos.length, label: t.repos },
   { value: links.length, label: t.links },
 ];
+
+/** 客户端切换布局所需的数据；背景图形已渲染在各自的图层中，不再重复。 */
+const clientLayouts = layouts.map(
+  ({ shapes: _shapes, label: _label, icon: _icon, positions, ...rest }) => ({
+    ...rest,
+    positions: Object.fromEntries(Object.entries(positions).map(([id, p]) => [id, [p.x, p.y]])),
+  }),
+);
 ---
 
-<figure class="constellation" data-constellation>
+<figure
+  class:list={['constellation', { 'is-fit': initial.fit, 'is-stacked': !initial.rows }]}
+  data-constellation
+  data-layout={initial.id}
+>
   <div class="sky">
     <div class="nebula" aria-hidden="true"></div>
     <div class="meteors" aria-hidden="true">
@@ -187,7 +124,20 @@ const stats = [
       <div class="hud-title">
         <span class="hud-pulse" aria-hidden="true"></span>
         <strong>{t.title}</strong>
-        <span>{t.sub}</span>
+        <span class="hud-sub">{t.sub}</span>
+        <div class="layout-switch" role="group" aria-label={t.layout}>
+          {layouts.map((layout, i) => (
+            <button
+              type="button"
+              data-sky-layout={layout.id}
+              aria-pressed={i === 0 ? 'true' : 'false'}
+              title={layout.label}
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true" set:html={layout.icon} />
+              <span>{layout.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
       <dl class="hud-stats">
         {stats.map((stat) => (
@@ -200,21 +150,33 @@ const stats = [
     </header>
 
     <div class="frame">
-      <ol class="lane-labels" aria-hidden="true">
-        {topics.map((topic, i) => (
-          <li style={`top:${AXIS_H + i * LANE_H}px;height:${LANE_H}px;--c:var(--t-${i})`}>
-            <span title={topic.label}>{LANE_SHORT[i]}</span>
+      <ol class="lane-labels" aria-hidden="true" style={`--n:${ctx.topics.length}`}>
+        {ctx.topics.map((topic, i) => (
+          <li
+            data-row
+            style={`--i:${i};--c:${topic.color}${initial.rows ? `;top:${initial.rows[i].top}px;height:${initial.rows[i].height}px` : ''}`}
+          >
+            <span title={topic.label}>{topic.short}</span>
           </li>
         ))}
-        <li class="hist-label" style={`top:${lanesBottom}px;height:${HIST_H}px`}>
-          <span>{t.perYear}</span>
-        </li>
+        {layouts.flatMap((layout) =>
+          (layout.notes ?? []).map((note) => (
+            <li
+              class="note"
+              data-note={layout.id}
+              hidden={layout !== initial}
+              style={`top:${note.top}px;height:${note.height}px`}
+            >
+              <span>{note.text}</span>
+            </li>
+          )),
+        )}
       </ol>
       <div class="scroll" data-sky-scroll tabindex="0" aria-label={t.label}>
         <svg
-          width={width}
-          height={height}
-          viewBox={`0 0 ${width} ${height}`}
+          width={initial.width}
+          height={initial.height}
+          viewBox={`0 0 ${initial.width} ${initial.height}`}
           role="img"
           aria-label={t.label}
           data-sky-svg
@@ -224,6 +186,11 @@ const stats = [
               <stop offset="0" stop-color="#fff" stop-opacity="0.9"></stop>
               <stop offset="0.35" stop-color="currentColor" stop-opacity="0.55"></stop>
               <stop offset="1" stop-color="currentColor" stop-opacity="0"></stop>
+            </radialGradient>
+            <radialGradient id="core-glow">
+              <stop offset="0" stop-color="#bfeaff" stop-opacity="0.85"></stop>
+              <stop offset="0.4" stop-color="#49bbdd" stop-opacity="0.3"></stop>
+              <stop offset="1" stop-color="#49bbdd" stop-opacity="0"></stop>
             </radialGradient>
             <linearGradient id="sweep-glow" x1="0" x2="1">
               <stop offset="0" stop-color="#7fd3ec" stop-opacity="0"></stop>
@@ -242,101 +209,77 @@ const stats = [
             ))}
           </g>
 
-          <g class="eras">
-            {ERAS.map((era, i) => {
-              const x0 = xOf(era.from) - PX_PER_YEAR / 2;
-              const x1 = xOf(era.to) + PX_PER_YEAR / 2;
-              return (
-                <g class:list={['era', { 'era-alt': i % 2 }]}>
-                  <rect x={x0} y={0} width={x1 - x0} height={lanesBottom} />
-                  <text x={x0 + 8} y={15}>
-                    {`${'①②③④⑤'[i]} ${ERA_SHORT[i]}`}
-                  </text>
-                </g>
-              );
-            })}
-          </g>
-
-          <g class="lanes">
-            {PAPER_TOPICS.map((_, i) => (
-              <line
-                x1="0"
-                x2={width}
-                y1={AXIS_H + (i + 1) * LANE_H}
-                y2={AXIS_H + (i + 1) * LANE_H}
-              />
-            ))}
-          </g>
-
-          <g class="axis">
-            {years.map((year) => (
-              <g class:list={['tick', { 'tick-major': year % 5 === 0 }]}>
-                <line x1={xOf(year)} x2={xOf(year)} y1={AXIS_H - 6} y2={lanesBottom} />
-                <text x={xOf(year)} y={AXIS_H - 12}>
-                  {year % 5 === 0 || year === YEAR_TO ? year : `'${String(year).slice(2)}`}
-                </text>
-              </g>
-            ))}
-          </g>
-
-          <g class="hist">
-            {years.map((year, i) => {
-              const h = perYear[i] ? 4 + (perYear[i] / maxPerYear) * (HIST_H - 18) : 0;
-              return (
-                perYear[i] > 0 && (
-                  <g class="bar" data-x={xOf(year)}>
-                    <rect x={xOf(year) - 7} y={height - 8 - h} width="14" height={h} rx="2" />
-                    <text x={xOf(year)} y={height - 12 - h}>
-                      {perYear[i]}
-                    </text>
-                  </g>
-                )
-              );
-            })}
-          </g>
-
-          <rect
-            class="sweep-trail"
-            x="0"
-            y="0"
-            width="0"
-            height={height}
-            fill="url(#sweep-glow)"
-            data-sweep-trail
-          />
-          <line class="sweep" x1="0" x2="0" y1="0" y2={height} data-sweep />
+          {layouts.map((layout) => (
+            <g class:list={['layer', { 'is-active': layout === initial }]} data-layer={layout.id}>
+              {layout.shapes.map(({ tag: Tag, class: className, text, ...attrs }) => (
+                <Tag class={className} {...attrs}>
+                  {text}
+                </Tag>
+              ))}
+              {layout.sweep.kind === 'line' && (
+                <>
+                  <rect
+                    class="sweep-trail"
+                    x="0"
+                    y="0"
+                    width="0"
+                    height={layout.height}
+                    fill="url(#sweep-glow)"
+                    data-sweep-trail
+                  />
+                  <line class="sweep" x1="0" x2="0" y1="0" y2={layout.height} data-sweep-line />
+                </>
+              )}
+              {layout.sweep.kind === 'ripple' && (
+                <circle
+                  class="ripple"
+                  cx={layout.sweep.cx}
+                  cy={layout.sweep.cy}
+                  r="0"
+                  data-ripple={layout.sweep.r}
+                />
+              )}
+              {layout.sweep.kind === 'trace' && (
+                <path class="trace" d={layout.sweep.d} pathLength="1" data-trace />
+              )}
+            </g>
+          ))}
 
           <g class="links">
-            {links.map((link) => (
+            {links.map((link, i) => (
               <g class:list={['link', `link-${link.kind}`]} data-from={link.from} data-to={link.to}>
                 <path
                   class="link-base"
-                  d={link.d}
+                  d={initial.links[i]}
                   pathLength={link.kind === 'cite' ? 1 : undefined}
                 />
-                <path class="link-flow" d={link.d} />
+                <path class="link-flow" d={initial.links[i]} />
               </g>
             ))}
           </g>
 
           <g class="stars">
-            {stars.map((star) => (
-              <g
-                class:list={['star', { 'has-code': star.code }]}
-                style={`--c:var(--t-${star.lane});--tw:${(2.6 + ((star.x * 7 + star.y * 3) % 23) / 10).toFixed(1)}s;--twd:${(((star.x * 13 + star.y) % 37) / 10).toFixed(1)}s`}
-                data-star={star.id}
-                data-x={star.x}
-                tabindex="0"
-                role="button"
-                aria-label={`${star.year} ${star.title}`}
-              >
-                <circle class="star-hit" cx={star.x} cy={star.y} r="10" />
-                <circle class="star-glow" cx={star.x} cy={star.y} r="13" fill="url(#star-glow)" />
-                {star.code && <circle class="star-ring" cx={star.x} cy={star.y} r="7.5" />}
-                <circle class="star-burst" cx={star.x} cy={star.y} r="9" />
-                <circle class="star-core" cx={star.x} cy={star.y} r="3.2" />
-              </g>
-            ))}
+            {ctx.stars.map((star, i) => {
+              const p = initial.positions[star.id];
+              return (
+                <g
+                  class:list={['star', { 'has-code': star.code }]}
+                  style={`--c:${ctx.topics[star.topic].color};--cx:${p.x};--cy:${p.y};--tw:${(2.6 + ((i * 7) % 23) / 10).toFixed(1)}s;--twd:${(((i * 13) % 37) / 10).toFixed(1)}s`}
+                  data-star={star.id}
+                  tabindex="0"
+                  role="button"
+                  aria-label={`${star.year} ${papers.find((paper) => paper.id === star.id)!.data.title}`}
+                >
+                  <g class="star-pos">
+                    <circle class="star-hit" r="10" />
+                    <circle class="star-glow" r="13" fill="url(#star-glow)" />
+                    {star.code && <circle class="star-ring" r="7.5" />}
+                    <circle class="star-burst" r="9" />
+                    <circle class="star-core" r="3.2" />
+                  </g>
+                </g>
+              );
+            })}
           </g>
         </svg>
         <div class="tip" data-sky-tip hidden></div>
@@ -365,6 +308,11 @@ const stats = [
 
   <script
     type="application/json"
+    data-sky-layouts
+    set:html={JSON.stringify(clientLayouts).replaceAll('<', '\\u003c')}
+  />
+  <script
+    type="application/json"
     data-sky-data
     set:html={JSON.stringify(
       Object.fromEntries(
@@ -379,7 +327,7 @@ const stats = [
             url: paper.data.url,
             code: paper.data.code ?? null,
             repos: reposByPaper.get(paper.id) ?? [],
-            topic: topics[PAPER_TOPICS.indexOf(paper.data.topic)].label,
+            topic: ctx.topics[PAPER_TOPICS.indexOf(paper.data.topic)].label,
             history: MILESTONES.some((m) => m.paper === paper.id)
               ? localize('/history/', lang)
               : null,
@@ -400,15 +348,6 @@ const stats = [
     --sky-faint: #4d5662;
     --sky-line: rgb(160 190 230 / 0.09);
     --sky-line-strong: rgb(160 190 230 / 0.18);
-    --t-0: #f5d77a;
-    --t-1: #9aa8ff;
-    --t-2: #49bbdd;
-    --t-3: #7fd38a;
-    --t-4: #f29fb8;
-    --t-5: #ffad6b;
-    --t-6: #c99bff;
-    --t-7: #6ee7d8;
-    --t-8: #ff8a8a;
     margin: 0 0 8px;
   }
 
@@ -506,8 +445,9 @@ const stats = [
 
   .hud-title {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
-    gap: 10px;
+    gap: 8px 10px;
     font-size: 15px;
   }
 
@@ -516,9 +456,52 @@ const stats = [
     letter-spacing: 0.01em;
   }
 
-  .hud-title > span:last-child {
+  .hud-sub {
     font: 12px var(--font-mono);
     color: var(--sky-muted);
+  }
+
+  .layout-switch {
+    display: inline-flex;
+    align-self: center;
+    margin-left: 6px;
+    padding: 2px;
+    border-radius: 999px;
+    border: 1px solid var(--sky-line-strong);
+    background: rgb(255 255 255 / 0.03);
+  }
+
+  .layout-switch button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    white-space: nowrap;
+    color: var(--sky-muted);
+    transition:
+      color 0.2s,
+      background-color 0.2s;
+  }
+
+  .layout-switch button:hover {
+    color: var(--sky-ink);
+  }
+
+  .layout-switch button[aria-pressed='true'] {
+    background: rgb(127 211 236 / 0.16);
+    color: #bfeaff;
+  }
+
+  .layout-switch svg {
+    width: 13px;
+    height: 13px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
   }
 
   .hud-pulse {
@@ -577,6 +560,9 @@ const stats = [
     position: absolute;
     left: 0;
     right: 0;
+    transition:
+      top 0.8s var(--ease),
+      height 0.8s var(--ease);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -596,13 +582,27 @@ const stats = [
     box-shadow: 0 0 10px var(--c);
   }
 
-  .lane-labels .hist-label {
+  .lane-labels li[hidden] {
+    display: none;
+  }
+
+  .lane-labels .note {
     font-size: 11px;
     color: var(--sky-faint);
   }
 
-  .lane-labels .hist-label::before {
+  .lane-labels .note::before {
     display: none;
+  }
+
+  /* 没有泳道的布局：主题标签收拢为左侧图例，画布较矮时由图例撑开高度 */
+  .is-stacked .lane-labels {
+    min-height: calc(40px + var(--n) * 30px);
+  }
+
+  .is-stacked .lane-labels li[data-row] {
+    top: calc(20px + var(--i) * 30px);
+    height: 30px;
   }
 
   .scroll {
@@ -625,6 +625,293 @@ const stats = [
     user-select: none;
   }
 
+  /* 缩放布局：画布缩放到容器宽度并居中 */
+  .is-fit svg {
+    max-width: 100%;
+    margin-inline: auto;
+  }
+
+  /* 每个布局的背景在各自的图层中，只显示当前布局的图层 */
+  .layer {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.6s;
+  }
+
+  .layer.is-active {
+    opacity: 1;
+  }
+
+  /* ── 背景图形（由 lib/constellation 的布局生成，按 class 匹配） ── */
+  .layer :global(text) {
+    font-family: var(--font-sans);
+  }
+
+  /* 通用：时期色带、网格、年份刻度、随扫描出现的计数 */
+  .layer :global(rect.era) {
+    fill: transparent;
+  }
+
+  .layer :global(rect.era-alt) {
+    fill: rgb(150 190 255 / 0.025);
+  }
+
+  .layer :global(.era-label) {
+    font-size: 11px;
+    font-weight: 600;
+    fill: var(--sky-faint);
+    letter-spacing: 0.02em;
+  }
+
+  .layer :global(.grid),
+  .layer :global(.baseline) {
+    stroke: var(--sky-line);
+  }
+
+  .layer :global(.baseline) {
+    stroke: var(--sky-line-strong);
+  }
+
+  .layer :global(line.tick) {
+    stroke: var(--sky-line);
+    stroke-dasharray: 2 6;
+  }
+
+  .layer :global(line.tick-major) {
+    stroke: var(--sky-line-strong);
+    stroke-dasharray: none;
+  }
+
+  .layer :global(.tick-label) {
+    font: 10.5px var(--font-mono);
+    fill: var(--sky-faint);
+    text-anchor: middle;
+  }
+
+  .layer :global(text.tick-major) {
+    fill: var(--sky-muted);
+  }
+
+  .layer :global([data-p]) {
+    opacity: 0;
+    transition:
+      opacity 0.4s,
+      transform 0.6s var(--ease);
+  }
+
+  .layer :global([data-p].is-on) {
+    opacity: 1;
+  }
+
+  .layer :global(rect.bar) {
+    fill: rgb(127 211 236 / 0.28);
+    transform-box: fill-box;
+    transform-origin: bottom;
+    transform: scaleY(0);
+  }
+
+  .layer :global(rect.bar.is-on) {
+    transform: none;
+  }
+
+  .layer :global(.bar-count) {
+    font: 9.5px var(--font-mono);
+    fill: var(--sky-muted);
+    text-anchor: middle;
+  }
+
+  .layer :global(.rim-label) {
+    font-size: 12px;
+    font-weight: 600;
+    fill: var(--c);
+    opacity: 0.85;
+  }
+
+  /* 放射 */
+  .layer :global(.ring-era) {
+    fill: none;
+    stroke: transparent;
+  }
+
+  .layer :global(.ring-era-alt) {
+    stroke: rgb(150 190 255 / 0.03);
+  }
+
+  .layer :global(circle.ring-year) {
+    fill: none;
+    stroke: var(--sky-line-strong);
+    stroke-dasharray: 2 5;
+  }
+
+  .layer :global(.ring-year-label),
+  .layer :global(.spiral-year) {
+    font: 10.5px var(--font-mono);
+    fill: var(--sky-muted);
+    text-anchor: middle;
+    paint-order: stroke;
+    stroke: var(--sky-bg);
+    stroke-width: 3px;
+  }
+
+  .layer :global(.spoke) {
+    fill: none;
+    stroke: var(--sky-line);
+  }
+
+  .layer :global(.core) {
+    animation: core 4s ease-in-out infinite alternate;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  @keyframes core {
+    to {
+      transform: scale(1.25);
+      opacity: 0.7;
+    }
+  }
+
+  .layer :global(.core-label) {
+    font: 600 10.5px var(--font-mono);
+    fill: var(--sky-ink);
+    text-anchor: middle;
+  }
+
+  /* 螺旋 */
+  .layer :global(.spiral) {
+    fill: none;
+    stroke: var(--sky-line-strong);
+    stroke-width: 1;
+  }
+
+  .layer :global(.spiral-era) {
+    fill: none;
+    stroke: rgb(127 211 236 / 0.16);
+    stroke-width: 22;
+    stroke-linecap: round;
+    opacity: 0.35;
+  }
+
+  .layer :global(.spiral-era-alt) {
+    stroke: rgb(170 140 255 / 0.16);
+  }
+
+  .layer :global(.spiral-era-label) {
+    font-size: 10.5px;
+    font-weight: 600;
+    fill: var(--sky-muted);
+    text-anchor: middle;
+    paint-order: stroke;
+    stroke: var(--sky-bg);
+    stroke-width: 4px;
+  }
+
+  .layer :global(.spiral-mark) {
+    fill: var(--sky-muted);
+  }
+
+  /* 星团 */
+  .layer :global(.cluster-halo) {
+    fill: color-mix(in srgb, var(--c) 7%, transparent);
+    stroke: color-mix(in srgb, var(--c) 30%, transparent);
+  }
+
+  .layer :global(.cluster-orbit) {
+    fill: none;
+    stroke: color-mix(in srgb, var(--c) 22%, transparent);
+    stroke-dasharray: 2 6;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: spin 60s linear infinite;
+  }
+
+  .layer :global(.cluster-label) {
+    font-size: 13px;
+    font-weight: 700;
+    fill: var(--c);
+    text-anchor: middle;
+  }
+
+  .layer :global(.cluster-meta) {
+    font: 10.5px var(--font-mono);
+    fill: var(--sky-muted);
+    text-anchor: middle;
+  }
+
+  /* 环形 */
+  .layer :global(.ring-band) {
+    fill: none;
+    stroke: rgb(150 190 255 / 0.035);
+  }
+
+  .layer :global(.ring-edge) {
+    fill: none;
+    stroke: var(--sky-line);
+    stroke-dasharray: 2 5;
+  }
+
+  .layer :global(.ring-arc) {
+    fill: none;
+    stroke: var(--c);
+    stroke-width: 3;
+    stroke-linecap: round;
+    opacity: 0.7;
+  }
+
+  .layer :global(.ring-note) {
+    font-size: 11.5px;
+    fill: var(--sky-muted);
+    text-anchor: middle;
+  }
+
+  .layer :global(.ring-note-years) {
+    font-family: var(--font-mono);
+    fill: var(--sky-faint);
+  }
+
+  /* 扫描：沿路径描绘 */
+  .trace {
+    fill: none;
+    stroke: #7fd3ec;
+    stroke-width: 1.6;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    opacity: 0;
+    filter: drop-shadow(0 0 5px #7fd3ec);
+    transition: opacity 0.6s;
+  }
+
+  .is-sweeping .trace {
+    opacity: 1;
+  }
+
+  .ripple {
+    fill: none;
+    stroke: #7fd3ec;
+    stroke-width: 1.5;
+    opacity: 0;
+    filter: drop-shadow(0 0 6px #7fd3ec);
+  }
+
+  .is-sweeping .ripple {
+    opacity: 1;
+  }
+
+  /* 布局切换时星点移动到新位置，按新布局的扫描顺序依次出发 */
+  .star-pos {
+    transform: translate(calc(var(--cx) * 1px), calc(var(--cy) * 1px));
+    transition: transform 1s cubic-bezier(0.65, 0, 0.25, 1) var(--delay, 0ms);
+  }
+
+  .links {
+    transition: opacity 0.4s;
+  }
+
+  .is-morphing .links {
+    opacity: 0;
+    transition-duration: 0.15s;
+  }
+
   .dust {
     transform: translate(var(--px, 0), var(--py, 0));
     transition: transform 0.8s var(--ease);
@@ -640,69 +927,6 @@ const stats = [
     to {
       opacity: 0.05;
     }
-  }
-
-  .era rect {
-    fill: transparent;
-  }
-
-  .era-alt rect {
-    fill: rgb(150 190 255 / 0.025);
-  }
-
-  .era text {
-    font: 600 11px var(--font-sans);
-    fill: var(--sky-faint);
-    letter-spacing: 0.02em;
-  }
-
-  .lanes line {
-    stroke: var(--sky-line);
-  }
-
-  .tick line {
-    stroke: var(--sky-line);
-    stroke-dasharray: 2 6;
-  }
-
-  .tick-major line {
-    stroke: var(--sky-line-strong);
-    stroke-dasharray: none;
-  }
-
-  .tick text {
-    font: 10.5px var(--font-mono);
-    fill: var(--sky-faint);
-    text-anchor: middle;
-  }
-
-  .tick-major text {
-    fill: var(--sky-muted);
-  }
-
-  /* 每年论文数 */
-  .bar rect {
-    fill: rgb(127 211 236 / 0.28);
-    transform-box: fill-box;
-    transform-origin: bottom;
-    transform: scaleY(0);
-    transition: transform 0.6s var(--ease);
-  }
-
-  .bar text {
-    font: 9.5px var(--font-mono);
-    fill: var(--sky-muted);
-    text-anchor: middle;
-    opacity: 0;
-    transition: opacity 0.4s;
-  }
-
-  .bar.is-on rect {
-    transform: none;
-  }
-
-  .bar.is-on text {
-    opacity: 1;
   }
 
   /* 扫描线 */
@@ -1050,12 +1274,39 @@ const stats = [
       gap: 16px;
     }
 
+    .hud-sub {
+      display: none;
+    }
+
     .hud-stats dd {
       font-size: 18px;
     }
 
     .frame {
       grid-template-columns: 84px minmax(0, 1fr);
+    }
+
+    .layout-switch button {
+      padding: 0 8px;
+    }
+
+    .layout-switch button span {
+      display: none;
+    }
+
+    /* 窄屏上没有泳道的布局：图例移到星图下方 */
+    .is-stacked .frame {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .is-stacked .lane-labels {
+      min-height: 0;
+      order: 2;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 12px;
+      padding: 8px 14px 0;
+      border-right: 0;
     }
 
     .lane-labels li {
@@ -1065,6 +1316,30 @@ const stats = [
 
     .lane-labels li::before {
       display: none;
+    }
+
+    .is-stacked .lane-labels li[data-row] {
+      position: static;
+      height: auto;
+      padding: 0;
+    }
+
+    .is-stacked .lane-labels li[data-row]::before {
+      display: block;
+    }
+
+    .is-stacked .lane-labels .note {
+      display: none;
+    }
+
+    .layer :global(.rim-label),
+    .layer :global(.cluster-meta) {
+      display: none;
+    }
+
+    /* 星图缩小后加大点击范围 */
+    .is-fit .star-hit {
+      r: 24px;
     }
 
     .legend {
@@ -1090,6 +1365,17 @@ const stats = [
       display: none;
     }
 
+    .layer :global(.core),
+    .layer :global(.cluster-orbit) {
+      animation: none;
+    }
+
+    .star-pos,
+    .lane-labels li,
+    .layer {
+      transition: none;
+    }
+
     .star-glow,
     .star-ring {
       animation: none !important;
@@ -1099,7 +1385,7 @@ const stats = [
     .star-glow,
     .star-ring,
     .link-base,
-    .bar rect {
+    .layer :global([data-p]) {
       transition: none;
     }
   }

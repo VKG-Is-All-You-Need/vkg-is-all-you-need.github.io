@@ -21,6 +21,8 @@ export type RepoGroup = (typeof REPO_GROUPS)[number];
 interface Section<T> {
   id: T;
   label: string;
+  /** 图表中使用的短名，缺省时使用 label。 */
+  short?: string;
   description: string;
 }
 
@@ -68,6 +70,7 @@ const TOPICS: Record<Lang, Section<PaperTopic>[]> = {
     {
       id: 'intro',
       label: 'Lectures and surveys',
+      short: 'Surveys',
       description: 'Introductory lectures, a design tutorial and surveys of the field.',
     },
     {
@@ -79,29 +82,34 @@ const TOPICS: Record<Lang, Section<PaperTopic>[]> = {
     {
       id: 'systems',
       label: 'Systems and platforms',
+      short: 'Systems',
       description:
         'OBDA/VKG systems and their extensions to spatial data, document databases, data lakes and federation.',
     },
     {
       id: 'construction',
       label: 'Construction and mappings',
+      short: 'Construction',
       description:
         'Generating and analyzing ontologies and mappings, mapping patterns, and building and extending VKGs with large language models.',
     },
     {
       id: 'evolution',
       label: 'Evolution and updates',
+      short: 'Evolution',
       description:
         'Evolution and repair of ontologies and mappings, and updates written back to the sources through the ontology.',
     },
     {
       id: 'temporal',
       label: 'Temporal and streaming data',
+      short: 'Temporal',
       description: 'OBDA over streams, temporal ontologies and temporal queries.',
     },
     {
       id: 'qa',
       label: 'Question answering',
+      short: 'QA',
       description:
         'Natural language question answering over VKGs and ontologies, and its benchmarks.',
     },
