@@ -1006,7 +1006,7 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
   const queries = cityQueries();
   let active: CityQuery = queries[0];
   let t = active.suggest;
-  let detail = false;
+  let detail = true;
   let sources = new Set<SourceId>(ALL_SOURCES);
   let playing = false;
   let speed = Number(

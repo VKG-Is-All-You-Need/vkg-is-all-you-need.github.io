@@ -13,7 +13,7 @@ import { langOf } from '../../i18n';
 const lang = langOf(Astro.url.pathname);
 const queries = cityQueries();
 const first = queries[0];
-const initial = first.run({ t: first.suggest, sources: new Set(ALL_SOURCES), detail: false });
+const initial = first.run({ t: first.suggest, sources: new Set(ALL_SOURCES), detail: true });
 const initialDay = dayOf(first.suggest);
 const observation = observationAt(first.suggest);
 const percent = (seconds: number) => ((seconds - DAY_START) / (DAY_END - DAY_START)) * 100;
@@ -164,10 +164,10 @@ const presets = ['all', 'gis', 'mobility', 'people'].map((id, i) => ({
       <div class="privacy">
         <span>{t.people}</span>
         <div class="segmented" role="group" aria-label={t.peopleView}>
-          <button type="button" data-city-detail="false" aria-pressed="true">
+          <button type="button" data-city-detail="false" aria-pressed="false">
             {t.aggregate}
           </button>
-          <button type="button" data-city-detail="true" aria-pressed="false">
+          <button type="button" data-city-detail="true" aria-pressed="true">
             {t.detail}
           </button>
         </div>
