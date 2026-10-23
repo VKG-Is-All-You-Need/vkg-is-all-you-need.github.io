@@ -981,7 +981,6 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
   const markerBox = root.querySelector<HTMLElement>('[data-city-markers]')!;
   const groupTabs = [...root.querySelectorAll<HTMLButtonElement>('[data-group-tab]')];
   const queryButtons = [...root.querySelectorAll<HTMLButtonElement>('[data-city-query]')];
-  const privacy = root.querySelector<HTMLElement>('[data-city-privacy]')!;
   const detailButtons = [...root.querySelectorAll<HTMLButtonElement>('[data-city-detail]')];
   const resultBox = root.querySelector<HTMLElement>('[data-city-result]')!;
   const card = root.querySelector<HTMLElement>('[data-city-card]')!;
@@ -1279,7 +1278,6 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
     queryButtons.forEach((button) =>
       button.setAttribute('aria-pressed', String(button.dataset.cityQuery === query.id)),
     );
-    privacy.hidden = !query.personal;
     t = query.suggest;
     syncPanels();
     syncSources();
