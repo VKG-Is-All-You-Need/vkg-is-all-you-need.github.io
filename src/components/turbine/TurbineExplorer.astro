@@ -362,7 +362,7 @@ const presets = ['all', 'live', 'archive', 'nomaster'].map((id, i) => ({
 </div>
 
 <style>
-  /* 示例固定使用深蓝暗色，不随站点主题变化 */
+  /* 暗色：深蓝底与青色荧光；亮色见下方，浅底配深色文字与描边 */
   .turbine-stage {
     --bg: #030816;
     --bg-elev: #040b1c;
@@ -380,10 +380,35 @@ const presets = ['all', 'live', 'archive', 'nomaster'].map((id, i) => ({
     --glow: rgb(63 208 255 / 0.5);
     --warn: #ffb547;
     --shadow: 0 30px 80px -30px rgb(0 0 0 / 0.85);
+    --on-accent: #041015;
+    --pin-glow: rgb(63 208 255 / 0.12);
 
     height: clamp(760px, 94vh, 920px);
     color: var(--ink);
     color-scheme: dark;
+  }
+
+  :global(html[data-theme='light']) .turbine-stage {
+    --bg: #eef2f7;
+    --bg-elev: #f4f7fb;
+    --surface: #ffffff;
+    --surface-2: #e7edf5;
+    --line: rgb(13 37 70 / 0.16);
+    --line-strong: rgb(13 37 70 / 0.32);
+    --ink: #0a1424;
+    --ink-2: #1c2b42;
+    --muted: #3b4b62;
+    --faint: #5f708a;
+    --accent: #0077b6;
+    --accent-ink: #00598a;
+    --accent-soft: rgb(0 119 182 / 0.1);
+    --glow: rgb(0 119 182 / 0.22);
+    --warn: #d9480f;
+    --shadow: 0 20px 50px -25px rgb(13 37 70 / 0.4);
+    --on-accent: #ffffff;
+    --pin-glow: rgb(13 37 70 / 0.12);
+
+    color-scheme: light;
   }
 
   .turbine .panel-queries {
@@ -544,7 +569,7 @@ const presets = ['all', 'live', 'archive', 'nomaster'].map((id, i) => ({
 
   .turbine :global(.pins .geo-pin) {
     border-color: color-mix(in srgb, var(--accent) 35%, var(--line-strong));
-    box-shadow: 0 0 10px rgb(63 208 255 / 0.12);
+    box-shadow: 0 0 10px var(--pin-glow);
   }
 
   .turbine :global(.pins .pin-plant) {
@@ -662,6 +687,19 @@ const presets = ['all', 'live', 'archive', 'nomaster'].map((id, i) => ({
     gap: 8px;
     font-size: 12.5px;
     animation: tour-in 0.35s var(--ease);
+  }
+
+  :global(html[data-theme='light']) .detail {
+    --k-speed: #0077b6;
+    --k-flame: #e8590c;
+    --k-tip: #e8590c;
+    --k-exhaust: #c92a2a;
+    --k-power: #2f9e44;
+    --k-vibration: #7048e8;
+    --k-inlet: #1c7ed6;
+    --k-pressure: #0c8f6c;
+    --k-fuel: #e67700;
+    --k-bearingTemp: #c2255c;
   }
 
   .detail-empty {
@@ -1011,7 +1049,7 @@ const presets = ['all', 'live', 'archive', 'nomaster'].map((id, i) => ({
 
   .tour-next {
     background: var(--accent);
-    color: #041015;
+    color: var(--on-accent);
     font-weight: 600;
   }
 

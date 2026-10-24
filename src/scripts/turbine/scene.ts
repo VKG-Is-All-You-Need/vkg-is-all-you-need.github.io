@@ -76,6 +76,8 @@ export interface TurbineScene {
   resetView(): void;
   /** 导览：镜头飞向某处，并在该处标出提示点；传入 null 时移除提示点。 */
   tour(step: TourFocus | null): void;
+  /** 切换暗色与亮色配色。 */
+  setMode(mode: SceneMode): void;
   /** 镜头移向某台机组。 */
   focusUnit(turbine: TurbineId): void;
   /** 镜头移近某个传感器并标出它；传入 null 时恢复显示全部机组。 */
@@ -108,17 +110,92 @@ const HOME = {
   position: new THREE.Vector3(0, 790, 1230),
   target: new THREE.Vector3(0, 40, -110),
 };
+/** 强调色与报警色随配色切换（setMode 时原地修改）。 */
 const WARN = new THREE.Color('#ffb547');
 const ACCENT = new THREE.Color('#3fd0ff');
-/** 场景固定使用深蓝底色与青色荧光轮廓，不随站点主题变化。 */
-const NEON = {
-  background: 0x030816,
-  ground: 0x050d1f,
-  grid: 0x123a66,
-  pad: 0x081631,
-  edge: 0x3fd0ff,
-} as const;
 const FLAME = new THREE.Color('#ff8a3c');
+
+/** 两套配色：暗色是深蓝底与青色荧光，亮色是浅底与深色描边。 */
+const SCHEMES = {
+  night: {
+    background: 0x030816,
+    fog: 0x071a3a,
+    horizon: 0x0b2350,
+    zenith: 0x01040c,
+    ground: 0x050d1f,
+    minor: 0x0f3a6e,
+    major: 0x1d7fc4,
+    ripple: 0x3fd0ff,
+    pad: 0x081631,
+    edge: 0x3fd0ff,
+    edgeOpacity: 0.7,
+    metal: 0x1d3556,
+    casing: 0x3a6ea8,
+    casingOpacity: 0.22,
+    generator: 0x16304f,
+    skid: 0x0f2140,
+    blade: 0x7fb2e6,
+    bladeEmissive: 0x123a66,
+    base: 0x0f2140,
+    hemiSky: 0x4a78c8,
+    hemiGround: 0x030712,
+    hemi: 1.6,
+    sun: 0x9cc4ff,
+    sunIntensity: 1.1,
+    exposure: 1.15,
+    bloom: 0.7,
+    bloomThreshold: 0.72,
+    smoke: 0x6f8fb8,
+    smokeOpacity: 0.32,
+    dust: 0x3fd0ff,
+    dustOpacity: 0.55,
+    stars: true,
+    accent: 0x3fd0ff,
+    warn: 0xffb547,
+    sourceGlow: 0.25,
+    sensorGlow: 0.35,
+  },
+  day: {
+    background: 0xeef2f7,
+    fog: 0xe8edf4,
+    horizon: 0xf4f6f9,
+    zenith: 0xc9d6e6,
+    ground: 0xe9eef4,
+    minor: 0xb7c4d4,
+    major: 0x5f7590,
+    ripple: 0x0077b6,
+    pad: 0xffffff,
+    edge: 0x0d2546,
+    edgeOpacity: 0.85,
+    metal: 0x4a5b72,
+    casing: 0x1d4f8a,
+    casingOpacity: 0.16,
+    generator: 0x2a4a72,
+    skid: 0xb9c4d2,
+    blade: 0x1f5fa8,
+    bladeEmissive: 0x000000,
+    base: 0xcfd8e3,
+    hemiSky: 0xffffff,
+    hemiGround: 0xaab6c4,
+    hemi: 1.9,
+    sun: 0xffffff,
+    sunIntensity: 2.3,
+    exposure: 1.0,
+    bloom: 0.12,
+    bloomThreshold: 0.92,
+    smoke: 0x6b7889,
+    smokeOpacity: 0.4,
+    dust: 0x0077b6,
+    dustOpacity: 0.35,
+    stars: false,
+    accent: 0x0077b6,
+    warn: 0xd9480f,
+    sourceGlow: 0.1,
+    sensorGlow: 0.15,
+  },
+} as const;
+
+export type SceneMode = keyof typeof SCHEMES;
 
 /** 数据源底座的横向位置，历史库分别在两座电厂后方。 */
 const SOURCE_X: Record<SourceId, number> = {
@@ -212,6 +289,20 @@ function sensorPosition(sensor: Sensor, count: number): THREE.Vector3 {
   }
 }
 
+/** 亮色下传感器的颜色：更深、更饱和，在浅底上清楚可辨。 */
+const SENSOR_COLORS_DAY: Record<SensorKind, number> = {
+  speed: 0x0077b6,
+  flame: 0xe8590c,
+  tip: 0xe8590c,
+  exhaust: 0xc92a2a,
+  power: 0x2f9e44,
+  vibration: 0x7048e8,
+  inlet: 0x1c7ed6,
+  pressure: 0x0c8f6c,
+  fuel: 0xe67700,
+  bearingTemp: 0xc2255c,
+};
+
 /** 传感器的颜色：转速、温度、压力等各用一种。 */
 const SENSOR_COLORS: Record<SensorKind, number> = {
   speed: 0x3fd0ff,
@@ -286,6 +377,7 @@ export function createTurbineScene(
   pinLayer: HTMLElement,
   options: {
     reducedMotion: boolean;
+    mode: SceneMode;
     onSelect(turbine: TurbineId): void;
     onSelectSensor(tag: string): void;
   },
@@ -315,11 +407,13 @@ export function createTurbineScene(
 
   // 荧光轮廓线：同一几何体的轮廓只生成一次
   const edgeMaterial = new THREE.LineBasicMaterial({
-    color: NEON.edge,
+    color: SCHEMES.night.edge,
     transparent: true,
     opacity: 0.7,
   });
   const edgeCache = new Map<THREE.BufferGeometry, THREE.EdgesGeometry>();
+  /** 场地轮廓线使用单独的材质，透明度不同。 */
+  const padEdges: THREE.LineBasicMaterial[] = [];
   const outline = (mesh: THREE.Mesh, opacity?: number) => {
     let edges = edgeCache.get(mesh.geometry);
     if (!edges) {
@@ -328,14 +422,17 @@ export function createTurbineScene(
       stage.markShared(edges);
     }
     const material = opacity === undefined ? edgeMaterial : edgeMaterial.clone();
-    if (opacity !== undefined) material.opacity = opacity;
+    if (opacity !== undefined) {
+      material.opacity = opacity;
+      padEdges.push(material);
+    }
     mesh.add(new THREE.LineSegments(edges, material));
   };
 
   // ── 背景：发光网格地面、夜空渐变、星点与漂浮的光点 ──
   const groundUniforms = {
     time: { value: 0 },
-    base: { value: new THREE.Color(NEON.ground) },
+    base: { value: new THREE.Color(SCHEMES.night.ground) },
     minor: { value: new THREE.Color(0x0f3a6e) },
     major: { value: new THREE.Color(0x1d7fc4) },
     ripple: { value: new THREE.Color(0x3fd0ff) },
@@ -367,12 +464,13 @@ export function createTurbineScene(
           float d = length(p - vec2(0.0, -80.0));
           float fade = 1.0 - smoothstep(350.0, 1700.0, d);
           vec3 color = base * (1.0 + 0.6 * (1.0 - smoothstep(0.0, 900.0, d)));
-          color += minor * grid(p, 26.0, 1.0) * 0.55 * fade;
-          color += major * grid(p, 130.0, 1.4) * 0.85 * fade;
+          // 网格线与底色混合而非叠加，浅底上的深色线条才不会溢出成白色
+          color = mix(color, minor, grid(p, 26.0, 1.0) * 0.7 * fade);
+          color = mix(color, major, grid(p, 130.0, 1.4) * 0.9 * fade);
           float r = length(p - center);
           float w = fract(r / 260.0 - time * 0.22);
           float ring = smoothstep(0.0, 0.015, w) * (1.0 - smoothstep(0.015, 0.06, w));
-          color += ripple * ring * 0.35 * (1.0 - smoothstep(150.0, 1100.0, r));
+          color = mix(color, ripple, ring * 0.45 * (1.0 - smoothstep(150.0, 1100.0, r)));
           gl_FragColor = vec4(color, 1.0);
         }`,
     }),
@@ -922,31 +1020,80 @@ export function createTurbineScene(
   let playing = false;
   let queryGlow = 0;
 
-  // ── 配色：深蓝底色，轮廓线发出青色荧光 ──
-  scene.background = new THREE.Color(NEON.background);
-  stage.fog.color.set(0x071a3a);
-  padMaterial.color.set(NEON.pad);
-  sourcePadMaterial.color.set(NEON.pad);
-  metal.color.set(0x1d3556);
-  casing.color.set(0x3a6ea8);
-  generatorMaterial.color.set(0x16304f);
-  skidMaterial.color.set(0x0f2140);
-  bladeMaterial.color.set(0x7fb2e6);
-  bladeMaterial.emissive.set(0x123a66);
-  baseMaterial.color.set(0x0f2140);
-  stage.hemi.color.set(0x4a78c8);
-  stage.hemi.groundColor.set(0x030712);
-  stage.hemi.intensity = 1.6;
-  stage.sun.color.set(0x9cc4ff);
-  stage.sun.intensity = 1.1;
-  stage.renderer.toneMappingExposure = 1.15;
-  stage.bloom.strength = 0.7;
-  stage.bloom.threshold = 0.72;
-  stage.bloom.radius = 0.45;
-  for (const unit of units.values()) {
-    for (const s of unit.smoke) (s.sprite.material as THREE.SpriteMaterial).color.set(0x6f8fb8);
-  }
-  hubDiscMaterial.opacity = 0.09;
+  // ── 配色：暗色为深蓝底与青色荧光，亮色为浅底与深色描边 ──
+  let scheme: (typeof SCHEMES)[SceneMode] = SCHEMES[options.mode];
+  /** 自发光强度的缩放：亮色背景下降低，避免颜色发白。 */
+  let glowScale = 1;
+  const applyMode = (mode: SceneMode) => {
+    scheme = SCHEMES[mode];
+    glowScale = mode === 'day' ? 0.4 : 1;
+    ACCENT.set(scheme.accent);
+    WARN.set(scheme.warn);
+    scene.background = new THREE.Color(scheme.background);
+    stage.fog.color.set(scheme.fog);
+    // 亮色下雾会把物体冲淡，推到更远处
+    stage.fog.near = mode === 'day' ? 2600 : 900;
+    stage.fog.far = mode === 'day' ? 6000 : 2600;
+    const skyUniforms = (sky.material as THREE.ShaderMaterial).uniforms;
+    skyUniforms.horizon.value.set(scheme.horizon);
+    skyUniforms.zenith.value.set(scheme.zenith);
+    groundUniforms.base.value.set(scheme.ground);
+    groundUniforms.minor.value.set(scheme.minor);
+    groundUniforms.major.value.set(scheme.major);
+    groundUniforms.ripple.value.set(scheme.ripple);
+    stars.visible = scheme.stars;
+    const dustMaterial = dust.material as THREE.PointsMaterial;
+    dustMaterial.color.set(scheme.dust);
+    dustMaterial.opacity = scheme.dustOpacity;
+    dustMaterial.blending = mode === 'day' ? THREE.NormalBlending : THREE.AdditiveBlending;
+    dustMaterial.needsUpdate = true;
+    padMaterial.color.set(scheme.pad);
+    sourcePadMaterial.color.set(scheme.pad);
+    edgeMaterial.color.set(scheme.edge);
+    edgeMaterial.opacity = scheme.edgeOpacity;
+    for (const material of padEdges) material.color.set(scheme.edge);
+    metal.color.set(scheme.metal);
+    casing.color.set(scheme.casing);
+    casing.opacity = scheme.casingOpacity;
+    generatorMaterial.color.set(scheme.generator);
+    skidMaterial.color.set(scheme.skid);
+    bladeMaterial.color.set(scheme.blade);
+    bladeMaterial.emissive.set(scheme.bladeEmissive);
+    baseMaterial.color.set(scheme.base);
+    stage.hemi.color.set(scheme.hemiSky);
+    stage.hemi.groundColor.set(scheme.hemiGround);
+    stage.hemi.intensity = scheme.hemi;
+    stage.sun.color.set(scheme.sun);
+    stage.sun.intensity = scheme.sunIntensity;
+    stage.renderer.toneMappingExposure = scheme.exposure;
+    stage.bloom.strength = scheme.bloom;
+    // 浅色背景本身就超过泛光阈值，亮色下关闭泛光，否则整个画面会蒙上一层光晕
+    stage.bloom.enabled = mode !== 'day';
+    stage.bloom.threshold = scheme.bloomThreshold;
+    stage.bloom.radius = 0.45;
+    // 数据源盘体：亮色下更不透明，避免在浅底上发淡
+    for (const material of sourceMaterials.values())
+      material.opacity = mode === 'day' ? 0.78 : 0.32;
+    neonMaterial.color.copy(ACCENT);
+    hubMaterial.color.copy(ACCENT);
+    hubDiscMaterial.color.copy(ACCENT);
+    hubDiscMaterial.opacity = mode === 'day' ? 0.12 : 0.09;
+    nodeMaterial.color.copy(ACCENT);
+    for (const line of graphLines) line.material.color.copy(ACCENT);
+    for (const unit of units.values()) {
+      for (const smoke of unit.smoke) {
+        (smoke.sprite.material as THREE.SpriteMaterial).color.set(scheme.smoke);
+      }
+      // 喷嘴在亮色下用深橙褐色，避免白色小球在浅底上发淡
+      for (const tip of unit.tips) tip.material.color.set(mode === 'day' ? 0x9a3a10 : 0xffffff);
+      for (const sensor of unit.sensors) {
+        if (sensor.sensor.kind === 'tip') continue;
+        sensor.color.set((mode === 'day' ? SENSOR_COLORS_DAY : SENSOR_COLORS)[sensor.sensor.kind]);
+        sensor.material.color.copy(sensor.color);
+      }
+    }
+  };
+  applyMode(options.mode);
 
   // ── 取景：面板占用的边距 ──
   let insets: Insets = { left: 0, right: 0, top: 0, bottom: 0 };
@@ -1064,7 +1211,7 @@ export function createTurbineScene(
             ? 1.3
             : s.sensor.kind === 'flame' && v.flame
               ? 0.9
-              : 0.3;
+              : 0.3 * glowScale;
         s.material.emissive.copy(isHitTag ? WARN : s.color);
         s.material.emissiveIntensity += (glow - s.material.emissiveIntensity) * k;
         s.mesh.scale.setScalar(isHitTag ? 1.6 : isUsed ? 1.3 : 1);
@@ -1096,7 +1243,7 @@ export function createTurbineScene(
           const size = 10 + life * 34;
           s.sprite.scale.set(size, size, 1);
           (s.sprite.material as THREE.SpriteMaterial).opacity =
-            0.32 * (1 - life) * Math.min(1, life * 6);
+            scheme.smokeOpacity * (1 - life) * Math.min(1, life * 6);
         } else if (unit.emit >= 1 && !reduced) {
           unit.emit -= 1;
           s.sprite.visible = true;
@@ -1117,7 +1264,7 @@ export function createTurbineScene(
       const on = sources.has(source.id);
       const material = sourceMaterials.get(source.id)!;
       const isUsed = used.includes(source.id);
-      const glow = on ? (isUsed ? 0.45 + 0.4 * queryGlow : 0.2) : 0;
+      const glow = on ? (isUsed ? 0.45 + 0.4 * queryGlow : 0.2) * glowScale : 0;
       material.emissiveIntensity += (glow - material.emissiveIntensity) * k;
       material.color.set(on ? source.color : 0x1a2740);
       const ring = sourceRings.get(source.id)!;
@@ -1203,10 +1350,24 @@ export function createTurbineScene(
         unit.visual = visuals[unit.id];
         const card = cards[unit.id];
         const el = unit.pin.element;
-        const html = cardHtml(unit.id, card);
-        if (el.dataset.html !== html) {
-          el.innerHTML = html;
-          el.dataset.html = html;
+        // 只更新变化的文字；报警说明在内容变化时才重建，入场动画只播放一次
+        const value = el.querySelector('.uc-head em');
+        const state = el.querySelector('.uc-state');
+        if (!value || !state) {
+          el.innerHTML = cardHtml(unit.id, card);
+        } else {
+          if (value.textContent !== card.value) value.textContent = card.value;
+          if (state.textContent !== card.state) state.textContent = card.state;
+          const alert = el.querySelector('.uc-alert');
+          if ((alert?.textContent ?? undefined) !== card.alert) {
+            alert?.remove();
+            if (card.alert) {
+              const next = document.createElement('span');
+              next.className = 'uc-alert';
+              next.textContent = card.alert;
+              el.append(next);
+            }
+          }
         }
         el.classList.toggle('is-hit', card.hit);
         el.classList.toggle('is-involved', card.involved && !card.hit);
@@ -1354,6 +1515,9 @@ export function createTurbineScene(
           );
         }
       }
+    },
+    setMode(mode) {
+      applyMode(mode);
     },
     focusUnit(turbine) {
       const unit = units.get(turbine)!;

@@ -54,6 +54,9 @@ function webglAvailable(): boolean {
   }
 }
 
+/** 示例的配色跟随站点主题：暗色为深蓝荧光，亮色为浅底深色描边。 */
+const themeMode = () => (document.documentElement.dataset.theme === 'light' ? 'day' : 'night');
+
 export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
   const $ = <T extends Element>(selector: string) => root.querySelector<T>(selector)!;
   const $$ = <T extends Element>(selector: string) => [...root.querySelectorAll<T>(selector)];
@@ -933,6 +936,12 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
   const resizeObserver = new ResizeObserver(() => scene?.setInsets(insets()));
   resizeObserver.observe(stage);
 
+  const themeObserver = new MutationObserver(() => scene?.setMode(themeMode()));
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  });
+
   // ── 三维场景按需加载 ──
   const loadScene = async () => {
     if (!webglAvailable()) {
@@ -950,6 +959,7 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
       if (signal.aborted) return;
       scene = createTurbineScene(viewport, pinLayer, {
         reducedMotion: reduced,
+        mode: themeMode(),
         onSelect: selectTurbine,
         onSelectSensor: openSensor,
       });
@@ -984,6 +994,7 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
     stop();
     loader.disconnect();
     resizeObserver.disconnect();
+    themeObserver.disconnect();
     scene?.dispose();
     scene = null;
   });

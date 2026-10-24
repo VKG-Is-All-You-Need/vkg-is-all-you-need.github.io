@@ -48,7 +48,7 @@ export const SOURCES: DataSource[] = [
       system: 'Teradata',
       catalog: 'hist_a',
       tables: ['turbine_components', 'sensors', 'measurements'],
-      color: '#49bbdd',
+      color: '#2f9fe0',
     },
     {
       name: '历史库 A',
@@ -69,7 +69,7 @@ export const SOURCES: DataSource[] = [
       system: 'Oracle',
       catalog: 'hist_b',
       tables: ['turbine_components', 'measurements'],
-      color: '#7fd38a',
+      color: '#35b866',
     },
     {
       name: '历史库 B',
@@ -89,7 +89,7 @@ export const SOURCES: DataSource[] = [
       system: 'Kafka → ExaStream',
       catalog: 'live',
       tables: ['live_measurements'],
-      color: '#ff9f6b',
+      color: '#ff7a33',
     },
     {
       name: '实时流',
@@ -110,7 +110,7 @@ export const SOURCES: DataSource[] = [
       system: 'SQL Server',
       catalog: 'master',
       tables: ['turbines', 'models', 'parameters', 'id_map'],
-      color: '#9fb0bd',
+      color: '#7f93a8',
     },
     {
       name: '设备主数据',
@@ -131,7 +131,7 @@ export const SOURCES: DataSource[] = [
       system: 'PostgreSQL（DCS 事件）',
       catalog: 'events',
       tables: ['alarm_log'],
-      color: '#f29fb8',
+      color: '#e0569b',
     },
     {
       name: '控制系统事件',
@@ -153,7 +153,7 @@ export const SOURCES: DataSource[] = [
       system: 'SAP PM',
       catalog: 'cmms',
       tables: ['work_orders', 'installed_parts'],
-      color: '#e6c07b',
+      color: '#e0a12e',
     },
     {
       name: '维修管理',
@@ -173,7 +173,7 @@ export const SOURCES: DataSource[] = [
       system: '调度系统 → CSV',
       catalog: 'dispatch',
       tables: ['unit_schedule'],
-      color: '#c9a0f0',
+      color: '#9b6ef0',
     },
     {
       name: '调度计划',
@@ -194,7 +194,7 @@ export const SOURCES: DataSource[] = [
       system: '气象接口 → Parquet',
       catalog: 'weather',
       tables: ['observations'],
-      color: '#9aa8ff',
+      color: '#5f78f0',
     },
     {
       name: '气象观测',

@@ -24,10 +24,10 @@ const texts: Record<
 > = {
   zh: {
     title: '示例',
-    meta: 'VKG 交互示例：地理信息查询与城市数据融合。',
+    meta: 'VKG 交互示例：地理信息查询、城市数据融合与设备诊断。',
     heading: '交互示例',
     description:
-      '两个示例共用同一座虚构街区：第一个聚焦空间查询与查询改写，第二个聚焦多源融合与动态数据。',
+      '前两个示例共用同一座虚构街区，分别聚焦空间查询与查询改写、多源融合与动态数据；第三个示例参照 Optique 项目在西门子的部署，聚焦工业设备的时序诊断。',
     open: '打开示例',
     examples: [
       {
@@ -44,14 +44,21 @@ const texts: Record<
         text: '八个独立数据源由一个本体统一描述：交通、出行、传感器、气象、商户、企业与社区。示例覆盖一周，每天天气不同；拖动时间轴查看动态数据，开关数据源比较融合与分离的结果。',
         tags: ['数据融合', '传感器与气象', 'SOSA/SSN'],
       },
+      {
+        href: '/examples/turbine/',
+        shot: 'turbine',
+        title: 'VKG × 设备诊断',
+        text: '两座电厂八台燃气轮机的秒级信号、报警事件、维修记录、调度计划与气象观测分布在八个数据源中。13 条查询演示时序规则、多源融合与实时监测；三维场景带导览，可以逐台机组、逐个传感器地查看。',
+        tags: ['时序规则', 'STARQL / sigRL', 'Optique · 西门子'],
+      },
     ],
   },
   en: {
     title: 'Examples',
-    meta: 'Interactive VKG examples: geospatial queries and urban data fusion.',
+    meta: 'Interactive VKG examples: geospatial queries, urban data fusion and equipment diagnostics.',
     heading: 'Interactive examples',
     description:
-      'Both examples share the same fictional city district: the first focuses on spatial queries and query rewriting, the second on fusing multiple sources and dynamic data.',
+      'The first two examples share the same fictional city district, focusing on spatial queries and query rewriting, and on fusing multiple sources and dynamic data. The third follows the Optique deployment at Siemens and focuses on temporal diagnostics of industrial equipment.',
     open: 'Open the example',
     examples: [
       {
@@ -67,6 +74,13 @@ const texts: Record<
         title: 'VKG × Urban data fusion',
         text: 'Eight independent data sources are described by a single ontology: traffic, mobility, sensors, weather, shops, companies and the residential community. The example covers one week with different weather each day; drag the timeline to view dynamic data, and switch sources on and off to compare fused and separate results.',
         tags: ['Data fusion', 'Sensors and weather', 'SOSA/SSN'],
+      },
+      {
+        href: '/examples/turbine/',
+        shot: 'turbine',
+        title: 'VKG × Equipment diagnostics',
+        text: 'Second-level signals, alarm events, maintenance records, dispatch plans and weather for eight gas turbines at two plants are spread over eight data sources. Thirteen queries demonstrate temporal rules, data fusion and live monitoring; the 3D scene comes with a guided tour and lets readers inspect each turbine and each sensor.',
+        tags: ['Temporal rules', 'STARQL / sigRL', 'Optique · Siemens'],
       },
     ],
   },
@@ -117,7 +131,7 @@ const t = texts[lang];
 
   .cards {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px;
   }
 
@@ -210,7 +224,7 @@ const t = texts[lang];
     transform: translateX(4px);
   }
 
-  @media (max-width: 760px) {
+  @media (max-width: 900px) {
     .cards {
       grid-template-columns: 1fr;
     }

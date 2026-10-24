@@ -22,6 +22,7 @@ const TRANSLATED = new Set([
   '/examples/',
   '/examples/geo/',
   '/examples/city/',
+  '/examples/turbine/',
 ]);
 
 /** 供 [...lang] 动态路由的 getStaticPaths 使用：根路径为中文，en 为英文。 */
