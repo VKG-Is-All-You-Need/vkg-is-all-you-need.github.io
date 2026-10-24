@@ -1,20 +1,29 @@
 /**
  * “VKG × 设备诊断”示例的三维场景。由 scripts/turbine/controller.ts 在场景进入视口后按需加载。
  *
- * 前方是两座电厂、六台燃气轮机：转子随转速转动，有火焰时燃烧室发光、烟囱冒烟，出力越大烟越浓。
+ * 前方是两座电厂、八台燃气轮机。外壳半透明，可以看到内部的压气机与涡轮叶片级、燃烧室与轴承座：
+ * 转子随转速转动，有火焰时燃烧室发光、烟囱冒烟，出力越大烟越浓。每个传感器都单独建模，
+ * 悬停可查看编号与读数，查询用到的传感器会亮起。
  * 后方是八个数据源：电厂的信号持续流入实时流，每 10 分钟批量写入各自的历史库。
  * 上方的环表示虚拟知识图谱：选中查询时，所用数据源的连线亮起，汇入图谱，结果再落到命中的机组上。
  */
 import * as THREE from 'three';
 import type { Line2 } from 'three/addons/lines/Line2.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { tr } from '../../i18n/runtime';
 import {
   MODELS,
   PLANTS,
   TURBINES,
+  SENSOR_UNITS,
+  componentById,
+  componentLabel,
+  sensorKindLabel,
   sensorsOf,
   turbineById,
   type PlantId,
+  type Sensor,
+  type SensorKind,
   type TurbineId,
 } from '../../lib/turbine/fleet';
 import { SOURCES, sourceById, type SourceId } from '../../lib/turbine/sources';
@@ -30,6 +39,8 @@ export interface UnitVisual {
   power: number;
   /** 喷嘴温度（°C），按序号排列。 */
   tips: number[];
+  /** 各传感器此刻的读数，按传感器编号索引。 */
+  readings: Record<string, number>;
 }
 
 /** 机组头顶卡片的内容。 */
@@ -57,27 +68,38 @@ export interface TurbineScene {
   setSources(sources: ReadonlySet<SourceId>): void;
   /** 选中查询后播放数据流：所用数据源 → 知识图谱 → 命中的机组。fresh 为 true 时重新播放。 */
   showQuery(used: SourceId[], hits: TurbineId[], hotTips: string[], fresh: boolean): void;
+  /** 查询用到的传感器与命中的传感器。 */
+  setSensorFocus(used: string[], hit: string[]): void;
   setPlantInfo(info: Record<PlantId, string>): void;
   select(turbine: TurbineId | null): void;
   setInsets(insets: Insets): void;
   resetView(): void;
   /** 导览：镜头飞向某处，并在该处标出提示点；传入 null 时移除提示点。 */
   tour(step: TourFocus | null): void;
+  /** 镜头移向某台机组。 */
+  focusUnit(turbine: TurbineId): void;
+  /** 镜头移近某个传感器并标出它；传入 null 时恢复显示全部机组。 */
+  focusSensor(tag: string | null): void;
   dispose(): void;
 }
 
-export type FocusKey = 'overview' | 'turbine' | 'tips' | 'sources' | 'ingest' | 'hub' | 'demo';
+export type FocusKey =
+  'overview' | 'turbine' | 'internals' | 'sources' | 'ingest' | 'hub' | 'demo' | 'pair';
 
 export interface TourFocus {
   focus: FocusKey;
   turbine?: TurbineId;
+  /** focus 为 pair 时同时取景的两台机组。 */
+  turbines?: [TurbineId, TurbineId];
   /** 提示点旁的短标签。 */
   marker?: string;
+  /** 标出该机组各类传感器的位置。 */
+  labels?: boolean;
 }
 
-const PLANT_X: Record<PlantId, number> = { A: -225, B: 225 };
-/** 同一电厂的三台机组左右并排。 */
-const UNIT_SPACING = 86;
+const PLANT_X: Record<PlantId, number> = { A: -200, B: 200 };
+/** 同一电厂的四台机组左右并排。 */
+const UNIT_SPACING = 78;
 const UNIT_Z = 30;
 const SOURCE_Z = -330;
 const HUB = new THREE.Vector3(0, 190, -250);
@@ -113,7 +135,7 @@ const SOURCE_X: Record<SourceId, number> = {
 const unitPosition = (id: TurbineId) => {
   const turbine = turbineById.get(id)!;
   const index = TURBINES.filter((t) => t.plant === turbine.plant).indexOf(turbine);
-  return new THREE.Vector3(PLANT_X[turbine.plant] + (index - 1) * UNIT_SPACING, 0, UNIT_Z);
+  return new THREE.Vector3(PLANT_X[turbine.plant] + (index - 1.5) * UNIT_SPACING, 0, UNIT_Z);
 };
 
 const sourceTop = (id: SourceId) => new THREE.Vector3(SOURCE_X[id], 34, SOURCE_Z);
@@ -158,11 +180,87 @@ function padGeometry(w: number, d: number, r: number) {
   return geometry;
 }
 
+/** 传感器在机组局部坐标中的位置（机组轴线沿 x，发电机在 -x 端）。 */
+function sensorPosition(sensor: Sensor, count: number): THREE.Vector3 {
+  const i = sensor.index - 1;
+  const SHAFT = 22;
+  switch (sensor.kind) {
+    case 'speed': {
+      const a = -Math.PI / 2 + (i + 0.5) * (Math.PI / count);
+      return new THREE.Vector3(-30, SHAFT + Math.sin(-a) * 5.5, Math.cos(a) * 5.5);
+    }
+    case 'inlet':
+      return new THREE.Vector3(-23, SHAFT + 18.5, 0);
+    case 'pressure':
+      return new THREE.Vector3(16, SHAFT + 13.5, 0);
+    case 'flame':
+      return new THREE.Vector3(29, SHAFT + 17.5, 0);
+    case 'fuel':
+      return new THREE.Vector3(29, SHAFT - 17.5, 0);
+    case 'tip': {
+      const a = (i / count) * Math.PI * 2;
+      return new THREE.Vector3(29, SHAFT + Math.cos(a) * 15.5, Math.sin(a) * 15.5);
+    }
+    case 'exhaust':
+      return new THREE.Vector3(72, 31, 0);
+    case 'vibration':
+      return new THREE.Vector3(sensor.index === 1 ? -34 : 62, 12, 7.5);
+    case 'bearingTemp':
+      return new THREE.Vector3(sensor.index === 1 ? -34 : 62, 12, -7.5);
+    case 'power':
+      return new THREE.Vector3(-54, 37, 0);
+  }
+}
+
+/** 传感器的颜色：转速、温度、压力等各用一种。 */
+const SENSOR_COLORS: Record<SensorKind, number> = {
+  speed: 0x3fd0ff,
+  flame: 0xff8a3c,
+  tip: 0xff8a3c,
+  exhaust: 0xff6f6f,
+  power: 0x9be15d,
+  vibration: 0xc9a0ff,
+  inlet: 0x7fe0ff,
+  pressure: 0x5ee6c0,
+  fuel: 0xffd166,
+  bearingTemp: 0xff9fd0,
+};
+
+/** 一组叶片级：每一级是一个薄盘加一圈径向叶片，合并成一个几何体。 */
+function bladeStages(stages: { x: number; r: number }[], blades: number): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  for (const { x, r } of stages) {
+    const disk = new THREE.CylinderGeometry(r * 0.45, r * 0.45, 1.6, 20);
+    disk.rotateZ(Math.PI / 2);
+    disk.translate(x, 0, 0);
+    parts.push(disk);
+    for (let b = 0; b < blades; b++) {
+      const blade = new THREE.BoxGeometry(0.5, r * 0.5, 1.5);
+      blade.translate(0, r * 0.45 + r * 0.275, 0);
+      blade.rotateX((b / blades) * Math.PI * 2);
+      blade.translate(x, 0, 0);
+      parts.push(blade);
+    }
+  }
+  const merged = mergeGeometries(parts.map((g) => g.toNonIndexed()));
+  parts.forEach((g) => g.dispose());
+  return merged;
+}
+
+interface SensorMesh {
+  mesh: THREE.Mesh;
+  material: THREE.MeshStandardMaterial;
+  sensor: Sensor;
+  color: THREE.Color;
+}
+
 interface Unit {
   id: TurbineId;
   group: THREE.Group;
   rotor: THREE.Group;
   combustor: THREE.MeshStandardMaterial;
+  crown: THREE.MeshBasicMaterial;
+  sensors: SensorMesh[];
   tips: { mesh: THREE.Mesh; material: THREE.MeshStandardMaterial; tag: string }[];
   ring: THREE.Mesh;
   pin: Pin;
@@ -186,7 +284,11 @@ interface Pulse {
 export function createTurbineScene(
   container: HTMLElement,
   pinLayer: HTMLElement,
-  options: { reducedMotion: boolean; onSelect(turbine: TurbineId): void },
+  options: {
+    reducedMotion: boolean;
+    onSelect(turbine: TurbineId): void;
+    onSelectSensor(tag: string): void;
+  },
 ): TurbineScene {
   const stage = createStage(container, pinLayer, {
     reducedMotion: options.reducedMotion,
@@ -230,44 +332,177 @@ export function createTurbineScene(
     mesh.add(new THREE.LineSegments(edges, material));
   };
 
-  // ── 地面与电厂场地 ──
-  const groundMaterial = new THREE.MeshStandardMaterial({ roughness: 1 });
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), groundMaterial);
+  // ── 背景：发光网格地面、夜空渐变、星点与漂浮的光点 ──
+  const groundUniforms = {
+    time: { value: 0 },
+    base: { value: new THREE.Color(NEON.ground) },
+    minor: { value: new THREE.Color(0x0f3a6e) },
+    major: { value: new THREE.Color(0x1d7fc4) },
+    ripple: { value: new THREE.Color(0x3fd0ff) },
+    center: { value: new THREE.Vector2(HUB.x, HUB.z) },
+  };
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(6000, 6000),
+    new THREE.ShaderMaterial({
+      uniforms: groundUniforms,
+      vertexShader: `
+        varying vec3 vWorld;
+        void main() {
+          vec4 world = modelMatrix * vec4(position, 1.0);
+          vWorld = world.xyz;
+          gl_Position = projectionMatrix * viewMatrix * world;
+        }`,
+      fragmentShader: `
+        uniform float time;
+        uniform vec3 base, minor, major, ripple;
+        uniform vec2 center;
+        varying vec3 vWorld;
+        float grid(vec2 p, float size, float width) {
+          vec2 q = p / size;
+          vec2 g = abs(fract(q - 0.5) - 0.5) / (fwidth(q) * width);
+          return 1.0 - min(min(g.x, g.y), 1.0);
+        }
+        void main() {
+          vec2 p = vWorld.xz;
+          float d = length(p - vec2(0.0, -80.0));
+          float fade = 1.0 - smoothstep(350.0, 1700.0, d);
+          vec3 color = base * (1.0 + 0.6 * (1.0 - smoothstep(0.0, 900.0, d)));
+          color += minor * grid(p, 26.0, 1.0) * 0.55 * fade;
+          color += major * grid(p, 130.0, 1.4) * 0.85 * fade;
+          float r = length(p - center);
+          float w = fract(r / 260.0 - time * 0.22);
+          float ring = smoothstep(0.0, 0.015, w) * (1.0 - smoothstep(0.015, 0.06, w));
+          color += ripple * ring * 0.35 * (1.0 - smoothstep(150.0, 1100.0, r));
+          gl_FragColor = vec4(color, 1.0);
+        }`,
+    }),
+  );
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.5;
-  ground.receiveShadow = true;
   scene.add(ground);
-  const grid = new THREE.GridHelper(2400, 60);
-  (grid.material as THREE.Material).transparent = true;
-  scene.add(grid);
+
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(4500, 32, 16),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+      uniforms: {
+        horizon: { value: new THREE.Color(0x0b2350) },
+        zenith: { value: new THREE.Color(0x01040c) },
+      },
+      vertexShader: `
+        varying float vHeight;
+        void main() {
+          vHeight = normalize(position).y;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `
+        uniform vec3 horizon, zenith;
+        varying float vHeight;
+        void main() {
+          gl_FragColor = vec4(mix(horizon, zenith, smoothstep(-0.02, 0.45, vHeight)), 1.0);
+        }`,
+    }),
+  );
+  scene.add(sky);
+
+  const random = (seed: number) => {
+    const x = Math.sin(seed * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  const starPositions = new Float32Array(900 * 3);
+  for (let i = 0; i < 900; i++) {
+    const a = random(i) * Math.PI * 2;
+    const h = 0.08 + random(i + 0.5) * 0.9;
+    const r = 4000;
+    starPositions.set(
+      [Math.cos(a) * Math.sqrt(1 - h * h) * r, h * r, Math.sin(a) * Math.sqrt(1 - h * h) * r],
+      i * 3,
+    );
+  }
+  const stars = new THREE.Points(
+    new THREE.BufferGeometry().setAttribute(
+      'position',
+      new THREE.BufferAttribute(starPositions, 3),
+    ),
+    new THREE.PointsMaterial({
+      color: 0x9cc8ff,
+      size: 1.6,
+      sizeAttenuation: false,
+      transparent: true,
+      opacity: 0.7,
+      fog: false,
+    }),
+  );
+  scene.add(stars);
+
+  const DUST = 420;
+  const dustPositions = new Float32Array(DUST * 3);
+  for (let i = 0; i < DUST; i++) {
+    dustPositions.set(
+      [(random(i + 7) - 0.5) * 1500, random(i + 13) * 320, (random(i + 21) - 0.6) * 1100],
+      i * 3,
+    );
+  }
+  const dustGeometry = new THREE.BufferGeometry().setAttribute(
+    'position',
+    new THREE.BufferAttribute(dustPositions, 3),
+  );
+  const dust = new THREE.Points(
+    dustGeometry,
+    new THREE.PointsMaterial({
+      color: 0x3fd0ff,
+      size: 3.2,
+      map: softTexture(),
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  scene.add(dust);
 
   const padMaterial = new THREE.MeshStandardMaterial({ roughness: 0.9 });
   const sourcePadMaterial = new THREE.MeshStandardMaterial({ roughness: 0.9 });
   const plantPins: Record<PlantId, Pin> = {} as Record<PlantId, Pin>;
   for (const plant of Object.values(PLANTS)) {
-    const pad = new THREE.Mesh(padGeometry(300, 230, 18), padMaterial);
+    const pad = new THREE.Mesh(padGeometry(350, 230, 18), padMaterial);
     pad.position.set(PLANT_X[plant.id], 0, UNIT_Z);
     pad.receiveShadow = true;
-    outline(pad, 0.45);
+    outline(pad, 0.8);
     scene.add(pad);
     plantPins[plant.id] = stage.addPin(
       `<b>${escapeHtml(plant.name)}</b><span></span>`,
-      new THREE.Vector3(PLANT_X[plant.id], 0, UNIT_Z + 122),
+      new THREE.Vector3(PLANT_X[plant.id], 0, UNIT_Z + 124),
       'pin-plant',
     );
   }
   const sourcePad = new THREE.Mesh(padGeometry(830, 90, 20), sourcePadMaterial);
   sourcePad.position.set(0, 0, SOURCE_Z);
   sourcePad.receiveShadow = true;
-  outline(sourcePad, 0.45);
+  outline(sourcePad, 0.8);
   scene.add(sourcePad);
 
   // ── 燃气轮机 ──
   const metal = new THREE.MeshStandardMaterial({ roughness: 0.45, metalness: 0.35 });
-  const casing = new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.25 });
+  // 外壳半透明，露出内部的转子、燃烧室与传感器
+  const casing = new THREE.MeshStandardMaterial({
+    roughness: 0.3,
+    metalness: 0.2,
+    transparent: true,
+    opacity: 0.22,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
   const generatorMaterial = new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.2 });
   const skidMaterial = new THREE.MeshStandardMaterial({ roughness: 0.8 });
   const bladeMaterial = new THREE.MeshStandardMaterial({ roughness: 0.4, metalness: 0.5 });
+  const neonMaterial = new THREE.MeshBasicMaterial({
+    color: ACCENT,
+    transparent: true,
+    opacity: 0.85,
+  });
 
   const shared = {
     skid: new THREE.BoxGeometry(150, 5, 46),
@@ -282,14 +517,30 @@ export function createTurbineScene(
     blade: new THREE.BoxGeometry(1.4, 2, 15),
     tip: new THREE.SphereGeometry(2.6, 12, 10),
     ring: new THREE.RingGeometry(40, 44, 64),
+    core: new THREE.CylinderGeometry(9, 9, 18, 24),
+    band: new THREE.TorusGeometry(9.3, 0.55, 8, 40),
+    crown: new THREE.TorusGeometry(8.4, 0.9, 8, 40),
+    rotorShaft: new THREE.CylinderGeometry(2.6, 2.6, 100, 12),
+    pedestal: new THREE.BoxGeometry(7, 14, 12),
+    probe: new THREE.SphereGeometry(1.7, 10, 8),
+    compressorStages: bladeStages(
+      [-17, -11, -5, 1, 7, 13].map((x) => ({ x, r: 17 - ((x + 22) / 40) * 6 - 1.6 })),
+      14,
+    ),
+    turbineStages: bladeStages(
+      [44, 50, 57].map((x) => ({ x, r: 11 + ((x - 40) / 24) * 6 - 1.6 })),
+      16,
+    ),
   };
   Object.values(shared).forEach((g) => stage.markShared(g));
 
   const units = new Map<TurbineId, Unit>();
   const pickables: THREE.Object3D[] = [];
+  /** 可悬停查看读数的传感器。 */
+  const probes: THREE.Object3D[] = [];
   const cardHtml = (id: TurbineId, card?: UnitCard) => {
     const model = turbineById.get(id)!.model;
-    return `<span class="uc-head"><b>${id}</b><i>${model}</i></span><span class="uc-state">${escapeHtml(card?.state ?? '—')}<em>${escapeHtml(card?.value ?? '')}</em></span>${card?.alert ? `<span class="uc-alert">${escapeHtml(card.alert)}</span>` : ''}`;
+    return `<span class="uc-head"><b>${id}</b><i>${model}</i><em>${escapeHtml(card?.value ?? '')}</em></span><span class="uc-state">${escapeHtml(card?.state ?? '—')}</span>${card?.alert ? `<span class="uc-alert">${escapeHtml(card.alert)}</span>` : ''}`;
   };
 
   for (const turbine of TURBINES) {
@@ -321,29 +572,57 @@ export function createTurbineScene(
     shaft.rotation.z = Math.PI / 2;
     const compressor = add(shared.compressor, casing, -2, 22);
     compressor.rotation.z = -Math.PI / 2;
+    const shell = add(shared.combustor, casing, 29, 22);
+    shell.rotation.z = Math.PI / 2;
+    // 燃烧室内的火焰核心
     const combustorMaterial = new THREE.MeshStandardMaterial({
-      roughness: 0.4,
-      metalness: 0.3,
+      color: 0x2a1a14,
+      roughness: 0.6,
       emissive: FLAME,
       emissiveIntensity: 0,
     });
-    const combustor = add(shared.combustor, combustorMaterial, 29, 22);
-    combustor.rotation.z = Math.PI / 2;
+    const core = new THREE.Mesh(shared.core, combustorMaterial);
+    core.position.set(29, 22, 0);
+    core.rotation.z = Math.PI / 2;
+    core.userData.turbine = turbine.id;
+    group.add(core);
+    pickables.push(core);
+    // 轴承座
+    for (const x of [-34, 62]) add(shared.pedestal, skidMaterial, x, 12);
     const turbineCone = add(shared.turbine, casing, 52, 22);
     turbineCone.rotation.z = -Math.PI / 2;
     add(shared.duct, casing, 72, 18);
     add(shared.stack, metal, 72, 66);
+    // 烟囱上的发光环；顶部的环在有火焰时变成橙色
+    for (const y of [44, 70]) {
+      const band = new THREE.Mesh(shared.band, neonMaterial);
+      band.position.set(72, y, 0);
+      band.rotation.x = Math.PI / 2;
+      group.add(band);
+    }
+    const crownMaterial = new THREE.MeshBasicMaterial({ color: ACCENT });
+    const crown = new THREE.Mesh(shared.crown, crownMaterial);
+    crown.position.set(72, 103, 0);
+    crown.rotation.x = Math.PI / 2;
+    group.add(crown);
 
-    // 进气端的转子叶片
+    // 转子：贯穿压气机与涡轮的主轴、各级叶片与进气端的叶片
     const rotor = new THREE.Group();
-    rotor.position.set(-23, 22, 0);
+    rotor.position.set(0, 22, 0);
+    const rotorShaft = new THREE.Mesh(shared.rotorShaft, metal);
+    rotorShaft.rotation.z = Math.PI / 2;
+    rotorShaft.position.x = 16;
+    rotor.add(rotorShaft);
+    rotor.add(new THREE.Mesh(shared.compressorStages, bladeMaterial));
+    rotor.add(new THREE.Mesh(shared.turbineStages, bladeMaterial));
     const hub = new THREE.Mesh(shared.hub, bladeMaterial);
     hub.rotation.z = Math.PI / 2;
+    hub.position.x = -23;
     rotor.add(hub);
     for (let i = 0; i < 8; i++) {
       const blade = new THREE.Mesh(shared.blade, bladeMaterial);
       blade.position.set(
-        0,
+        -23,
         Math.cos((i / 8) * Math.PI * 2) * 6,
         Math.sin((i / 8) * Math.PI * 2) * 6,
       );
@@ -351,6 +630,26 @@ export function createTurbineScene(
       rotor.add(blade);
     }
     group.add(rotor);
+
+    // 传感器：每个都单独建模，颜色按类型区分
+    const sensorMeshes: SensorMesh[] = sensorsOf(turbine.id)
+      .filter((sensor) => sensor.kind !== 'tip')
+      .map((sensor) => {
+        const color = new THREE.Color(SENSOR_COLORS[sensor.kind]);
+        const material = new THREE.MeshStandardMaterial({
+          color,
+          emissive: color,
+          emissiveIntensity: 0.35,
+          roughness: 0.4,
+        });
+        const mesh = new THREE.Mesh(shared.probe, material);
+        const count = sensorsOf(turbine.id, sensor.kind).length;
+        mesh.position.copy(sensorPosition(sensor, count));
+        mesh.userData = { turbine: turbine.id, tag: sensor.tag };
+        group.add(mesh);
+        probes.push(mesh);
+        return { mesh, material, sensor, color };
+      });
 
     // 燃烧室外圈的喷嘴
     const tips = sensorsOf(turbine.id, 'tip').map((sensor, i, all) => {
@@ -363,6 +662,9 @@ export function createTurbineScene(
       const mesh = new THREE.Mesh(shared.tip, material);
       mesh.position.set(29, 22 + Math.cos(angle) * 15.5, Math.sin(angle) * 15.5);
       group.add(mesh);
+      mesh.userData = { turbine: turbine.id, tag: sensor.tag };
+      probes.push(mesh);
+      sensorMeshes.push({ mesh, material, sensor, color: FLAME.clone() });
       return { mesh, material, tag: sensor.tag };
     });
 
@@ -388,11 +690,11 @@ export function createTurbineScene(
       return { sprite, age: 0, life: 1, vx: 0, vz: 0 };
     });
 
-    // 中间一台的卡片抬高，避免与相邻卡片重叠
+    // 相邻机组的卡片高低错开，避免重叠
     const index = TURBINES.filter((t) => t.plant === turbine.plant).indexOf(turbine);
     const pin = stage.addPin(
       cardHtml(turbine.id),
-      group.position.clone().add(new THREE.Vector3(0, index === 1 ? 172 : 100, 0)),
+      group.position.clone().add(new THREE.Vector3(0, index % 2 ? 170 : 100, 0)),
       'pin-unit',
     );
     pin.element.dataset.turbine = turbine.id;
@@ -401,12 +703,14 @@ export function createTurbineScene(
       group,
       rotor,
       combustor: combustorMaterial,
+      crown: crownMaterial,
+      sensors: sensorMeshes,
       tips,
       ring,
       pin,
       smoke,
       stackTop: (group.updateMatrixWorld(), group.localToWorld(new THREE.Vector3(72, 104, 0))),
-      visual: { speed: 0, flame: false, power: 0, tips: [] },
+      visual: { speed: 0, flame: false, power: 0, tips: [], readings: {} },
       spin: 0,
       emit: 0,
     });
@@ -417,6 +721,8 @@ export function createTurbineScene(
   const sourcePins = new Map<SourceId, Pin>();
   const baseMaterial = new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.2 });
   const diskGeometry = new THREE.CylinderGeometry(20, 20, 6, 32);
+  const sourceRingGeometry = new THREE.TorusGeometry(20, 0.6, 6, 48);
+  const sourceRings = new Map<SourceId, THREE.MeshBasicMaterial>();
   const baseGeometry = new THREE.CylinderGeometry(24, 26, 10, 32);
   for (const source of SOURCES) {
     const x = SOURCE_X[source.id];
@@ -424,18 +730,29 @@ export function createTurbineScene(
     base.position.set(x, 5, SOURCE_Z);
     base.castShadow = true;
     scene.add(base);
+    // 半透明的盘体，边缘是发光的环
     const material = new THREE.MeshStandardMaterial({
       color: source.color,
       emissive: source.color,
-      emissiveIntensity: 0.4,
-      roughness: 0.5,
+      emissiveIntensity: 0.25,
+      roughness: 0.3,
+      transparent: true,
+      opacity: 0.32,
+      depthWrite: false,
     });
+    const ringMaterial = new THREE.MeshBasicMaterial({ color: source.color, transparent: true });
     for (let i = 0; i < 3; i++) {
       const disk = new THREE.Mesh(diskGeometry, material);
       disk.position.set(x, 13 + i * 7.5, SOURCE_Z);
-      disk.castShadow = true;
       scene.add(disk);
+      for (const dy of [-3, 3]) {
+        const ring = new THREE.Mesh(sourceRingGeometry, ringMaterial);
+        ring.position.set(x, 13 + i * 7.5 + dy, SOURCE_Z);
+        ring.rotation.x = Math.PI / 2;
+        scene.add(ring);
+      }
     }
+    sourceRings.set(source.id, ringMaterial);
     sourceMaterials.set(source.id, material);
     sourcePins.set(
       source.id,
@@ -607,17 +924,15 @@ export function createTurbineScene(
 
   // ── 配色：深蓝底色，轮廓线发出青色荧光 ──
   scene.background = new THREE.Color(NEON.background);
-  stage.fog.color.set(NEON.background);
-  groundMaterial.color.set(NEON.ground);
-  (grid.material as THREE.LineBasicMaterial).color.set(NEON.grid);
-  (grid.material as THREE.LineBasicMaterial).opacity = 0.55;
+  stage.fog.color.set(0x071a3a);
   padMaterial.color.set(NEON.pad);
   sourcePadMaterial.color.set(NEON.pad);
   metal.color.set(0x1d3556);
-  casing.color.set(0x213d63);
+  casing.color.set(0x3a6ea8);
   generatorMaterial.color.set(0x16304f);
   skidMaterial.color.set(0x0f2140);
-  bladeMaterial.color.set(0x5d8fc4);
+  bladeMaterial.color.set(0x7fb2e6);
+  bladeMaterial.emissive.set(0x123a66);
   baseMaterial.color.set(0x0f2140);
   stage.hemi.color.set(0x4a78c8);
   stage.hemi.groundColor.set(0x030712);
@@ -652,17 +967,49 @@ export function createTurbineScene(
   const resizeObserver = new ResizeObserver(applyInsets);
   resizeObserver.observe(container);
 
-  // ── 拾取 ──
-  const pickTurbine = (event: PointerEvent) =>
-    stage.pick(event, pickables)?.object.userData.turbine as TurbineId | undefined;
+  // ── 拾取与悬停 ──
   stage.onClick((event) => {
-    const id = pickTurbine(event);
-    if (id) options.onSelect(id);
+    const hit = stage.pick(event, [...probes, ...pickables]);
+    const tag = hit?.object.userData.tag as string | undefined;
+    if (tag) options.onSelectSensor(tag);
+    else if (hit?.object.userData.turbine)
+      options.onSelect(hit.object.userData.turbine as TurbineId);
   });
+  const probePin = stage.addPin('', new THREE.Vector3(), 'pin-probe', 'both', false);
+  let hovered: string | null = null;
+  const probeHtml = (tag: string) => {
+    const sensor = [...units.values()]
+      .flatMap((u) => u.sensors)
+      .find((s) => s.sensor.tag === tag)!.sensor;
+    const value = units.get(sensor.turbine)!.visual.readings[tag];
+    const unit = SENSOR_UNITS[sensor.kind];
+    const reading =
+      value === undefined || Number.isNaN(value)
+        ? '—'
+        : sensor.kind === 'flame'
+          ? value > 0.5
+            ? tr('有火焰', 'Flame on')
+            : tr('无火焰', 'No flame')
+          : `${value.toLocaleString('en-US', { maximumFractionDigits: Math.abs(value) < 10 ? 2 : 1 })} ${unit}`;
+    return `<b>${tag}</b><span>${escapeHtml(sensorKindLabel(sensor.kind))} · ${escapeHtml(componentLabel(componentById.get(sensor.component)!))}</span><em>${escapeHtml(reading)}</em>`;
+  };
   stage.onHover((event) => {
-    stage.canvas.style.cursor = pickTurbine(event) ? 'pointer' : '';
+    const hit = stage.pick(event, [...probes, ...pickables]);
+    const tag = hit?.object.userData.tag as string | undefined;
+    stage.canvas.style.cursor = hit ? 'pointer' : '';
+    hovered = tag ?? null;
+    probePin.shown = !!tag;
+    if (tag) {
+      (hit!.object as THREE.Mesh).getWorldPosition(probePin.anchor);
+      probePin.anchor.y += 3;
+      probePin.element.innerHTML = probeHtml(tag);
+    }
   });
-  pinLayer.addEventListener('click', (event) => {
+  let usedTags = new Set<string>();
+  let hitTags = new Set<string>();
+  // 卡片内容随播放刷新，按下时即响应，避免 click 因元素被替换而丢失
+  pinLayer.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) return;
     const card = (event.target as HTMLElement).closest<HTMLElement>('.pin-unit');
     if (card?.dataset.turbine) options.onSelect(card.dataset.turbine as TurbineId);
   });
@@ -672,6 +1019,15 @@ export function createTurbineScene(
   stage.onFrame((now, dt) => {
     const k = reduced ? 1 : damp(4, dt);
     const time = now / 1000;
+    groundUniforms.time.value = reduced ? 0 : time;
+    if (!reduced) {
+      const array = dustGeometry.attributes.position.array as Float32Array;
+      for (let i = 0; i < DUST; i++) {
+        array[i * 3 + 1] += dt * (4 + (i % 5));
+        if (array[i * 3 + 1] > 320) array[i * 3 + 1] = 0;
+      }
+      dustGeometry.attributes.position.needsUpdate = true;
+    }
     hubRing.rotation.z += dt * 0.15;
     graph.rotation.y += dt * 0.12;
     queryGlow = Math.max(0, queryGlow - dt * 0.35);
@@ -685,17 +1041,35 @@ export function createTurbineScene(
       unit.spin += ((rpm / 3000) * 9 - unit.spin) * k;
       if (!reduced) unit.rotor.rotation.x += unit.spin * dt;
       const flameGoal = v.flame ? 0.75 : 0;
+      unit.crown.color.copy(v.flame ? FLAME : ACCENT);
       unit.combustor.emissiveIntensity += (flameGoal - unit.combustor.emissiveIntensity) * k;
       const model = MODELS[turbineById.get(unit.id)!.model];
       unit.tips.forEach((tip, i) => {
         const temp = v.tips[i] ?? 0;
-        const hot = hotTips.has(tip.tag);
+        const hot = hotTips.has(tip.tag) || hitTags.has(tip.tag);
         const level = v.flame ? Math.min(0.8, Math.max(0, (temp - 420) / 300)) : 0;
         const pulse = hot ? 0.6 + 0.6 * Math.abs(Math.sin(time * 4)) : 0;
         tip.material.emissive.copy(hot ? WARN : FLAME);
         tip.material.emissiveIntensity += (level + pulse * 2 - tip.material.emissiveIntensity) * k;
         tip.mesh.scale.setScalar(hot ? 1.5 : temp > model.tipLimit ? 1.3 : 1);
       });
+      // 传感器：查询用到的亮起，命中的闪烁
+      for (const s of unit.sensors) {
+        if (s.sensor.kind === 'tip') continue;
+        const isHitTag = hitTags.has(s.sensor.tag);
+        const isUsed = usedTags.has(s.sensor.tag);
+        const glow = isHitTag
+          ? 1.2 + Math.abs(Math.sin(time * 4)) * 1.5
+          : isUsed
+            ? 1.3
+            : s.sensor.kind === 'flame' && v.flame
+              ? 0.9
+              : 0.3;
+        s.material.emissive.copy(isHitTag ? WARN : s.color);
+        s.material.emissiveIntensity += (glow - s.material.emissiveIntensity) * k;
+        s.mesh.scale.setScalar(isHitTag ? 1.6 : isUsed ? 1.3 : 1);
+      }
+
       // 选中与命中的地面光环
       const ringMaterial = unit.ring.material as THREE.MeshBasicMaterial;
       const isHit = hits.includes(unit.id);
@@ -706,7 +1080,7 @@ export function createTurbineScene(
       unit.ring.scale.setScalar(scale);
 
       // 烟囱冒烟：出力越大越浓
-      const rate = v.flame ? 1.5 + (v.power / model.capacity) * 9 : 0;
+      const rate = v.flame && unit.group.visible ? 1.5 + (v.power / model.capacity) * 9 : 0;
       unit.emit += rate * dt;
       for (const s of unit.smoke) {
         if (s.sprite.visible) {
@@ -743,9 +1117,12 @@ export function createTurbineScene(
       const on = sources.has(source.id);
       const material = sourceMaterials.get(source.id)!;
       const isUsed = used.includes(source.id);
-      const glow = on ? (isUsed ? 0.9 + 0.5 * queryGlow : 0.35) : 0;
+      const glow = on ? (isUsed ? 0.45 + 0.4 * queryGlow : 0.2) : 0;
       material.emissiveIntensity += (glow - material.emissiveIntensity) * k;
       material.color.set(on ? source.color : 0x1a2740);
+      const ring = sourceRings.get(source.id)!;
+      ring.color.set(on ? source.color : 0x22324d);
+      ring.opacity = on ? (isUsed ? 1 : 0.6) : 0.4;
       const line = feedLines.get(source.id)!;
       const lineGoal = on ? (isUsed ? 0.85 : 0.14) : 0;
       line.material.opacity += (lineGoal - line.material.opacity) * k;
@@ -789,6 +1166,14 @@ export function createTurbineScene(
   });
 
   // ── 接口 ──
+  /** 只显示某台机组（看内部或传感器时），传入 null 时全部显示。 */
+  const isolateUnit = (id: TurbineId | null) => {
+    for (const u of units.values()) {
+      const visible = !id || u.id === id;
+      u.group.visible = visible;
+      u.pin.shown = visible;
+    }
+  };
   const clearAnswers = () => {
     for (const line of answerLines) {
       scene.remove(line);
@@ -827,6 +1212,11 @@ export function createTurbineScene(
         el.classList.toggle('is-involved', card.involved && !card.hit);
         el.classList.toggle('is-selected', unit.id === selected);
       }
+      if (hovered) probePin.element.innerHTML = probeHtml(hovered);
+    },
+    setSensorFocus(used, hit) {
+      usedTags = new Set(used);
+      hitTags = new Set(hit);
     },
     setSources(next) {
       sources = next;
@@ -884,6 +1274,9 @@ export function createTurbineScene(
     },
     tour(step) {
       stage.removePins('pin-marker');
+      stage.removePins('pin-sensor');
+      // 看机组内部时只保留这一台，其余机组暂时隐去
+      isolateUnit(step?.focus === 'internals' ? (step.turbine ?? 'A3') : null);
       if (!step) return;
       const unit = units.get(step.turbine ?? 'A3')!;
       unit.group.updateMatrixWorld();
@@ -902,11 +1295,19 @@ export function createTurbineScene(
           position = target.clone().add(new THREE.Vector3(240, 130, 110));
           anchor = local(-54, 40);
           break;
-        case 'tips':
-          target = local(29, 22);
-          position = target.clone().add(new THREE.Vector3(120, 55, 30));
-          anchor = local(29, 40);
+        case 'internals':
+          target = local(8, 6);
+          position = target.clone().add(new THREE.Vector3(205, 95, 26));
+          anchor = null;
           break;
+        case 'pair': {
+          const [a, b] = (step.turbines ?? ['A1', 'A2']).map((id) => units.get(id)!.group.position);
+          target = a.clone().add(b).multiplyScalar(0.5).setY(60);
+          const span = Math.max(160, a.distanceTo(b));
+          position = target.clone().add(new THREE.Vector3(0, span * 0.75 + 120, span * 1.05 + 160));
+          anchor = local(0, 60);
+          break;
+        }
         case 'sources':
           target = new THREE.Vector3(0, 30, SOURCE_Z);
           position = new THREE.Vector3(0, 430, SOURCE_Z + 780);
@@ -935,6 +1336,48 @@ export function createTurbineScene(
       if (anchor && step.marker) {
         stage.addPin(`<i></i><span>${escapeHtml(step.marker)}</span>`, anchor, 'pin-marker');
       }
+      if (step.labels) {
+        // 每类传感器标一次，注明数量
+        const seen = new Set<SensorKind>();
+        for (const s of unit.sensors) {
+          if (seen.has(s.sensor.kind)) continue;
+          const group = unit.sensors.filter((x) => x.sensor.kind === s.sensor.kind);
+          const count = group.length;
+          // 喷嘴的标签放在侧面的喷嘴上，避免与上方的火焰传感器重叠
+          if (s.sensor.kind === 'tip' && s !== group[Math.floor(count / 4)]) continue;
+          seen.add(s.sensor.kind);
+          const world = s.mesh.getWorldPosition(new THREE.Vector3());
+          stage.addPin(
+            `<i style="--c:#${s.color.getHexString()}"></i>${escapeHtml(sensorKindLabel(s.sensor.kind))}${count > 1 ? ` ×${count}` : ''}`,
+            world,
+            'pin-sensor',
+          );
+        }
+      }
+    },
+    focusUnit(turbine) {
+      const unit = units.get(turbine)!;
+      isolateUnit(null);
+      stage.removePins('pin-focus');
+      const target = unit.group.position.clone().setY(40);
+      moved = true;
+      stage.flyToPose(target.clone().add(new THREE.Vector3(150, 190, 260)), target, 1200);
+    },
+    focusSensor(tag) {
+      stage.removePins('pin-focus');
+      if (!tag) {
+        isolateUnit(null);
+        return;
+      }
+      const sensor = [...units.values()]
+        .flatMap((u) => u.sensors)
+        .find((x) => x.sensor.tag === tag);
+      if (!sensor) return;
+      isolateUnit(sensor.sensor.turbine);
+      const world = sensor.mesh.getWorldPosition(new THREE.Vector3());
+      stage.addPin('<i></i>', world.clone(), 'pin-focus');
+      moved = true;
+      stage.flyToPose(world.clone().add(new THREE.Vector3(150, 75, 70)), world, 1200);
     },
     dispose() {
       resizeObserver.disconnect();

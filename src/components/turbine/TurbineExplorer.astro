@@ -41,6 +41,10 @@ const t = {
     origin: '数据来源',
     future: '尚未到达',
     tour: '导览',
+    tabSources: '数据源',
+    tabDetail: '详情',
+    detailEmpty:
+      '点击场景中的机组或传感器，查看它在各数据源中的记录；也可以在详情中跳到同组传感器或相关机组。',
     tourPrev: '上一步',
     tourNext: '下一步',
     tourSkip: '跳过导览',
@@ -72,6 +76,10 @@ const t = {
     origin: 'Data origin',
     future: 'Not yet arrived',
     tour: 'Tour',
+    tabSources: 'Sources',
+    tabDetail: 'Details',
+    detailEmpty:
+      'Click a turbine or sensor in the scene to see its records in each source; from there you can jump to sibling sensors or related turbines.',
     tourPrev: 'Back',
     tourNext: 'Next',
     tourSkip: 'Skip tour',
@@ -180,40 +188,53 @@ const presets = ['all', 'live', 'archive', 'nomaster'].map((id, i) => ({
     </aside>
 
     <aside class="panel panel-sources" aria-label={t.sources}>
-      <div class="sources-head">
-        <p class="panel-label">{t.sources}</p>
-        <span class="sources-count" data-turbine-source-count>
-          {t.connected}
-        </span>
+      <div class="side-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected="true" data-side-tab="sources">
+          {t.tabSources}
+        </button>
+        <button type="button" role="tab" aria-selected="false" data-side-tab="detail">
+          {t.tabDetail}
+        </button>
       </div>
-      <ul class="sources" role="list">
-        {SOURCES.map((source) => (
-          <li>
-            <label class="source" style={`--source:${source.color}`}>
-              <input type="checkbox" checked data-source={source.id} />
-              <span class="source-dot" aria-hidden="true" />
-              <span class="source-body">
-                <span class="source-name">{source.name}</span>
-                <span class="source-system">{source.system}</span>
-              </span>
-              <span class="source-need" data-source-need={source.id} hidden>
-                {t.need}
-              </span>
-              <span class="source-switch" aria-hidden="true">
-                <span />
-              </span>
-            </label>
-          </li>
-        ))}
-      </ul>
-      <div class="presets" role="group" aria-label={t.presetsLabel}>
-        {presets.map((preset) => (
-          <button type="button" data-turbine-preset={preset.id}>
-            {preset.label}
-          </button>
-        ))}
+      <div class="detail" data-turbine-detail data-side-panel="detail" hidden>
+        <p class="detail-empty">{t.detailEmpty}</p>
       </div>
-      <p class="sources-hint">{t.sourcesHint}</p>
+      <div class="side-sources" data-side-panel="sources">
+        <div class="sources-head">
+          <p class="panel-label">{t.sources}</p>
+          <span class="sources-count" data-turbine-source-count>
+            {t.connected}
+          </span>
+        </div>
+        <ul class="sources" role="list">
+          {SOURCES.map((source) => (
+            <li>
+              <label class="source" style={`--source:${source.color}`}>
+                <input type="checkbox" checked data-source={source.id} />
+                <span class="source-dot" aria-hidden="true" />
+                <span class="source-body">
+                  <span class="source-name">{source.name}</span>
+                  <span class="source-system">{source.system}</span>
+                </span>
+                <span class="source-need" data-source-need={source.id} hidden>
+                  {t.need}
+                </span>
+                <span class="source-switch" aria-hidden="true">
+                  <span />
+                </span>
+              </label>
+            </li>
+          ))}
+        </ul>
+        <div class="presets" role="group" aria-label={t.presetsLabel}>
+          {presets.map((preset) => (
+            <button type="button" data-turbine-preset={preset.id}>
+              {preset.label}
+            </button>
+          ))}
+        </div>
+        <p class="sources-hint">{t.sourcesHint}</p>
+      </div>
     </aside>
 
     <section class="signals" data-turbine-signals aria-label={t.signals}>
@@ -374,7 +395,7 @@ const presets = ['all', 'live', 'archive', 'nomaster'].map((id, i) => ({
     top: 16px;
     right: 16px;
     bottom: 92px;
-    width: 226px;
+    width: 272px;
   }
 
   /* 当前查询的说明 */
@@ -382,7 +403,7 @@ const presets = ['all', 'live', 'archive', 'nomaster'].map((id, i) => ({
     position: absolute;
     top: 16px;
     left: 300px;
-    right: 254px;
+    right: 300px;
     z-index: 2;
     padding: 12px 16px;
     border-radius: 16px;
@@ -463,6 +484,17 @@ const presets = ['all', 'live', 'archive', 'nomaster'].map((id, i) => ({
     color: var(--faint);
   }
 
+  .turbine :global(.pins .uc-head em) {
+    margin-left: auto;
+    padding-left: 8px;
+    font: normal 11.5px var(--font-mono);
+    color: var(--accent-ink);
+  }
+
+  .turbine :global(.pins .pin-unit:not(.is-hit, .is-selected, :hover) .uc-state) {
+    display: none;
+  }
+
   .turbine :global(.pins .uc-state) {
     display: flex;
     justify-content: space-between;
@@ -506,8 +538,13 @@ const presets = ['all', 'live', 'archive', 'nomaster'].map((id, i) => ({
   }
 
   .turbine :global(.pins .pin-unit.is-selected) {
-    outline: 1.5px solid var(--ink);
-    outline-offset: 2px;
+    border-color: var(--accent);
+    box-shadow: 0 0 20px var(--glow);
+  }
+
+  .turbine :global(.pins .geo-pin) {
+    border-color: color-mix(in srgb, var(--accent) 35%, var(--line-strong));
+    box-shadow: 0 0 10px rgb(63 208 255 / 0.12);
   }
 
   .turbine :global(.pins .pin-plant) {
@@ -572,6 +609,308 @@ const presets = ['all', 'live', 'archive', 'nomaster'].map((id, i) => ({
   .turbine :global(.pins .pin-hub span) {
     font-size: 11px;
     color: var(--muted);
+  }
+
+  /* 右侧面板：数据源与详情 */
+  .side-tabs {
+    display: flex;
+    flex: none;
+    gap: 4px;
+    padding: 3px;
+    border-radius: 999px;
+    background: var(--surface-2);
+  }
+
+  .side-tabs button {
+    flex: 1;
+    padding: 5px 0;
+    border-radius: 999px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .side-tabs button[aria-selected='true'] {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 0 0 12px var(--accent-soft);
+  }
+
+  .side-sources {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .side-sources[hidden],
+  .detail[hidden] {
+    display: none;
+  }
+
+  .detail {
+    --k-speed: #3fd0ff;
+    --k-flame: #ff8a3c;
+    --k-tip: #ff8a3c;
+    --k-exhaust: #ff6f6f;
+    --k-power: #9be15d;
+    --k-vibration: #c9a0ff;
+    --k-inlet: #7fe0ff;
+    --k-pressure: #5ee6c0;
+    --k-fuel: #ffd166;
+    --k-bearingTemp: #ff9fd0;
+
+    display: grid;
+    gap: 8px;
+    font-size: 12.5px;
+    animation: tour-in 0.35s var(--ease);
+  }
+
+  .detail-empty {
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--muted);
+  }
+
+  .detail :global(.card-nav) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    font: 11px var(--font-mono);
+    color: var(--faint);
+  }
+
+  .detail :global(.card-nav-pair) {
+    display: flex;
+    gap: 4px;
+  }
+
+  .detail :global(.card-head) {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .detail :global(.card-kind) {
+    font-size: 11.5px;
+    color: var(--accent-ink);
+  }
+
+  .detail :global(.card-title) {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-shadow: 0 0 18px var(--glow);
+  }
+
+  .detail :global(.card-mono) {
+    font-family: var(--font-mono);
+    font-size: 18px;
+  }
+
+  .detail :global(.card-close) {
+    flex: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    font-size: 18px;
+    line-height: 1;
+    color: var(--muted);
+  }
+
+  .detail :global(.card-close:hover) {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+
+  .detail :global(.card-state) {
+    color: var(--muted);
+  }
+
+  .detail :global(.card-state b) {
+    color: var(--ink);
+  }
+
+  .detail :global(.card-value) {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font: 600 22px var(--font-mono);
+    color: var(--accent-ink);
+    text-shadow: 0 0 16px var(--glow);
+  }
+
+  .detail :global(.card-value span) {
+    padding: 1px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--source);
+    font: 500 11px var(--font-sans);
+    color: var(--ink-2);
+    text-shadow: none;
+  }
+
+  .detail :global(.card-note) {
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--warn) 12%, transparent);
+    color: var(--ink-2);
+    line-height: 1.6;
+  }
+
+  .detail :global(.card-spark) {
+    width: 100%;
+    height: 56px;
+    border-radius: 8px;
+    background: linear-gradient(var(--accent-soft), transparent);
+  }
+
+  .detail :global(.card-spark path) {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.6;
+    vector-effect: non-scaling-stroke;
+    filter: drop-shadow(0 0 4px var(--glow));
+  }
+
+  .detail :global(.card-spark-axis) {
+    display: flex;
+    justify-content: space-between;
+    margin-top: -4px;
+    font: 10px var(--font-mono);
+    color: var(--faint);
+  }
+
+  .detail :global(.card-iri) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    font: 11px var(--font-mono);
+    color: var(--faint);
+  }
+
+  .detail :global(.card-iri code) {
+    padding: 0;
+    background: none;
+    color: var(--ink-2);
+  }
+
+  .detail :global(.card-label) {
+    margin-top: 6px;
+    font-size: 11.5px;
+    color: var(--faint);
+  }
+
+  .detail :global(.card-rows) {
+    display: grid;
+    gap: 4px;
+  }
+
+  .detail :global(.card-rows li) {
+    display: grid;
+    gap: 2px;
+    padding: 6px 8px 6px 10px;
+    border-left: 3px solid var(--source);
+    border-radius: 4px 8px 8px 4px;
+    background: var(--surface-2);
+    line-height: 1.55;
+  }
+
+  .detail :global(.card-rows li.is-off) {
+    border-left-color: var(--line-strong);
+    background: none;
+  }
+
+  .detail :global(.card-rows li.is-off .card-text) {
+    color: var(--warn);
+  }
+
+  .detail :global(.card-source) {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .detail :global(.card-text code),
+  .detail :global(.card-label code),
+  .detail :global(.card-group code) {
+    padding: 0 3px;
+    font-size: 11px;
+  }
+
+  .detail :global(.card-foot) {
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--faint);
+  }
+
+  .detail :global(.card-group p) {
+    margin-bottom: 4px;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .detail :global(.card-chips) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .detail :global(.card-chip) {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface-2);
+    font-size: 11.5px;
+    color: var(--ink-2);
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+  }
+
+  .detail :global(.card-chip:hover) {
+    border-color: var(--accent);
+    box-shadow: 0 0 12px var(--accent-soft);
+    color: var(--ink);
+  }
+
+  .detail :global(.card-chip i) {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: 0 0 6px var(--c);
+  }
+
+  .detail :global(.card-chip em) {
+    font: normal 11px var(--font-mono);
+    color: var(--accent-ink);
+  }
+
+  .turbine :global(.pins .pin-focus) {
+    translate: -50% -50%;
+    padding: 0;
+    border: 0;
+    background: none;
+    backdrop-filter: none;
+  }
+
+  .turbine :global(.pins .pin-focus i) {
+    position: relative;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    box-shadow: 0 0 14px var(--glow);
+  }
+
+  .turbine :global(.pins .pin-focus i::after) {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    animation: marker-pulse 1.4s ease-out infinite;
   }
 
   /* 导览 */
@@ -686,6 +1025,47 @@ const presets = ['all', 'live', 'archive', 'nomaster'].map((id, i) => ({
     pointer-events: none;
   }
 
+  .turbine :global(.pins .pin-probe) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    padding: 6px 10px;
+    border-color: var(--accent);
+    border-radius: 10px;
+    box-shadow: 0 0 18px var(--glow);
+  }
+
+  .turbine :global(.pins .pin-probe b) {
+    font: 600 12.5px var(--font-mono);
+    color: var(--ink);
+  }
+
+  .turbine :global(.pins .pin-probe span) {
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .turbine :global(.pins .pin-probe em) {
+    font: normal 13px var(--font-mono);
+    color: var(--accent-ink);
+  }
+
+  .turbine :global(.pins .pin-sensor) {
+    gap: 6px;
+    padding: 2px 8px 2px 6px;
+    font-size: 11.5px;
+    color: var(--ink-2);
+    animation: marker-in 0.5s var(--ease) 1.4s both;
+  }
+
+  .turbine :global(.pins .pin-sensor i) {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: 0 0 8px var(--c);
+  }
+
   .turbine :global(.pins .pin-marker) {
     gap: 8px;
     padding: 4px 10px 4px 6px;
@@ -748,7 +1128,7 @@ const presets = ['all', 'live', 'archive', 'nomaster'].map((id, i) => ({
   .signals {
     position: absolute;
     left: 300px;
-    right: 254px;
+    right: 300px;
     bottom: 92px;
     z-index: 2;
     display: flex;

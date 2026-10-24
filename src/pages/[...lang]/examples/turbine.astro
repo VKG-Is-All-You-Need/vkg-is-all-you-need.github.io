@@ -21,10 +21,10 @@ const queries = turbineQueries();
 const t = {
   zh: {
     title: 'VKG × 设备诊断',
-    meta: '交互示例：两座电厂六台燃气轮机的秒级信号、控制系统事件、维修记录、调度计划与气象观测由一个本体统一描述，诊断规则写一次即可用于所有机组。场景取自 Optique 项目在西门子的部署。',
+    meta: '交互示例：两座电厂八台燃气轮机的秒级信号、控制系统事件、维修记录、调度计划与气象观测由一个本体统一描述，诊断规则写一次即可用于所有机组。场景取自 Optique 项目在西门子的部署。',
     label: '示例',
     description:
-      '燃气轮机的诊断需要同时查询秒级传感器信号与设备结构、维修记录、调度计划等静态数据，这些数据分散在结构各异的系统中。示例参照 Optique 项目在西门子的部署，合成了两座电厂六台机组一小时的数据：拖动时间轴查看信号随时间到达，开关数据源比较结果的变化，用同一条语义规则诊断全部机组。',
+      '燃气轮机的诊断需要同时查询秒级传感器信号与设备结构、维修记录、调度计划等静态数据，这些数据分散在结构各异的系统中。示例参照 Optique 项目在西门子的部署，合成了两座电厂八台机组一小时的数据：拖动时间轴查看信号随时间到达，开关数据源比较结果的变化，用同一条语义规则诊断全部机组。',
     scene: '交互场景',
     footnote:
       '示例中的电厂、机组、传感器读数、事件、工单与调度计划均为虚构，按论文中的场景合成；查询结果由示例数据实时计算，规则与 SQL 为便于阅读的简化形式。Ontop 本身不执行 STARQL 与 sigRL，时序查询对应 Ontop-temporal 与 DatalogMTL 一类的工作。',
@@ -80,10 +80,10 @@ const t = {
   },
   en: {
     title: 'VKG × Equipment diagnostics',
-    meta: 'Interactive example: second-level signals, control system events, maintenance records, dispatch plans and weather for six gas turbines at two plants are described by one ontology, and a diagnostic rule written once applies to every turbine. The scenario follows the Optique deployment at Siemens.',
+    meta: 'Interactive example: second-level signals, control system events, maintenance records, dispatch plans and weather for eight gas turbines at two plants are described by one ontology, and a diagnostic rule written once applies to every turbine. The scenario follows the Optique deployment at Siemens.',
     label: 'Examples',
     description:
-      'Diagnosing gas turbines requires querying second-level sensor signals together with static data such as equipment structure, maintenance records and dispatch plans, all spread across systems with different structures. Following the Optique deployment at Siemens, the example synthesizes one hour of data for six turbines at two plants: drag the timeline to watch signals arrive, switch sources on and off to compare results, and diagnose every turbine with the same semantic rule.',
+      'Diagnosing gas turbines requires querying second-level sensor signals together with static data such as equipment structure, maintenance records and dispatch plans, all spread across systems with different structures. Following the Optique deployment at Siemens, the example synthesizes one hour of data for eight turbines at two plants: drag the timeline to watch signals arrive, switch sources on and off to compare results, and diagnose every turbine with the same semantic rule.',
     scene: 'Interactive scene',
     footnote:
       'The plants, turbines, sensor readings, events, work orders and dispatch plans are fictional and synthesized from the scenarios in the papers. Query results are computed from the sample data on the fly; rules and SQL are simplified for readability. Ontop itself does not execute STARQL or sigRL; the temporal queries correspond to work such as Ontop-temporal and DatalogMTL.',

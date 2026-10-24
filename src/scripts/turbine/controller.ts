@@ -7,6 +7,7 @@ import {
   PLANTS,
   TURBINES,
   sensorByTag,
+  sensorsOf,
   turbineById,
   type TurbineId,
 } from '../../lib/turbine/fleet';
@@ -26,6 +27,7 @@ import { ALL_SOURCES, SOURCES, sourceById, type SourceId } from '../../lib/turbi
 import { SPAN, formatTime, lastBatch, m } from '../../lib/turbine/time';
 import { prefersReducedMotion } from '../lifecycle';
 import { SignalChart, seriesColor, type OriginSpan } from './chart';
+import { sensorDetail, unitDetail } from './detail';
 import type { TourFocus, TurbineScene, UnitCard, UnitVisual } from './scene';
 
 const PRESETS: Record<string, SourceId[]> = {
@@ -93,6 +95,11 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
   /** 自动播放的终点；为 null 时播放到结尾。 */
   let storyEnd: number | null = null;
   let scene: TurbineScene | null = null;
+  /** 右侧面板中展示的详情。 */
+  let detail: { type: 'unit'; id: TurbineId } | { type: 'sensor'; tag: string } | null = null;
+  const detailBox = $<HTMLElement>('[data-turbine-detail]');
+  const detailEmpty = detailBox.innerHTML;
+  let lastDetailHtml = '';
   let freshQuery = true;
 
   const ctx = (): TurbineContext => ({ now, sources });
@@ -235,6 +242,9 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
         flame,
         power: Number.isNaN(power) ? 0 : power,
         tips: tagsOf(id, 'tip').map((tag) => observed(tag, now, sources)[t]),
+        readings: Object.fromEntries(
+          sensorsOf(id).map((sensor) => [sensor.tag, observed(sensor.tag, now, sources)[t]]),
+        ),
       };
       const s = stateOf(id, c);
       const row = result.rows.find((r) => r.turbine === id && r.hit);
@@ -256,8 +266,17 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
     }
     scene.setUnits(visuals, cards);
     scene.setSources(sources);
-    const hot = result.hits.flatMap((id) =>
-      query.chart(id, c, result).hitSensors.filter((tag) => sensorByTag.get(tag)?.kind === 'tip'),
+    const focusTurbines = [...new Set([...result.hits, ...(selected ? [selected] : [])])];
+    const specs = focusTurbines.map((id) => query.chart(id, c, result));
+    const hitTags = specs.flatMap((spec) => spec.hitSensors);
+    const hot = hitTags.filter((tag) => sensorByTag.get(tag)?.kind === 'tip');
+    // 正在查看的传感器始终亮起
+    scene.setSensorFocus(
+      [
+        ...specs.flatMap((spec) => spec.sensors),
+        ...(detail?.type === 'sensor' ? [detail.tag] : []),
+      ],
+      hitTags,
     );
     scene.showQuery(
       query.sources.filter((id) => sources.has(id)),
@@ -283,9 +302,59 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
     renderNeeds();
     renderSignals();
     renderScene();
+    renderDetail();
     for (const b of $$<HTMLButtonElement>('[data-turbine-range]')) {
       b.setAttribute('aria-pressed', String(b.dataset.turbineRange === range));
     }
+  }
+
+  function showSideTab(tab: 'sources' | 'detail') {
+    for (const b of $$<HTMLButtonElement>('[data-side-tab]')) {
+      b.setAttribute('aria-selected', String(b.dataset.sideTab === tab));
+    }
+    for (const panel of $$<HTMLElement>('[data-side-panel]')) {
+      panel.hidden = panel.dataset.sidePanel !== tab;
+    }
+  }
+
+  function renderDetail() {
+    const html = !detail
+      ? detailEmpty
+      : detail.type === 'unit'
+        ? unitDetail(detail.id, ctx())
+        : sensorDetail(detail.tag, ctx());
+    if (html !== lastDetailHtml) {
+      lastDetailHtml = html;
+      detailBox.innerHTML = html;
+    }
+  }
+
+  function openUnit(id: TurbineId) {
+    detail = { type: 'unit', id };
+    selected = id;
+    autoSelect = false;
+    showSideTab('detail');
+    sourcesPanel.scrollTop = 0;
+    scene?.focusUnit(id);
+    refresh();
+  }
+
+  function openSensor(tag: string) {
+    const turbine = sensorByTag.get(tag)!.turbine;
+    detail = { type: 'sensor', tag };
+    selected = turbine;
+    autoSelect = false;
+    showSideTab('detail');
+    sourcesPanel.scrollTop = 0;
+    scene?.focusSensor(tag);
+    refresh();
+  }
+
+  function closeDetail() {
+    if (detail?.type === 'sensor') scene?.focusSensor(null);
+    detail = null;
+    scene?.resetView();
+    refresh();
   }
 
   function setSpeed(next: number) {
@@ -349,9 +418,7 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
   }
 
   function selectTurbine(id: TurbineId) {
-    selected = id;
-    autoSelect = false;
-    refresh();
+    openUnit(id);
   }
 
   function setSources(next: Set<SourceId>) {
@@ -387,10 +454,10 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
   const TOUR: TourStep[] = [
     {
       focus: 'overview',
-      title: tr('两座电厂，六台燃气轮机', 'Two plants, six gas turbines'),
+      title: tr('两座电厂，八台燃气轮机', 'Two plants, eight gas turbines'),
       text: tr(
-        '这是一家虚构的发电公司：北港电厂和西岭电厂各有三台燃气轮机。每台机组头顶的卡片显示它此刻的状态，烟囱冒烟表示正在燃烧发电。',
-        'A fictional power company: the North Harbor and Westridge plants each run three gas turbines. The card above each turbine shows its current state, and smoke from a stack means it is burning fuel and generating power.',
+        '这是一家虚构的发电公司：北港电厂和西岭电厂各有四台燃气轮机。每台机组头顶的卡片显示它此刻的状态，烟囱冒烟表示正在燃烧发电。',
+        'A fictional power company: the North Harbor and Westridge plants each run four gas turbines. The card above each turbine shows its current state, and smoke from a stack means it is burning fuel and generating power.',
       ),
       duration: 8,
       enter() {
@@ -414,15 +481,15 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
       enter() {},
     },
     {
-      focus: 'tips',
+      focus: 'internals',
       turbine: 'A3',
-      marker: tr('喷嘴 × 6', 'Burner tips × 6'),
-      title: tr('每秒都在产生数据', 'Data every second'),
+      labels: true,
+      title: tr('机组内部的传感器', 'Sensors inside the turbine'),
       text: tr(
-        '燃烧室外圈的小圆点是喷嘴，每个都装有温度传感器。加上转速、火焰、振动和出力，一台机组有十几个传感器，每个每秒产生一个读数。',
-        'The small dots around the combustor are burner tips, each with a temperature sensor. With speed, flame, vibration and output sensors, one turbine has more than a dozen sensors, each producing a reading every second.',
+        '外壳做成了半透明：前段是压气机的多级叶片，中间是燃烧室，后段是涡轮。每台机组装有 18 或 19 个传感器，测量转速、进气温度、压气机出口压力、火焰、燃料流量、喷嘴温度、排气温度、轴承振动与温度以及有功功率，每个每秒产生一个读数。鼠标移到传感器上可以看到编号和读数。',
+        'The casing is see-through: compressor stages at the front, the combustor in the middle and the turbine behind it. Each turbine carries 18 or 19 sensors for rotor speed, inlet temperature, compressor discharge pressure, flame, fuel flow, burner tip temperature, exhaust temperature, bearing vibration and temperature, and active power, each producing a reading every second. Hover over a sensor to see its tag and reading.',
       ),
-      duration: 8,
+      duration: 13,
       enter() {},
     },
     {
@@ -434,6 +501,18 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
         'Each plant has its own historian with a different table layout, one storing Celsius and the other Fahrenheit; there are also a live stream and the master data, alarm, maintenance, dispatch and weather systems, each numbering turbines its own way.',
       ),
       duration: 9,
+      enter() {},
+    },
+    {
+      focus: 'turbine',
+      turbine: 'A3',
+      marker: 'NH-GT3 = 10004713 = GA-60-0207',
+      title: tr('同一台机组，三个编号', 'One turbine, three identifiers'),
+      text: tr(
+        '报警系统叫它 NH-GT3，维修系统叫它 10004713，设备主数据和调度计划叫它 GA-60-0207；西岭电厂的报警代码又是另一套写法。在 VKG 中，它们都映射到同一台机组，查询时只需写“A3”。',
+        'The alarm system calls it NH-GT3, the maintenance system 10004713, and the master data and dispatch plan GA-60-0207; the Westridge plant uses yet another code scheme for alarms. In the VKG they all map to the same turbine, so a query simply refers to A3.',
+      ),
+      duration: 10,
       enter() {},
     },
     {
@@ -493,6 +572,61 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
         now = query.suggest;
         setSources(new Set(ALL_SOURCES.filter((id) => id !== 'live')));
         refresh();
+      },
+    },
+    {
+      focus: 'pair',
+      turbines: ['A1', 'A2'],
+      turbine: 'A2',
+      marker: tr('清吹未完成', 'Purge not finished'),
+      title: tr('一条规则，用于全部机组', 'One rule for every turbine'),
+      text: tr(
+        '点火失败后要“清吹”残留燃料：火焰熄灭后 15 秒内升速，再在 20 秒内降速。两种型号的转速阈值不同，传统做法要为每台机组手写规则；语义规则只写一次，阈值从设备主数据读取。结果：A1 清吹完成，A2 的转速停在 760 rpm，没能完成。',
+        'After a failed ignition the turbine must purge leftover fuel: speed up within 15 s after flame out, then slow down within 20 s. The two models use different speed thresholds, so traditionally each turbine gets hand-written rules; the semantic rule is written once and reads thresholds from the master data. Result: A1 finishes purging, while A2 stalls at 760 rpm.',
+      ),
+      duration: 14,
+      enter() {
+        setSources(new Set(ALL_SOURCES));
+        setQuery(byId('purging'));
+        selected = null;
+        autoSelect = true;
+        playFrom(query.story.from, query.story.speed, query.suggest);
+      },
+    },
+    {
+      focus: 'pair',
+      turbines: ['A1', 'B1'],
+      turbine: 'A1',
+      marker: tr('同批次 L17', 'Same batch L17'),
+      title: tr('跨电厂追溯同批次零件', 'Tracing a part batch across plants'),
+      text: tr(
+        '西岭电厂 B1 的喷嘴报警后，查询沿着“报警 → 零件批次 → 同批次零件 → 所在机组”查下去，发现北港电厂 A1 的 6 个喷嘴也来自批次 L17。这需要同时用到报警系统、维修系统和设备主数据。',
+        'After a burner tip alarm at Westridge B1, the query follows alarm → part batch → parts from the same batch → their turbines, and finds that the six tips of North Harbor A1 also come from batch L17. This takes the alarm system, the maintenance system and the master data together.',
+      ),
+      duration: 11,
+      enter() {
+        setQuery(byId('batchRisk'));
+        selected = null;
+        autoSelect = true;
+        playFrom(query.story.from, query.story.speed, query.suggest);
+      },
+    },
+    {
+      focus: 'pair',
+      turbines: ['A3', 'B3'],
+      turbine: 'B3',
+      marker: tr('计划内停机', 'Planned shutdown'),
+      title: tr('计划内还是计划外', 'Planned or unplanned'),
+      text: tr(
+        '最近 15 分钟，A3 和 B3 的出力都明显下降。对照调度计划可以区分：B3 是按计划停机，A3 是计划外的降负荷，原因来自报警系统中的喷嘴温度高。',
+        'In the last 15 minutes, output fell sharply at both A3 and B3. The dispatch plan tells them apart: B3 is a planned shutdown, while A3 is an unplanned load reduction caused by the burner tip overtemperature in the alarm system.',
+      ),
+      duration: 11,
+      enter() {
+        setQuery(byId('powerDrop'));
+        selected = null;
+        autoSelect = true;
+        playFrom(query.story.from, query.story.speed, query.suggest);
       },
     },
     {
@@ -639,21 +773,52 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
       { signal },
     );
   }
-  resultBox.addEventListener(
-    'click',
-    (event) => {
-      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-row-turbine]');
-      if (!button) return;
-      selected = button.dataset.rowTurbine as TurbineId;
-      autoSelect = false;
-      if (button.dataset.rowAt !== undefined && !playing) {
-        now = Math.min(SPAN, Number(button.dataset.rowAt));
-      }
-      range = 'fit';
-      refresh();
-    },
-    { signal },
-  );
+  /**
+   * 播放时结果列表与详情每秒重绘多次，按下与松开可能落在不同的元素上而丢失 click，
+   * 因此鼠标在按下时响应，键盘仍通过 click 响应。
+   */
+  const onActivate = (el: HTMLElement, handler: (target: HTMLElement) => void) => {
+    el.addEventListener(
+      'pointerdown',
+      (event) => {
+        if (event.button === 0) handler(event.target as HTMLElement);
+      },
+      { signal },
+    );
+    el.addEventListener(
+      'click',
+      (event) => {
+        if (event.detail === 0) handler(event.target as HTMLElement);
+      },
+      { signal },
+    );
+  };
+  onActivate(detailBox, (target) => {
+    const unit = target.closest<HTMLElement>('[data-unit]');
+    const sensor = target.closest<HTMLElement>('[data-sensor]');
+    if (target.closest('[data-detail-close]')) closeDetail();
+    else if (sensor) openSensor(sensor.dataset.sensor!);
+    else if (unit) {
+      if (detail?.type === 'sensor') scene?.focusSensor(null);
+      openUnit(unit.dataset.unit as TurbineId);
+    }
+  });
+  for (const b of $$<HTMLButtonElement>('[data-side-tab]')) {
+    b.addEventListener('click', () => showSideTab(b.dataset.sideTab as 'sources' | 'detail'), {
+      signal,
+    });
+  }
+  onActivate(resultBox, (target) => {
+    const button = target.closest<HTMLButtonElement>('[data-row-turbine]');
+    if (!button) return;
+    selected = button.dataset.rowTurbine as TurbineId;
+    autoSelect = false;
+    if (button.dataset.rowAt !== undefined && !playing) {
+      now = Math.min(SPAN, Number(button.dataset.rowAt));
+    }
+    range = 'fit';
+    refresh();
+  });
   for (const input of $$<HTMLInputElement>('[data-source]')) {
     input.addEventListener(
       'change',
@@ -786,6 +951,7 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
       scene = createTurbineScene(viewport, pinLayer, {
         reducedMotion: reduced,
         onSelect: selectTurbine,
+        onSelectSensor: openSensor,
       });
       stage.classList.add('is-ready');
       status.textContent = '';

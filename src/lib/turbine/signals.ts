@@ -5,7 +5,8 @@
  * 预设过程对应论文中的诊断任务：
  * A1 点火失败后清吹并重新点火；A2 清吹后转速停在 760 rpm，清吹未完成，启动中止；
  * A3 与 B1 喷嘴温度在 10 秒内单调上升后报故障；A3 的 2 号转速传感器自 06:20 起读数不变；
- * B2 加速中火焰丢失跳闸，停转后重新启动；B3 按调度计划停机，2 号轴承检修后振动偏高。
+ * B2 加速中火焰丢失跳闸，停转后重新启动；B3 按调度计划停机，2 号轴承检修后振动偏高；
+ * A4 与 B4 全程稳定带负荷，作为同型号机组的比较对象。
  */
 import {
   MODELS,
@@ -127,6 +128,16 @@ export const SCENARIOS: Record<TurbineId, Scenario> = {
       [2401, 2],
       [3360, 35],
     ],
+  },
+  A4: {
+    speed: [[0, 3000]],
+    flame: [[0, END]],
+    power: [[0, 34]],
+  },
+  B4: {
+    speed: [[0, 3000]],
+    flame: [[0, END]],
+    power: [[0, 36]],
   },
   B3: {
     speed: [
@@ -268,6 +279,30 @@ function generate(sensor: Sensor): Float32Array {
       };
       const lagged = lag(target, 40, 200, target(0));
       for (let t = 0; t < SAMPLES; t++) out[t] = lagged[t] + noise(seed, t) * 1;
+      return out;
+    }
+    case 'inlet':
+      for (let t = 0; t < SAMPLES; t++) out[t] = ambient(t) + 0.6 + noise(seed, t) * 0.1;
+      return out;
+    case 'pressure':
+      for (let t = 0; t < SAMPLES; t++) {
+        const spin = Math.min(1, speed(t) / 3000) ** 2;
+        const load = 0.7 + (0.3 * power(t)) / model.capacity;
+        out[t] = 1.01 + 14.5 * spin * load + (spin > 0 ? noise(seed, t) * 0.03 : 0);
+      }
+      return out;
+    case 'fuel':
+      for (let t = 0; t < SAMPLES; t++) {
+        out[t] = flameOn(turbine.id, t)
+          ? 0.35 * Math.min(1, speed(t) / 3000) + 0.055 * power(t) + noise(seed, t) * 0.01
+          : 0;
+      }
+      return out;
+    case 'bearingTemp': {
+      const hot = scenario.vibration?.bearing === sensor.index ? 12 : 0;
+      const target = (t: number) => ambient(t) + 18 + (34 + hot) * Math.min(1, speed(t) / 3000);
+      const lagged = lag(target, 300, 400, target(0));
+      for (let t = 0; t < SAMPLES; t++) out[t] = lagged[t] + noise(seed, t) * 0.15;
       return out;
     }
     case 'vibration': {

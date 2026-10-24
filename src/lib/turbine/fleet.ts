@@ -1,5 +1,5 @@
 /**
- * 设备诊断示例中的机组：两座电厂、两种型号、六台燃气轮机，以及它们的部件与传感器。
+ * 设备诊断示例中的机组：两座电厂、两种型号、八台燃气轮机，以及它们的部件与传感器。
  * 型号、部件层级与阈值参数记录在设备主数据中；传感器与部件的对应关系分别记录在两座电厂的历史库中。
  * 部件代号参照电厂标识系统（KKS）的写法，传感器编号沿用 sigRL 论文中的格式（如 S21R1T1）。
  */
@@ -7,9 +7,20 @@ import { tr } from '../../i18n/runtime';
 
 export type PlantId = 'A' | 'B';
 export type ModelId = 'GT-A' | 'GT-B';
-export type TurbineId = 'A1' | 'A2' | 'A3' | 'B1' | 'B2' | 'B3';
-export type SensorKind = 'speed' | 'flame' | 'tip' | 'exhaust' | 'power' | 'vibration';
-export type ComponentKind = 'rotor' | 'combustor' | 'tip' | 'exhaust' | 'bearing' | 'generator';
+export type TurbineId = 'A1' | 'A2' | 'A3' | 'A4' | 'B1' | 'B2' | 'B3' | 'B4';
+export type SensorKind =
+  | 'speed'
+  | 'flame'
+  | 'tip'
+  | 'exhaust'
+  | 'power'
+  | 'vibration'
+  | 'inlet'
+  | 'pressure'
+  | 'fuel'
+  | 'bearingTemp';
+export type ComponentKind =
+  'rotor' | 'compressor' | 'combustor' | 'tip' | 'exhaust' | 'bearing' | 'generator';
 
 export interface Plant {
   id: PlantId;
@@ -154,6 +165,15 @@ export const TURBINES: Turbine[] = [
     equipmentNo: '10004713',
   },
   {
+    id: 'A4',
+    no: 7,
+    plant: 'A',
+    model: 'GT-B',
+    serial: 'GB-40-0302',
+    dcs: 'NH-GT4',
+    equipmentNo: '10004714',
+  },
+  {
     id: 'B1',
     no: 4,
     plant: 'B',
@@ -180,6 +200,15 @@ export const TURBINES: Turbine[] = [
     dcs: '13MBA',
     equipmentNo: '20007303',
   },
+  {
+    id: 'B4',
+    no: 8,
+    plant: 'B',
+    model: 'GT-B',
+    serial: 'GB-40-0317',
+    dcs: '14MBA',
+    equipmentNo: '20007304',
+  },
 ];
 
 export const turbineById = new Map(TURBINES.map((t) => [t.id, t]));
@@ -188,6 +217,7 @@ export const plantOf = (id: TurbineId) => PLANTS[turbineById.get(id)!.plant];
 
 const COMPONENT_CODES: Record<ComponentKind, string> = {
   rotor: 'MBA10',
+  compressor: 'MBA20',
   combustor: 'MBM10',
   tip: 'MBM1',
   exhaust: 'MBR10',
@@ -230,8 +260,17 @@ for (const turbine of TURBINES) {
   sense('flame', combustor, 1, `F01C1T${n}`);
   for (let i = 1; i <= model.tips; i++) sense('tip', add('tip', i), i, `T4${i}B1T${n}`);
   sense('exhaust', add('exhaust'), 1, `T51E1T${n}`);
-  for (let i = 1; i <= 2; i++) sense('vibration', add('bearing', i), i, `V6${i}D${i}T${n}`);
+  const bearings = [1, 2].map((i) => add('bearing', i));
+  bearings.forEach((bearing, i) => sense('vibration', bearing, i + 1, `V6${i + 1}D${i + 1}T${n}`));
   sense('power', add('generator'), 1, `P01G1T${n}`);
+  // 更细粒度的传感器：进气温度、压气机出口压力、燃料流量与轴承温度
+  const compressor = add('compressor');
+  sense('inlet', compressor, 1, `T11K1T${n}`);
+  sense('pressure', compressor, 1, `P21K1T${n}`);
+  sense('fuel', combustor, 1, `Q31C1T${n}`);
+  bearings.forEach((bearing, i) =>
+    sense('bearingTemp', bearing, i + 1, `T7${i + 1}D${i + 1}T${n}`),
+  );
 }
 
 export const sensorByTag = new Map(SENSORS.map((s) => [s.tag, s]));
@@ -250,6 +289,10 @@ export const SENSOR_UNITS: Record<SensorKind, string> = {
   exhaust: '°C',
   power: 'MW',
   vibration: 'mm/s',
+  inlet: '°C',
+  pressure: 'bar',
+  fuel: 'kg/s',
+  bearingTemp: '°C',
 };
 
 /** 本体中的传感器类。 */
@@ -260,6 +303,10 @@ export const SENSOR_CLASSES: Record<SensorKind, string> = {
   exhaust: ':TemperatureSensor',
   power: ':PowerMeter',
   vibration: ':VibrationSensor',
+  inlet: ':TemperatureSensor',
+  pressure: ':PressureSensor',
+  fuel: ':FlowSensor',
+  bearingTemp: ':TemperatureSensor',
 };
 
 export const sensorKindLabel = (kind: SensorKind) =>
@@ -270,11 +317,16 @@ export const sensorKindLabel = (kind: SensorKind) =>
     exhaust: tr('排气温度', 'Exhaust temperature'),
     power: tr('有功出力', 'Active power'),
     vibration: tr('轴承振动', 'Bearing vibration'),
+    inlet: tr('进气温度', 'Inlet temperature'),
+    pressure: tr('压气机出口压力', 'Compressor discharge pressure'),
+    fuel: tr('燃料流量', 'Fuel flow'),
+    bearingTemp: tr('轴承温度', 'Bearing temperature'),
   })[kind];
 
 export const componentLabel = (component: Component) =>
   ({
     rotor: tr('转子', 'Rotor'),
+    compressor: tr('压气机', 'Compressor'),
     combustor: tr('燃烧室', 'Combustor'),
     tip: tr(`${component.index} 号喷嘴`, `Burner tip ${component.index}`),
     exhaust: tr('排气段', 'Exhaust'),
@@ -286,6 +338,7 @@ export const componentLabel = (component: Component) =>
 export const componentShort = (component: Component) =>
   ({
     rotor: 'R1',
+    compressor: 'CP',
     combustor: 'CB',
     tip: `BT${component.index}`,
     exhaust: 'EX',

@@ -163,6 +163,9 @@ const RAW_ORDERS: [TurbineId, string, string, WorkType, string?][] = [
   ['B2', 'MBM10', '2026-09-14', 'replace'],
   ['B3', 'MBM1*', '2026-04-02', 'replace', 'L22'],
   ['B3', 'MBD20', '2026-10-21', 'replace', 'K03'],
+  ['A4', 'MBM1*', '2026-01-15', 'replace', 'L12'],
+  ['A4', 'MBM10', '2026-07-02', 'inspect'],
+  ['B4', 'MBM1*', '2026-03-11', 'replace', 'L22'],
 ];
 
 export const WORK_ORDERS: WorkOrder[] = RAW_ORDERS.map(([id, component, date, type, batch], i) => ({
@@ -237,7 +240,9 @@ export const DISPATCH: Record<TurbineId, [number, number][]> = {
     [2100, 30],
   ],
   A3: [[0, 52]],
+  A4: [[0, 34]],
   B1: [[0, 50]],
+  B4: [[0, 36]],
   B2: [
     [0, 0],
     [1200, 0],

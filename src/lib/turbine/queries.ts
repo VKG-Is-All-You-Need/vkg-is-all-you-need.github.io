@@ -515,8 +515,8 @@ const purging = (): TurbineQuery => ({
       'After a failed ignition, the turbine blows out leftover fuel with fast airflow (purging). Whether purging finished depends on rotor speed, which is spread across two historians with different layouts and a live stream, and the two models use different thresholds. Traditionally, rules are written separately for every turbine.',
     ),
     vkg: tr(
-      '一条规则按“火焰熄灭 → 15 秒内升速 → 20 秒内降速”描述清吹。VKG 通过本体找到每台机组的转速传感器，从设备主数据读取各自的阈值，规则自动用于全部 6 台机组。',
-      "One rule describes purging as “flame out → speed up within 15 s → slow down within 20 s”. The VKG finds each turbine's speed sensors through the ontology and reads its thresholds from the master data, so the rule applies to all six turbines.",
+      '一条规则按“火焰熄灭 → 15 秒内升速 → 20 秒内降速”描述清吹。VKG 通过本体找到每台机组的转速传感器，从设备主数据读取各自的阈值，规则自动用于全部 8 台机组。',
+      "One rule describes purging as “flame out → speed up within 15 s → slow down within 20 s”. The VKG finds each turbine's speed sensors through the ontology and reads its thresholds from the master data, so the rule applies to all eight turbines.",
     ),
   },
   text: {
