@@ -14,3 +14,4 @@ import './history';
 import './timeline';
 import './geo';
 import './city';
+import './turbine';

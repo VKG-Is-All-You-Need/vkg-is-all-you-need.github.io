@@ -1,0 +1,544 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import PageHeader from '../../../components/ui/PageHeader.astro';
+import SectionHeading from '../../../components/ui/SectionHeading.astro';
+import Icon from '../../../components/ui/Icon.astro';
+import TurbineExplorer from '../../../components/turbine/TurbineExplorer.astro';
+import { turbineQueries } from '../../../lib/turbine/queries';
+import { TURBINE_MAPPING, TURBINE_ONTOLOGY } from '../../../lib/turbine/mapping';
+import { SOURCES } from '../../../lib/turbine/sources';
+import { highlight } from '../../../lib/highlight';
+import { langOf, langPaths, localize } from '../../../i18n';
+import { setLang } from '../../../i18n/runtime';
+
+export const getStaticPaths = langPaths;
+
+const lang = langOf(Astro.url.pathname);
+setLang(lang);
+
+const queries = turbineQueries();
+
+const t = {
+  zh: {
+    title: 'VKG × 设备诊断',
+    meta: '交互示例：两座电厂六台燃气轮机的秒级信号、控制系统事件、维修记录、调度计划与气象观测由一个本体统一描述，诊断规则写一次即可用于所有机组。场景取自 Optique 项目在西门子的部署。',
+    label: '示例',
+    description:
+      '燃气轮机的诊断需要同时查询秒级传感器信号与设备结构、维修记录、调度计划等静态数据，这些数据分散在结构各异的系统中。示例参照 Optique 项目在西门子的部署，合成了两座电厂六台机组一小时的数据：拖动时间轴查看信号随时间到达，开关数据源比较结果的变化，用同一条语义规则诊断全部机组。',
+    scene: '交互场景',
+    footnote:
+      '示例中的电厂、机组、传感器读数、事件、工单与调度计划均为虚构，按论文中的场景合成；查询结果由示例数据实时计算，规则与 SQL 为便于阅读的简化形式。Ontop 本身不执行 STARQL 与 sigRL，时序查询对应 Ontop-temporal 与 DatalogMTL 一类的工作。',
+    rewriteTitle: '规则与查询如何改写',
+    rewriteDescription:
+      '左侧为面向本体的规则或查询（sigRL、STARQL 或 SPARQL），右侧为改写后经联邦查询引擎分发到各数据源的 SQL。obs 表示映射展开后的观测数据：历史库 A、历史库 B 与实时流的 UNION ALL，温度已统一为摄氏度。',
+    sqlLabel: 'SQL（简化）',
+    sourcesTitle: '八个数据源',
+    sourcesDescription:
+      '信号分属两座电厂的历史库与一条实时流，其余数据由设备、维修、调度与气象系统各自维护。各系统对机组的标识方式不同，设备主数据中的对照表把它们连到同一个机组。',
+    refresh: '更新：',
+    mappingTitle: '映射与本体',
+    mappingDescription:
+      '融合的关键在映射：两座电厂的历史库表结构不同，温度传感器由一条 UNION 映射统一为 :TemperatureSensor，这是 Optique 演示中的写法；历史库 B 的华氏温度在映射中换算为摄氏度；归档与实时数据都映射为 sosa:Observation；控制系统事件、维修工单经设备主数据的对照表映射到同一个机组 IRI，两座电厂各自的事件代码归入同一个事件类。',
+    mappingLabel: 'Ontop 映射（节选）',
+    ontologyLabel: '本体（Turtle，节选）',
+    pointsTitle: '要点',
+    points: [
+      [
+        'rotate',
+        '查询覆盖归档与实时数据',
+        '归档数据每 10 分钟入库，最近 10 分钟的数据只在实时流中。映射把两部分统一为同一类观测，查询无须区分数据所在的位置，结果随新数据到达而更新。',
+      ],
+      [
+        'layers',
+        '映射消除结构与单位的差异',
+        '两种表结构、两种温度单位、三套机组编号与两套事件代码，在映射后成为同一组类与属性。同一条查询可以比较两座电厂的机组。',
+      ],
+      [
+        'hierarchy',
+        '规则写一次，用于所有机组',
+        '规则通过本体选取传感器，阈值从设备主数据读取。sigRL 论文报告，西门子的一个清吹任务需要约 300 条数据相关规则，而语义规则只需几行，换到其他机组时无须修改。',
+      ],
+    ],
+    readingTitle: '延伸阅读',
+    reading: [
+      [
+        'Semantic Access to Streaming and Static Data at Siemens',
+        'Kharlamov 等，JWS 2017',
+        '/papers/#siemens',
+      ],
+      [
+        'Semantic Rule-Based Equipment Diagnostics',
+        'sigRL，Mehdi 等，ISWC 2017',
+        'https://doi.org/10.1007/978-3-319-68204-4_29',
+      ],
+      ['SDRL', '西门子列车与涡轮机的诊断规则语言，JWS 2019', '/papers/#sdrl'],
+      ['STARQL', '面向 OBDA 的流与时态查询语言，KI 2014', '/papers/#starql'],
+      ['Ontop-temporal', 'DatalogMTL 上的时态查询', '/papers/#ontop-temporal'],
+      ['W3C SOSA/SSN', '传感器与观测本体', 'https://www.w3.org/TR/vocab-ssn/'],
+      ['VKG × 城市数据融合', '本站示例：八个数据源的联邦查询', '/examples/city/'],
+    ],
+  },
+  en: {
+    title: 'VKG × Equipment diagnostics',
+    meta: 'Interactive example: second-level signals, control system events, maintenance records, dispatch plans and weather for six gas turbines at two plants are described by one ontology, and a diagnostic rule written once applies to every turbine. The scenario follows the Optique deployment at Siemens.',
+    label: 'Examples',
+    description:
+      'Diagnosing gas turbines requires querying second-level sensor signals together with static data such as equipment structure, maintenance records and dispatch plans, all spread across systems with different structures. Following the Optique deployment at Siemens, the example synthesizes one hour of data for six turbines at two plants: drag the timeline to watch signals arrive, switch sources on and off to compare results, and diagnose every turbine with the same semantic rule.',
+    scene: 'Interactive scene',
+    footnote:
+      'The plants, turbines, sensor readings, events, work orders and dispatch plans are fictional and synthesized from the scenarios in the papers. Query results are computed from the sample data on the fly; rules and SQL are simplified for readability. Ontop itself does not execute STARQL or sigRL; the temporal queries correspond to work such as Ontop-temporal and DatalogMTL.',
+    rewriteTitle: 'How rules and queries are rewritten',
+    rewriteDescription:
+      'On the left is the rule or query over the ontology (sigRL, STARQL or SPARQL); on the right is the SQL that a federated query engine dispatches to the sources after rewriting. obs stands for the observations unfolded from the mappings: a UNION ALL of Historian A, Historian B and the live stream, with temperatures in Celsius.',
+    sqlLabel: 'SQL (simplified)',
+    sourcesTitle: 'Eight data sources',
+    sourcesDescription:
+      'Signals live in the historians of the two plants and in one live stream; the other data is maintained by the equipment, maintenance, dispatch and weather systems. Each system identifies turbines in its own way, and the cross-reference in the master data links them to the same turbine.',
+    refresh: 'Updated: ',
+    mappingTitle: 'Mappings and ontology',
+    mappingDescription:
+      'Fusion happens in the mappings: the historians of the two plants have different table layouts, and a single UNION mapping turns both into :TemperatureSensor, as in the Optique demo; Fahrenheit values from Historian B are converted to Celsius in the mapping; archived and live data both become sosa:Observation; control system events and work orders reach the same turbine IRI through the cross-reference in the master data, and the event codes of both plants fall into the same event classes.',
+    mappingLabel: 'Ontop mappings (excerpt)',
+    ontologyLabel: 'Ontology (Turtle, excerpt)',
+    pointsTitle: 'Key points',
+    points: [
+      [
+        'rotate',
+        'Queries cover archived and live data',
+        'Archived data is loaded every 10 minutes, and the latest 10 minutes exist only in the live stream. The mappings turn both into the same kind of observation, so queries do not depend on where the data is stored, and results update as new data arrives.',
+      ],
+      [
+        'layers',
+        'Mappings remove structural and unit differences',
+        'Two table layouts, two temperature units, three turbine numbering schemes and two sets of event codes become one set of classes and properties after mapping. A single query can compare turbines across both plants.',
+      ],
+      [
+        'hierarchy',
+        'A rule written once applies to every turbine',
+        'Rules select sensors through the ontology and read thresholds from the master data. The sigRL paper reports that one purging task at Siemens takes about 300 data-dependent rules, while the semantic rule is a few lines and needs no change for other turbines.',
+      ],
+    ],
+    readingTitle: 'Further reading',
+    reading: [
+      [
+        'Semantic Access to Streaming and Static Data at Siemens',
+        'Kharlamov et al., JWS 2017',
+        '/papers/#siemens',
+      ],
+      [
+        'Semantic Rule-Based Equipment Diagnostics',
+        'sigRL, Mehdi et al., ISWC 2017',
+        'https://doi.org/10.1007/978-3-319-68204-4_29',
+      ],
+      [
+        'SDRL',
+        'Diagnostic rule language for Siemens trains and turbines, JWS 2019',
+        '/papers/#sdrl',
+      ],
+      ['STARQL', 'Stream-temporal query language for OBDA, KI 2014', '/papers/#starql'],
+      ['Ontop-temporal', 'Temporal queries over DatalogMTL', '/papers/#ontop-temporal'],
+      ['W3C SOSA/SSN', 'Sensor and observation ontology', 'https://www.w3.org/TR/vocab-ssn/'],
+      [
+        'VKG × Urban data fusion',
+        'Example on this site: federated queries over eight sources',
+        '/examples/city/',
+      ],
+    ],
+  },
+}[lang];
+
+const reading = t.reading.map(([title, meta, href]) => ({
+  title,
+  meta,
+  href: localize(href, lang),
+  external: href.startsWith('http'),
+}));
+---
+
+<BaseLayout title={t.title} description={t.meta}>
+  <PageHeader label={t.label} title={t.title} description={t.description} art="hero-examples" />
+
+  <section class="wide" aria-label={t.scene}>
+    <TurbineExplorer />
+    <p class="footnote">{t.footnote}</p>
+  </section>
+
+  <section class="section" aria-labelledby="rewrite-title">
+    <div class="container">
+      <SectionHeading
+        id="rewrite-title"
+        title={t.rewriteTitle}
+        description={t.rewriteDescription}
+      />
+      {queries.map((query, index) => (
+        <article class="rewrite" data-turbine-panel={query.id} hidden={index !== 0}>
+          <header class="rewrite-head">
+            <span class="rewrite-index">{String(index + 1).padStart(2, '0')}</span>
+            <div>
+              <h3>
+                {query.title}
+                <span class="variant">{query.lang}</span>
+              </h3>
+              <p>{query.description}</p>
+            </div>
+          </header>
+          <div class="rewrite-grid">
+            <div class="codebox">
+              <p class="codebox-label">{query.lang}</p>
+              <pre set:html={`<code>${highlight(query.text.rule)}</code>`} />
+            </div>
+            <span class="rewrite-arrow" aria-hidden="true">
+              <Icon name="arrow-right" size={18} />
+            </span>
+            <div class="codebox">
+              <p class="codebox-label">{t.sqlLabel}</p>
+              <pre set:html={`<code>${highlight(query.text.sql)}</code>`} />
+            </div>
+          </div>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section section-rule" aria-labelledby="sources-title">
+    <div class="container">
+      <SectionHeading
+        id="sources-title"
+        title={t.sourcesTitle}
+        description={t.sourcesDescription}
+      />
+      <ul class="source-cards" role="list">
+        {SOURCES.map((source) => (
+          <li class="source-card spotlight" style={`--source:${source.color}`} data-reveal>
+            <p class="source-system">{source.system}</p>
+            <h3>{source.name}</h3>
+            <p class="source-desc">{source.description}</p>
+            <p class="source-tables">
+              {source.tables.map((table) => (
+                <code>
+                  {source.catalog}.{table}
+                </code>
+              ))}
+            </p>
+            <p class="source-refresh">
+              {t.refresh}
+              {source.refresh}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <section class="section section-rule" aria-labelledby="mapping-title">
+    <div class="container">
+      <SectionHeading
+        id="mapping-title"
+        title={t.mappingTitle}
+        description={t.mappingDescription}
+      />
+      <div class="mapping-grid" data-reveal>
+        <div class="codebox">
+          <p class="codebox-label">{t.mappingLabel}</p>
+          <pre set:html={`<code>${highlight(TURBINE_MAPPING)}</code>`} />
+        </div>
+        <div class="codebox">
+          <p class="codebox-label">{t.ontologyLabel}</p>
+          <pre set:html={`<code>${highlight(TURBINE_ONTOLOGY)}</code>`} />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-rule" aria-labelledby="points-title">
+    <div class="container">
+      <SectionHeading id="points-title" title={t.pointsTitle} />
+      <ul class="points" role="list">
+        {t.points.map(([icon, title, text], i) => (
+          <li
+            class="point spotlight"
+            data-reveal
+            style={i ? `--reveal-delay:${i * 90}ms` : undefined}
+          >
+            <span class="point-icon">
+              <Icon name={icon as 'rotate' | 'layers' | 'hierarchy'} size={20} />
+            </span>
+            <h3>{title}</h3>
+            <p>{text}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <section class="section section-rule" aria-labelledby="reading-title">
+    <div class="container">
+      <SectionHeading id="reading-title" title={t.readingTitle} />
+      <ul class="reading" role="list" data-reveal>
+        {reading.map((item) => (
+          <li>
+            <a
+              href={item.href}
+              target={item.external ? '_blank' : undefined}
+              rel={item.external ? 'noopener' : undefined}
+            >
+              <span class="reading-title">{item.title}</span>
+              <span class="reading-meta">{item.meta}</span>
+              <Icon name={item.external ? 'arrow-up-right' : 'arrow-right'} size={16} />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  /* 交互场景比正文略宽，给信号轨道留出空间 */
+  .wide {
+    width: min(1560px, 100% - var(--gutter) * 2);
+    margin-inline: auto;
+  }
+
+  .footnote {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--faint);
+  }
+
+  .codebox {
+    min-width: 0;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--code-bg);
+    overflow: hidden;
+  }
+
+  .codebox-label {
+    padding: 9px 16px;
+    border-bottom: 1px solid rgb(255 255 255 / 0.07);
+    font: 12px var(--font-mono);
+    color: var(--code-faint);
+  }
+
+  .codebox pre {
+    margin: 0;
+    padding: 16px;
+    font: 13px/1.8 var(--font-mono);
+    color: var(--code-ink);
+    overflow-x: auto;
+  }
+
+  .codebox :global(.k) {
+    color: var(--code-kw);
+  }
+
+  .codebox :global(.v) {
+    color: var(--code-var);
+  }
+
+  .codebox :global(.s) {
+    color: var(--code-str);
+  }
+
+  .codebox :global(.f) {
+    color: #f29fb8;
+  }
+
+  .codebox :global(.c) {
+    color: var(--code-faint);
+  }
+
+  .rewrite-head {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .rewrite-index {
+    font: 500 14px/1.9 var(--font-mono);
+    color: var(--accent-ink);
+  }
+
+  .rewrite-head h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .variant {
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent-ink);
+  }
+
+  .rewrite-head p {
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 15px;
+  }
+
+  .rewrite-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+  }
+
+  .rewrite-grid .codebox {
+    align-self: stretch;
+  }
+
+  .rewrite-arrow {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--accent-ink);
+  }
+
+  .source-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 16px;
+  }
+
+  .source-card {
+    padding: 22px;
+    border-top: 3px solid var(--source);
+  }
+
+  .source-system {
+    font: 12px var(--font-mono);
+    color: var(--faint);
+  }
+
+  .source-card h3 {
+    margin-top: 4px;
+    font-size: 18px;
+    font-weight: 650;
+  }
+
+  .source-desc {
+    margin-top: 8px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .source-tables {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+  }
+
+  .source-tables code {
+    font-size: 11.5px;
+  }
+
+  .source-refresh {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--faint);
+  }
+
+  .mapping-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+
+  .points {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .point {
+    padding: 26px;
+  }
+
+  .point-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin-bottom: 18px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--accent-ink);
+  }
+
+  .point h3 {
+    font-size: 18px;
+    font-weight: 650;
+  }
+
+  .point p {
+    margin-top: 8px;
+    font-size: 15px;
+    color: var(--muted);
+  }
+
+  .reading {
+    display: grid;
+    border-top: 1px solid var(--line);
+  }
+
+  .reading a {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 4px;
+    border-bottom: 1px solid var(--line);
+    transition: color 0.2s;
+  }
+
+  .reading a:hover {
+    color: var(--accent-ink);
+  }
+
+  .reading-title {
+    font-weight: 600;
+  }
+
+  .reading-meta {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--faint);
+  }
+
+  .reading a :global(svg) {
+    flex: none;
+    color: var(--faint);
+    transition: transform 0.3s var(--ease);
+  }
+
+  .reading a:hover :global(svg) {
+    color: var(--accent-ink);
+    transform: translateX(3px);
+  }
+
+  @media (max-width: 900px) {
+    .rewrite-grid,
+    .mapping-grid,
+    .points {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .rewrite-arrow {
+      justify-self: center;
+      rotate: 90deg;
+    }
+  }
+</style>

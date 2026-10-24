@@ -1,0 +1,1401 @@
+---
+import '../../styles/explorer.css';
+import Icon from '../ui/Icon.astro';
+import { queryGroups, turbineQueries } from '../../lib/turbine/queries';
+import { ALL_SOURCES, SOURCES } from '../../lib/turbine/sources';
+import { EVENTS, eventLabel } from '../../lib/turbine/records';
+import { SPAN, formatMinute, formatTime } from '../../lib/turbine/time';
+import { langOf } from '../../i18n';
+
+const lang = langOf(Astro.url.pathname);
+const queries = turbineQueries();
+const first = queries[0];
+const initial = first.run({ now: first.suggest, sources: new Set(ALL_SOURCES) });
+const percent = (t: number) => (t / SPAN) * 100;
+const marked = EVENTS.filter((e) => ['fault', 'trip', 'abort', 'shutdown'].includes(e.type));
+
+const t = {
+  zh: {
+    queries: '示例查询',
+    groups: '查询分组',
+    results: '结果',
+    hard: '难在哪里',
+    vkg: 'VKG 怎么做',
+    signals: '信号曲线',
+    follow: '跟随此刻',
+    fit: '查询时段',
+    full: '全程',
+    range: '显示范围',
+    sources: '数据源',
+    connected: `${SOURCES.length} / ${SOURCES.length} 已接入`,
+    need: '需要',
+    presetsLabel: '快捷组合',
+    presets: ['全部接入', '只接实时流', '只接历史库', '不含主数据'],
+    sourcesHint: '关闭某个数据源，看看哪些结果会消失或出错。标记“需要”的是当前查询用到的数据源。',
+    time: '模拟时间',
+    play: '播放',
+    speed: '播放速度',
+    replay: '重放',
+    reset: '复位视角',
+    fullscreen: '全屏',
+    origin: '数据来源',
+    future: '尚未到达',
+    tour: '导览',
+    tourPrev: '上一步',
+    tourNext: '下一步',
+    tourSkip: '跳过导览',
+  },
+  en: {
+    queries: 'Example queries',
+    groups: 'Query groups',
+    results: 'Results',
+    hard: 'What makes it hard',
+    vkg: 'What the VKG does',
+    signals: 'Signals',
+    follow: 'Follow now',
+    fit: 'Query period',
+    full: 'Full hour',
+    range: 'Range',
+    sources: 'Data sources',
+    connected: `${SOURCES.length} / ${SOURCES.length} connected`,
+    need: 'Needed',
+    presetsLabel: 'Presets',
+    presets: ['All sources', 'Live stream only', 'Historians only', 'No master data'],
+    sourcesHint:
+      'Switch off a source to see which results disappear or go wrong. Sources marked "Needed" are used by the current query.',
+    time: 'Simulated time',
+    play: 'Play',
+    speed: 'Playback speed',
+    replay: 'Replay',
+    reset: 'Reset view',
+    fullscreen: 'Full screen',
+    origin: 'Data origin',
+    future: 'Not yet arrived',
+    tour: 'Tour',
+    tourPrev: 'Back',
+    tourNext: 'Next',
+    tourSkip: 'Skip tour',
+  },
+}[lang];
+
+const presets = ['all', 'live', 'archive', 'nomaster'].map((id, i) => ({
+  id,
+  label: t.presets[i],
+}));
+---
+
+<div class="turbine xp" data-turbine>
+  <div class="stage turbine-stage" data-turbine-stage>
+    <div class="viewport" data-turbine-viewport>
+      <div class="pins" data-turbine-pins></div>
+      <p class="status" data-turbine-status role="status"></p>
+    </div>
+
+    <section class="tour" data-tour hidden aria-live="polite">
+      <div class="tour-progress" aria-hidden="true">
+        <span data-tour-bar></span>
+      </div>
+      <p class="tour-step" data-tour-step></p>
+      <h3 class="tour-title" data-tour-title></h3>
+      <p class="tour-text" data-tour-text></p>
+      <div class="tour-actions">
+        <button type="button" class="tour-skip" data-tour-skip>
+          {t.tourSkip}
+        </button>
+        <button type="button" class="tour-prev" data-tour-prev>
+          {t.tourPrev}
+        </button>
+        <button type="button" class="tour-next" data-tour-next>
+          {t.tourNext}
+        </button>
+      </div>
+    </section>
+
+    <section class="story" aria-live="polite">
+      <p class="story-title">
+        <span class="story-index" data-story-index>
+          01
+        </span>
+        <span data-story-title>{first.title}</span>
+      </p>
+      <div class="story-grid">
+        <p>
+          <b>{t.hard}</b>
+          <span data-story-hard>{first.explain.hard}</span>
+        </p>
+        <p>
+          <b>{t.vkg}</b>
+          <span data-story-vkg>{first.explain.vkg}</span>
+        </p>
+      </div>
+    </section>
+
+    <aside class="panel panel-queries" aria-label={t.queries}>
+      <div class="group-tabs" role="tablist" aria-label={t.groups}>
+        {queryGroups().map((group, i) => (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={i === 0 ? 'true' : 'false'}
+            data-group-tab={group.id}
+          >
+            {group.label}
+          </button>
+        ))}
+      </div>
+      <div class="queries">
+        {queries.map((query, i) => (
+          <button
+            type="button"
+            data-turbine-query={query.id}
+            data-group={query.group}
+            aria-pressed={i === 0 ? 'true' : 'false'}
+            hidden={query.group !== first.group}
+          >
+            <span class="q-index">{String(i + 1).padStart(2, '0')}</span>
+            <span class="q-body">
+              <span class="q-title">{query.title}</span>
+              <span class="q-feature">
+                {query.sources.length} {lang === 'zh' ? '个数据源' : 'sources'}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+      <div class="results" data-turbine-result>
+        <p class="results-head">
+          {t.results} <span>{initial.summary}</span>
+        </p>
+        <ul role="list">
+          {initial.rows.map((row) => (
+            <li>
+              <span class:list={['result', { 'is-miss': !row.hit }]}>
+                <span class="result-name">{row.title}</span>
+                <span class="result-detail">{row.detail}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </aside>
+
+    <aside class="panel panel-sources" aria-label={t.sources}>
+      <div class="sources-head">
+        <p class="panel-label">{t.sources}</p>
+        <span class="sources-count" data-turbine-source-count>
+          {t.connected}
+        </span>
+      </div>
+      <ul class="sources" role="list">
+        {SOURCES.map((source) => (
+          <li>
+            <label class="source" style={`--source:${source.color}`}>
+              <input type="checkbox" checked data-source={source.id} />
+              <span class="source-dot" aria-hidden="true" />
+              <span class="source-body">
+                <span class="source-name">{source.name}</span>
+                <span class="source-system">{source.system}</span>
+              </span>
+              <span class="source-need" data-source-need={source.id} hidden>
+                {t.need}
+              </span>
+              <span class="source-switch" aria-hidden="true">
+                <span />
+              </span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <div class="presets" role="group" aria-label={t.presetsLabel}>
+        {presets.map((preset) => (
+          <button type="button" data-turbine-preset={preset.id}>
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      <p class="sources-hint">{t.sourcesHint}</p>
+    </aside>
+
+    <section class="signals" data-turbine-signals aria-label={t.signals}>
+      <div class="signals-head">
+        <button type="button" class="signals-toggle" data-turbine-collapse aria-expanded="true">
+          <span data-turbine-chart-title>{t.signals}</span>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6"></path>
+          </svg>
+        </button>
+        <ul class="legend" role="list" data-turbine-legend></ul>
+        <div class="segmented" role="group" aria-label={t.range}>
+          <button type="button" data-turbine-range="follow" aria-pressed="true">
+            {t.follow}
+          </button>
+          <button type="button" data-turbine-range="fit" aria-pressed="false">
+            {t.fit}
+          </button>
+          <button type="button" data-turbine-range="full" aria-pressed="false">
+            {t.full}
+          </button>
+        </div>
+      </div>
+      <div class="chart" data-turbine-chart>
+        <canvas data-turbine-canvas></canvas>
+        <div class="chart-tip" data-turbine-tip hidden></div>
+      </div>
+      <div class="origin" aria-label={t.origin}>
+        <span>{t.origin}</span>
+        {SOURCES.filter((s) => ['hist_a', 'hist_b', 'live'].includes(s.id)).map((s) => (
+          <span class="origin-key" style={`--source:${s.color}`}>
+            {s.name}
+          </span>
+        ))}
+        <span class="origin-key origin-future">{t.future}</span>
+      </div>
+    </section>
+
+    <div class="timeline" role="group" aria-label={t.time}>
+      <button type="button" class="play" data-turbine-play aria-pressed="false" aria-label={t.play}>
+        <svg class="when-paused" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 5v14l12-7z" fill="currentColor"></path>
+        </svg>
+        <svg class="when-playing" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"></path>
+        </svg>
+      </button>
+      <div class="speeds" role="group" aria-label={t.speed}>
+        {[1, 10, 30, 60].map((speed) => (
+          <button
+            type="button"
+            data-turbine-speed={speed}
+            aria-pressed={speed === 60 ? 'true' : 'false'}
+          >
+            ×{speed}
+          </button>
+        ))}
+      </div>
+      <span class="clock" data-turbine-clock>
+        {formatTime(first.suggest)}
+      </span>
+      <div class="track">
+        <div class="markers" aria-hidden="true">
+          {marked.map((e) => (
+            <span
+              class:list={['marker', `marker-${e.type}`]}
+              style={`left:${percent(e.t)}%`}
+              title={`${e.turbine} ${eventLabel(e.type)} ${formatTime(e.t)}`}
+            />
+          ))}
+        </div>
+        <input
+          type="range"
+          min="0"
+          max={SPAN}
+          step="1"
+          value={first.suggest}
+          aria-label={t.time}
+          data-turbine-time
+        />
+        <div class="ticks" aria-hidden="true">
+          {[0, 600, 1200, 1800, 2400, 3000, 3600].map((s) => (
+            <span style={`left:${percent(s)}%`}>{formatMinute(s)}</span>
+          ))}
+        </div>
+      </div>
+      <div class="tools">
+        <button type="button" class="tool tool-tour" data-turbine-tour>
+          <Icon name="sparkles" size={15} />
+          <span>{t.tour}</span>
+        </button>
+        <button
+          type="button"
+          class="tool"
+          data-turbine-replay
+          aria-label={t.replay}
+          title={t.replay}
+        >
+          <Icon name="rotate" size={16} />
+        </button>
+        <button type="button" class="tool" data-turbine-reset aria-label={t.reset} title={t.reset}>
+          <Icon name="home" size={16} />
+        </button>
+        <button
+          type="button"
+          class="tool"
+          data-turbine-fullscreen
+          aria-pressed="false"
+          aria-label={t.fullscreen}
+        >
+          <Icon name="maximize" size={16} class="when-normal" />
+          <Icon name="minimize" size={16} class="when-full" />
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* 示例固定使用深蓝暗色，不随站点主题变化 */
+  .turbine-stage {
+    --bg: #030816;
+    --bg-elev: #040b1c;
+    --surface: #08142c;
+    --surface-2: #0e1f3f;
+    --line: rgb(110 170 255 / 0.13);
+    --line-strong: rgb(110 170 255 / 0.24);
+    --ink: #e6f0ff;
+    --ink-2: #c2d3ec;
+    --muted: #89a0c2;
+    --faint: #5b7397;
+    --accent: #3fd0ff;
+    --accent-ink: #7fe0ff;
+    --accent-soft: rgb(63 208 255 / 0.13);
+    --glow: rgb(63 208 255 / 0.5);
+    --warn: #ffb547;
+    --shadow: 0 30px 80px -30px rgb(0 0 0 / 0.85);
+
+    height: clamp(760px, 94vh, 920px);
+    color: var(--ink);
+    color-scheme: dark;
+  }
+
+  .turbine .panel-queries {
+    bottom: 92px;
+    width: 272px;
+  }
+
+  .panel-sources {
+    top: 16px;
+    right: 16px;
+    bottom: 92px;
+    width: 226px;
+  }
+
+  /* 当前查询的说明 */
+  .story {
+    position: absolute;
+    top: 16px;
+    left: 300px;
+    right: 254px;
+    z-index: 2;
+    padding: 12px 16px;
+    border-radius: 16px;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, var(--surface) 86%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .story-title {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    font-size: 16px;
+    font-weight: 650;
+    line-height: 1.4;
+  }
+
+  .story-index {
+    font: 500 13px var(--font-mono);
+    color: var(--accent-ink);
+  }
+
+  .story-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 18px;
+    margin-top: 6px;
+  }
+
+  .story-grid p {
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--muted);
+  }
+
+  .story-grid b {
+    display: block;
+    margin-bottom: 1px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--warn);
+  }
+
+  .story-grid p + p b {
+    color: var(--accent-ink);
+  }
+
+  /* 三维场景中的卡片与标签 */
+  .turbine :global(.pins .pin-unit) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1px;
+    min-width: 104px;
+    padding: 5px 9px 6px;
+    border-radius: 10px;
+    white-space: nowrap;
+    pointer-events: auto;
+    cursor: pointer;
+    transition:
+      border-color 0.3s,
+      box-shadow 0.3s;
+  }
+
+  .turbine :global(.pins .uc-head) {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .turbine :global(.pins .uc-head b) {
+    font: 600 13px var(--font-mono);
+    color: var(--ink);
+  }
+
+  .turbine :global(.pins .uc-head i) {
+    font: normal 10.5px var(--font-mono);
+    color: var(--faint);
+  }
+
+  .turbine :global(.pins .uc-state) {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .turbine :global(.pins .uc-state em) {
+    font: normal 11.5px var(--font-mono);
+    color: var(--ink-2);
+  }
+
+  .turbine :global(.pins .uc-alert) {
+    max-width: 180px;
+    margin-top: 4px;
+    padding: 3px 7px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--warn) 16%, transparent);
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--ink);
+    white-space: normal;
+    animation: alert-in 0.5s var(--ease);
+  }
+
+  @keyframes alert-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px) scale(0.96);
+    }
+  }
+
+  .turbine :global(.pins .pin-unit.is-involved) {
+    border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+
+  .turbine :global(.pins .pin-unit.is-hit) {
+    border-color: var(--warn);
+    box-shadow: 0 0 22px color-mix(in srgb, var(--warn) 40%, transparent);
+  }
+
+  .turbine :global(.pins .pin-unit.is-selected) {
+    outline: 1.5px solid var(--ink);
+    outline-offset: 2px;
+  }
+
+  .turbine :global(.pins .pin-plant) {
+    translate: -50% 0;
+    gap: 8px;
+    padding: 4px 12px;
+    font-size: 13px;
+  }
+
+  .turbine :global(.pins .pin-plant b) {
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .turbine :global(.pins .pin-plant span) {
+    font: 12px var(--font-mono);
+    color: var(--accent-ink);
+  }
+
+  .turbine :global(.pins .pin-plant span:empty) {
+    display: none;
+  }
+
+  .turbine :global(.pins .pin-source) {
+    gap: 6px;
+    padding: 2px 9px;
+    font-size: 11.5px;
+    transition: opacity 0.3s;
+  }
+
+  .turbine :global(.pins .pin-source i) {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--source);
+  }
+
+  .turbine :global(.pins .pin-source.is-used) {
+    border-color: var(--accent);
+    color: var(--ink);
+  }
+
+  .turbine :global(.pins .pin-source.is-off) {
+    opacity: 0.4;
+    text-decoration: line-through;
+  }
+
+  .turbine :global(.pins .pin-hub) {
+    flex-direction: column;
+    gap: 0;
+    padding: 4px 12px;
+    border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+    text-align: center;
+  }
+
+  .turbine :global(.pins .pin-hub b) {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .turbine :global(.pins .pin-hub span) {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* 导览 */
+  .tour {
+    position: absolute;
+    left: 50%;
+    bottom: 96px;
+    z-index: 4;
+    width: min(560px, calc(100% - 32px));
+    translate: -50% 0;
+    padding: 16px 20px 14px;
+    border-radius: 16px;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    animation: tour-in 0.45s var(--ease);
+  }
+
+  .tour[hidden] {
+    display: none;
+  }
+
+  @keyframes tour-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+  }
+
+  .tour-progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 3px;
+    background: var(--line);
+  }
+
+  .tour-progress span {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: var(--accent);
+  }
+
+  .tour-step {
+    font: 12px var(--font-mono);
+    color: var(--accent-ink);
+  }
+
+  .tour-title {
+    margin-top: 2px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .tour-text {
+    margin-top: 6px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+
+  .tour-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .tour-actions button {
+    height: 32px;
+    padding: 0 14px;
+    border-radius: 999px;
+    font-size: 13px;
+  }
+
+  .tour-skip {
+    margin-right: auto;
+    color: var(--faint);
+  }
+
+  .tour-skip:hover {
+    color: var(--ink);
+  }
+
+  .tour-prev {
+    border: 1px solid var(--line-strong);
+    color: var(--ink-2);
+  }
+
+  .tour-prev:disabled {
+    opacity: 0.4;
+  }
+
+  .tour-next {
+    background: var(--accent);
+    color: #041015;
+    font-weight: 600;
+  }
+
+  /* 导览时隐藏面板，让出整个画面 */
+  .turbine-stage :is(.story, .panel, .signals) {
+    transition: opacity 0.4s var(--ease);
+  }
+
+  .turbine-stage:global(.is-touring) :is(.story, .panel, .signals) {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .turbine :global(.pins .pin-marker) {
+    gap: 8px;
+    padding: 4px 10px 4px 6px;
+    border-color: var(--accent);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 0 24px var(--glow);
+    animation: marker-in 0.6s var(--ease) 1.2s both;
+  }
+
+  .turbine :global(.pins .pin-marker i) {
+    position: relative;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .turbine :global(.pins .pin-marker i::after) {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    animation: marker-pulse 1.6s ease-out infinite;
+  }
+
+  @keyframes marker-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+
+  @keyframes marker-pulse {
+    from {
+      opacity: 0.9;
+      transform: scale(0.6);
+    }
+    to {
+      opacity: 0;
+      transform: scale(1.8);
+    }
+  }
+
+  .tool-tour {
+    width: auto !important;
+    gap: 6px;
+    padding: 0 12px;
+    border-radius: 999px !important;
+    display: inline-flex !important;
+    align-items: center;
+    border-color: color-mix(in srgb, var(--accent) 50%, transparent) !important;
+    color: var(--accent-ink) !important;
+    font-size: 13px;
+  }
+
+  /* 信号曲线 */
+  .signals {
+    position: absolute;
+    left: 300px;
+    right: 254px;
+    bottom: 92px;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    height: 244px;
+    padding: 8px 14px;
+    border-radius: 16px;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, var(--surface) 90%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    transition: height 0.3s var(--ease);
+  }
+
+  .signals:global(.is-collapsed) {
+    height: 42px;
+  }
+
+  .signals:global(.is-collapsed) .chart,
+  .signals:global(.is-collapsed) .origin,
+  .signals:global(.is-collapsed) .legend,
+  .signals:global(.is-collapsed) .segmented {
+    display: none;
+  }
+
+  .signals:global(.is-collapsed) .signals-toggle svg {
+    rotate: 180deg;
+  }
+
+  .signals-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    min-height: 26px;
+    margin-bottom: 2px;
+  }
+
+  .signals-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .signals-toggle svg {
+    color: var(--faint);
+    transition: rotate 0.3s;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 12px;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .legend :global(li) {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .legend :global(i) {
+    width: 14px;
+    height: 0;
+    border-top: 2px solid var(--swatch);
+  }
+
+  .legend :global(i.is-dashed) {
+    border-top-style: dashed;
+  }
+
+  .signals-head .segmented {
+    margin-left: auto;
+  }
+
+  .segmented {
+    display: flex;
+    padding: 2px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+  }
+
+  .segmented button {
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .segmented button[aria-pressed='true'] {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+  }
+
+  .chart {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .chart canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: pan-y;
+  }
+
+  .chart-tip {
+    position: absolute;
+    z-index: 1;
+    min-width: 150px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--line-strong);
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    font: 11.5px/1.6 var(--font-mono);
+    color: var(--ink-2);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  .chart-tip :global(b) {
+    display: block;
+    margin-bottom: 2px;
+    color: var(--ink);
+  }
+
+  .chart-tip :global(span) {
+    color: var(--faint);
+  }
+
+  .origin {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 12px;
+    font-size: 11px;
+    color: var(--faint);
+  }
+
+  .origin-key {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--muted);
+  }
+
+  .origin-key::before {
+    content: '';
+    width: 12px;
+    height: 5px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--source) 70%, transparent);
+  }
+
+  .origin-future::before {
+    background: repeating-linear-gradient(135deg, var(--line-strong) 0 2px, transparent 2px 4px);
+  }
+
+  /* 查询与结果 */
+  .group-tabs {
+    display: flex;
+    flex: none;
+    gap: 4px;
+    padding: 3px;
+    border-radius: 999px;
+    background: var(--surface-2);
+  }
+
+  .group-tabs button {
+    flex: 1;
+    padding: 5px 0;
+    border-radius: 999px;
+    font-size: 13px;
+    color: var(--muted);
+    transition:
+      background-color 0.2s,
+      color 0.2s;
+  }
+
+  .group-tabs button[aria-selected='true'] {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.15);
+  }
+
+  .results :global(.notes) {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .results :global(.notes li) {
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+
+  .results :global(.notes li.is-missing) {
+    background: color-mix(in srgb, var(--warn) 12%, transparent);
+    color: var(--ink-2);
+  }
+
+  .results :global(.results-head.is-unavailable span) {
+    background: color-mix(in srgb, var(--warn) 18%, transparent);
+    color: var(--warn);
+  }
+
+  .results :global(.result.is-hit .result-detail) {
+    color: var(--warn);
+  }
+
+  .results :global(.expansion) {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  .results :global(.expansion summary) {
+    cursor: pointer;
+    color: var(--ink-2);
+  }
+
+  .results :global(.expansion summary b) {
+    font-weight: 600;
+    color: var(--accent-ink);
+  }
+
+  .results :global(.expansion dl) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 4px 10px;
+    margin-top: 8px;
+    font: 11px/1.6 var(--font-mono);
+  }
+
+  .results :global(.expansion dt) {
+    color: var(--ink-2);
+  }
+
+  .results :global(.expansion dd) {
+    overflow-wrap: anywhere;
+    color: var(--faint);
+  }
+
+  /* 数据源 */
+  .sources-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .sources-count {
+    font: 12px var(--font-mono);
+    color: var(--faint);
+  }
+
+  .sources {
+    display: grid;
+    gap: 2px;
+  }
+
+  .source {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 6px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .source:hover {
+    background: var(--surface-2);
+  }
+
+  .source input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .source-dot {
+    width: 10px;
+    height: 10px;
+    flex: none;
+    border-radius: 3px;
+    background: var(--source);
+    transition: background-color 0.2s;
+  }
+
+  .source-body {
+    display: grid;
+    min-width: 0;
+    line-height: 1.4;
+  }
+
+  .source-name {
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .source-system {
+    display: none;
+  }
+
+  .source-need {
+    flex: none;
+    white-space: nowrap;
+    margin-left: auto;
+    padding: 0 6px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--source) 70%, transparent);
+    font-size: 11px;
+    color: var(--ink-2);
+  }
+
+  .source-switch {
+    position: relative;
+    flex: none;
+    width: 30px;
+    height: 18px;
+    margin-left: auto;
+    border-radius: 999px;
+    background: var(--line-strong);
+    transition: background-color 0.25s;
+  }
+
+  .source-need:not([hidden]) + .source-switch {
+    margin-left: 0;
+  }
+
+  .source-need:global(.is-missing) {
+    border-color: var(--warn);
+    background: color-mix(in srgb, var(--warn) 16%, transparent);
+    color: var(--warn);
+  }
+
+  .source-switch span {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.25s var(--ease);
+  }
+
+  .source input:checked ~ .source-switch {
+    background: var(--source);
+  }
+
+  .source input:checked ~ .source-switch span {
+    transform: translateX(12px);
+  }
+
+  .source input:not(:checked) ~ .source-dot {
+    background: var(--line-strong);
+  }
+
+  .source input:not(:checked) ~ .source-body {
+    opacity: 0.55;
+  }
+
+  .source input:focus-visible ~ .source-switch {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .presets button {
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .presets button:hover {
+    color: var(--ink);
+    border-color: var(--line-strong);
+  }
+
+  .sources-hint {
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--faint);
+  }
+
+  /* 时间轴 */
+  .timeline {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 64px;
+    padding: 0 12px;
+    border-radius: 16px;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .play {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--bg);
+  }
+
+  .play[aria-pressed='true'] .when-paused,
+  .play[aria-pressed='false'] .when-playing {
+    display: none;
+  }
+
+  .speeds {
+    display: flex;
+    flex: none;
+    gap: 2px;
+  }
+
+  .speeds button {
+    padding: 3px 7px;
+    border-radius: 6px;
+    font: 12px var(--font-mono);
+    color: var(--faint);
+  }
+
+  .speeds button[aria-pressed='true'] {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+
+  .clock {
+    flex: none;
+    font: 600 18px var(--font-mono);
+    letter-spacing: 0.02em;
+  }
+
+  .track {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    height: 44px;
+  }
+
+  .track input {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 12px;
+    width: 100%;
+    margin: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .markers {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 2px;
+    height: 8px;
+  }
+
+  .marker {
+    position: absolute;
+    top: 0;
+    width: 3px;
+    height: 8px;
+    border-radius: 2px;
+    translate: -50% 0;
+    background: var(--warn);
+  }
+
+  .marker-shutdown {
+    background: var(--faint);
+  }
+
+  .ticks span {
+    position: absolute;
+    bottom: 0;
+    translate: -50% 0;
+    font: 10px var(--font-mono);
+    color: var(--faint);
+  }
+
+  .ticks span:first-child {
+    translate: 0 0;
+  }
+
+  .ticks span:last-child {
+    translate: -100% 0;
+  }
+
+  .tools {
+    display: flex;
+    flex: none;
+    gap: 4px;
+  }
+
+  .tool {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    color: var(--ink-2);
+  }
+
+  .tool:hover {
+    border-color: var(--line-strong);
+    color: var(--ink);
+  }
+
+  [data-turbine-fullscreen][aria-pressed='true'] :global(.when-normal),
+  [data-turbine-fullscreen][aria-pressed='false'] :global(.when-full) {
+    display: none;
+  }
+
+  .turbine :global(.stage.is-fallback .viewport) {
+    background:
+      linear-gradient(var(--line) 1px, transparent 1px) 0 0 / 40px 40px,
+      linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0 / 40px 40px;
+  }
+
+  @media (max-width: 1280px) {
+    .story-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 1080px) {
+    .turbine-stage {
+      height: auto;
+    }
+
+    .story,
+    .signals {
+      position: static;
+      margin-inline: 12px;
+    }
+
+    .tour {
+      bottom: auto;
+      top: 12px;
+    }
+
+    .turbine-stage:global(.is-touring) :is(.story, .panel, .signals) {
+      display: none;
+    }
+
+    .story {
+      order: -1;
+      margin-top: 12px;
+    }
+
+    .signals {
+      order: 1;
+      height: 300px;
+    }
+
+    .timeline {
+      position: relative;
+      left: auto;
+      right: auto;
+      bottom: auto;
+      order: 0;
+      flex-wrap: wrap;
+      height: auto;
+      margin-inline: 12px;
+      padding: 10px 12px;
+    }
+
+    .track {
+      order: 5;
+      flex-basis: 100%;
+    }
+
+    .tools {
+      margin-left: auto;
+    }
+
+    .turbine .panel-queries {
+      order: 2;
+      width: auto;
+    }
+
+    .panel-sources {
+      order: 3;
+      width: auto;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .turbine :global(.pins .pin-unit) {
+      min-width: 0;
+      padding: 3px 6px 4px;
+      zoom: 0.8;
+    }
+
+    .turbine :global(.pins .pin-source),
+    .turbine :global(.pins .pin-hub span),
+    .turbine :global(.pins .uc-state),
+    .turbine :global(.pins .uc-head i) {
+      display: none;
+    }
+
+    .turbine :global(.pins .uc-alert) {
+      max-width: 120px;
+    }
+
+    .ticks span:nth-child(even) {
+      display: none;
+    }
+
+    .speeds button:first-child {
+      display: none;
+    }
+  }
+</style>
