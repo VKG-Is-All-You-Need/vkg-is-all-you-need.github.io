@@ -5,7 +5,7 @@ interface Props {
   title: string;
   description: string;
   label?: string;
-  /** 右侧插图，public/art/ 中的素材名。 */
+  /** 右侧的单色线稿插图，public/art/ 中的素材名。 */
   art?: string;
 }
 
@@ -15,7 +15,7 @@ const { title, description, label, art } = Astro.props;
 <section class="page-header">
   <div class="backdrop dot-grid" aria-hidden="true"></div>
   <div class="container">
-    {art && <img class="art" src={artSrc(art)} width="420" height="280" alt="" />}
+    {art && <span class="art line-art" style={`--src:url(${artSrc(art)})`} aria-hidden="true" />}
     {label && <p class="label">{label}</p>}
     <h1>{title}</h1>
     <p class="description">{description}</p>
@@ -62,17 +62,8 @@ const { title, description, label, art } = Astro.props;
     bottom: -12px;
     width: clamp(240px, 30vw, 420px);
     height: clamp(180px, 21vw, 290px);
-    object-fit: contain;
-    object-position: right bottom;
-    pointer-events: none;
-    filter: drop-shadow(0 24px 40px var(--glow));
-    animation: ph-float 7s var(--ease) infinite;
-  }
-
-  @keyframes ph-float {
-    50% {
-      transform: translateY(-10px);
-    }
+    -webkit-mask-position: right bottom;
+    mask-position: right bottom;
   }
 
   .label {

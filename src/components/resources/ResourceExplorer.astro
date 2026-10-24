@@ -1,13 +1,21 @@
 ---
 import ResourceCard from './ResourceCard.astro';
-import Icon from '../ui/Icon.astro';
+import Icon, { type IconName } from '../ui/Icon.astro';
 import { langOf, localize } from '../../i18n';
-import { art } from '../../lib/art';
 import { getResourceGroups } from '../../lib/resources';
 
 const lang = langOf(Astro.url.pathname);
 const groups = await getResourceGroups(lang);
 const total = groups.reduce((sum, group) => sum + group.items.length, 0);
+/** 分类标题前的线性图标。 */
+const CATEGORY_ICONS: Record<string, IconName> = {
+  standards: 'file',
+  tools: 'grid',
+  tutorials: 'book',
+  benchmarks: 'route',
+  papers: 'page',
+  adjacent: 'globe',
+};
 const t = {
   zh: {
     search: '搜索资源',
@@ -73,7 +81,9 @@ const t = {
       >
         <header class="group-head" data-reveal>
           <h2 id={`group-${category.id}`}>
-            <img class="group-art" src={art(`cat-${category.id}`)} width="48" height="48" alt="" loading="lazy" />
+            <span class="group-icon" aria-hidden="true">
+              <Icon name={CATEGORY_ICONS[category.id] ?? 'page'} size={16} />
+            </span>
             {category.label}
             <span>{items.length}</span>
           </h2>
@@ -229,21 +239,21 @@ const t = {
     letter-spacing: -0.02em;
   }
 
-  .group-art {
-    align-self: center;
-    width: 48px;
-    height: 48px;
-    margin: -8px 2px -8px -4px;
-    transition: transform 0.5s var(--ease);
-  }
-
-  .group-head:hover .group-art {
-    transform: translateY(-3px) rotate(-4deg);
-  }
-
   .group-head h2 span {
     font: 500 14px var(--font-mono);
     color: var(--faint);
+  }
+
+  .group-head h2 .group-icon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    align-self: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--muted);
   }
 
   .group-head .more {

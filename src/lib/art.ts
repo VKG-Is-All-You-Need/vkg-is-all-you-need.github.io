@@ -1,5 +1,5 @@
-/** Codex 生成的插图素材（public/art/，透明背景 webp），深浅主题共用。 */
+/**
+ * Codex 生成的插图素材（public/art/）：首页应用场景用透明底的彩色小图，
+ * hero-* 是页首的单色线稿蒙版（配合全局 .line-art 着色）。
+ */
 export const art = (name: string) => `/art/${name}.webp`;
-
-/** 学习路径四个阶段的插图，顺序与学习页的阶段一致。 */
-export const LEARN_ART = ['learn-concepts', 'learn-tutorial', 'learn-mapping', 'learn-topics'];

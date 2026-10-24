@@ -81,15 +81,11 @@ const t = {
   <section class="hero" data-history-hero>
     <div class="hero-bg dot-grid" aria-hidden="true"></div>
     <div class="container hero-inner">
-      <img
-        class="hero-art"
-        src={art('hero-history')}
-        width="1000"
-        height="559"
-        alt=""
+      <span
+        class="hero-art line-art"
+        style={`--src:url(${art('hero-history')})`}
         aria-hidden="true"
-        fetchpriority="high"
-      />
+      ></span>
       <p class="hero-label">{t.label}</p>
       <h1>
         <span class="acronym" data-acronym={JSON.stringify(ACRONYMS)} aria-hidden="true">
@@ -172,15 +168,6 @@ const t = {
               {era.from}–{String(era.to).slice(2)}
             </span>
             <header class="era-head" data-reveal>
-              <img
-                class="era-art"
-                src={art(`era-${era.id}`)}
-                width="140"
-                height="140"
-                alt=""
-                aria-hidden="true"
-                loading="lazy"
-              />
               <p class="era-kicker">
                 {NUMERALS[i]} {era.from}–{era.to}
               </p>
@@ -288,17 +275,8 @@ const t = {
     position: absolute;
     top: -24px;
     right: 0;
-    width: clamp(300px, 36vw, 520px);
-    height: auto;
-    filter: drop-shadow(0 24px 40px var(--glow));
-    animation: hist-float 7s var(--ease) infinite;
-    pointer-events: none;
-  }
-
-  @keyframes hist-float {
-    50% {
-      transform: translateY(-8px);
-    }
+    width: clamp(300px, 36vw, 500px);
+    aspect-ratio: 900 / 512;
   }
 
   .hero-label {
@@ -581,30 +559,6 @@ const t = {
     pointer-events: none;
   }
 
-  .era-head {
-    position: relative;
-  }
-
-  .era-art {
-    position: absolute;
-    top: 30px;
-    right: 24px;
-    width: 140px;
-    height: 140px;
-    opacity: 0.8;
-    transition:
-      opacity 0.6s,
-      filter 0.6s,
-      transform 0.8s var(--ease);
-    pointer-events: none;
-  }
-
-  .era.is-current .era-art {
-    opacity: 1;
-    filter: saturate(1) drop-shadow(0 14px 26px var(--glow));
-    transform: translateY(-6px);
-  }
-
   .era-kicker {
     font: 500 13px var(--font-mono);
     color: var(--accent-ink);
@@ -790,17 +744,6 @@ const t = {
 
     .hero-art {
       display: none;
-    }
-
-    .era-art {
-      top: 0;
-      right: 0;
-      width: 72px;
-      height: 72px;
-    }
-
-    .era-head h3 {
-      padding-right: 80px;
     }
   }
 
