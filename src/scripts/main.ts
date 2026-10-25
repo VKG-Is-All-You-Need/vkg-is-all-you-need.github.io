@@ -1,6 +1,7 @@
 // 全站脚本入口。各模块在 astro:page-load 时按需初始化，页面上没有对应元素时直接跳过。
 import './theme';
 import './header';
+import './brand-typewriter';
 import './reveal';
 import './spotlight';
 import './palette';

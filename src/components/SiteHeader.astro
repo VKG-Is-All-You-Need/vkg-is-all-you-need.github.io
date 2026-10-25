@@ -42,10 +42,17 @@ const langSwitch = {
 
 <header class="site-header" data-header>
   <div class="container header-inner">
-    <a class="brand" href={localize('/', lang)} aria-label={`${site.name} ${t.home}`}>
+    <a class="brand" href={localize('/', lang)} aria-label={`VKG ${t.home}`}>
       <Logo size={30} />
       <span>
-        VKG <em>is all you need</em>
+        VKG{' '}
+        <em aria-hidden="true">
+          ·{' '}
+          <span class="brand-tagline">
+            <span data-brand-typewriter>Things, connected</span>
+            <span class="typing-cursor"></span>
+          </span>
+        </em>
       </span>
     </a>
 
@@ -167,9 +174,41 @@ const langSwitch = {
   }
 
   .brand em {
-    font: italic 400 17px var(--font-serif);
-    color: var(--muted);
+    font: normal 400 14px var(--font-sans);
+    color: var(--ink-2);
     letter-spacing: 0;
+  }
+
+  .brand-tagline {
+    display: inline-block;
+    width: 19ch;
+  }
+
+  .typing-cursor {
+    visibility: hidden;
+    display: inline-block;
+    width: 1px;
+    height: 0.9em;
+    margin-left: 3px;
+    vertical-align: -0.08em;
+    background: var(--accent);
+  }
+
+  [data-brand-typewriter][data-typing] + .typing-cursor {
+    visibility: visible;
+    animation: cursor-blink 1.1s step-end infinite;
+  }
+
+  @keyframes cursor-blink {
+    50% {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .typing-cursor {
+      display: none;
+    }
   }
 
   .nav {
