@@ -19,6 +19,7 @@ const t = {
     org: 'GitHub 组织',
     menu: '打开菜单',
     switchLabel: 'Switch to English',
+    taglines: ['万物，彼此相连', '知识，相互链接', '数据，置于语境', '关联，举足轻重'],
   },
   en: {
     home: 'home',
@@ -30,6 +31,7 @@ const t = {
     org: 'GitHub organization',
     menu: 'Open menu',
     switchLabel: '切换到中文',
+    taglines: ['Things, connected', 'Knowledge, linked', 'Data, in context', 'Connections matter'],
   },
 }[lang];
 const langSwitch = {
@@ -42,14 +44,14 @@ const langSwitch = {
 
 <header class="site-header" data-header>
   <div class="container header-inner">
-    <a class="brand" href={localize('/', lang)} aria-label={`VKG ${t.home}`}>
+    <a class="brand" href={localize('/', lang)} aria-label={`${site.name} ${t.home}`}>
       <Logo size={30} />
       <span>
         VKG{' '}
         <em aria-hidden="true">
           ·{' '}
           <span class="brand-tagline">
-            <span data-brand-typewriter>Things, connected</span>
+            <span data-brand-typewriter={JSON.stringify(t.taglines)}>{t.taglines[0]}</span>
             <span class="typing-cursor"></span>
           </span>
         </em>
@@ -182,6 +184,11 @@ const langSwitch = {
   .brand-tagline {
     display: inline-block;
     width: 19ch;
+  }
+
+  /* 中文短语为七个全角字符，按 em 计宽 */
+  .brand-tagline:lang(zh) {
+    width: 7.5em;
   }
 
   .typing-cursor {
@@ -383,7 +390,7 @@ const langSwitch = {
     }
   }
 
-  @media (max-width: 1040px) and (min-width: 941px) {
+  @media (max-width: 1100px) and (min-width: 941px) {
     .brand em {
       display: none;
     }

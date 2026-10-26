@@ -1,16 +1,12 @@
 import { onPageLoad } from './lifecycle';
 
-const phrases = [
-  'Things, connected',
-  'Knowledge, linked',
-  'Data, in context',
-  'Connections matter',
-];
-
 onPageLoad((signal) => {
   const text = document.querySelector<HTMLElement>('[data-brand-typewriter]');
   const brand = text?.closest('.brand');
   if (!text || !brand) return;
+  // SiteHeader renders the phrases for the page language.
+  const phrases: string[] = JSON.parse(text.dataset.brandTypewriter || '[]');
+  if (phrases.length === 0) return;
 
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let phrase = 0;
