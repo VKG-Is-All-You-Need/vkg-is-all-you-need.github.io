@@ -19,6 +19,8 @@ const t = {
     categories: '资源分类',
     categoryCount: `${categoryCount} 类`,
     verified: '最近核对',
+    quoteAuthor: '——亚里士多德',
+    quoteWork: '《形而上学》',
   },
   en: {
     label: 'Virtual knowledge graphs · OBDA · Resources',
@@ -29,6 +31,8 @@ const t = {
     categories: 'Categories',
     categoryCount: String(categoryCount),
     verified: 'Last verified',
+    quoteAuthor: '— Aristotle',
+    quoteWork: 'Metaphysics',
   },
 }[lang];
 ---
@@ -46,10 +50,33 @@ const t = {
         <span class="live-dot"></span>
         {t.label}
       </p>
-      <h1>
-        <span class="h1-mark">VKG</span>
-        <span class="h1-serif">is all you need</span>
-      </h1>
+      <div class="hero-heading">
+        <h1>
+          <span class="h1-mark">VKG</span>
+        </h1>
+        <figure class="hero-quote">
+          <blockquote>
+            {lang === 'zh' ? (
+              <p class="quote-line">
+                <span>作为</span>存在的存在。
+              </p>
+            ) : (
+              <p class="quote-line">
+                Being <span>qua</span> being.
+              </p>
+            )}
+            <p class="quote-greek" lang="grc">
+              Τὸ ὂν ᾗ ὄν.
+            </p>
+          </blockquote>
+          <figcaption>
+            <span class="quote-author">{t.quoteAuthor}</span>
+            <span class="quote-source">
+              <cite>{t.quoteWork}</cite> IV.1 · 1003a21
+            </span>
+          </figcaption>
+        </figure>
+      </div>
       {lang === 'zh' ? (
         <p class="hero-lede">
           虚拟知识图谱（Virtual Knowledge
@@ -198,14 +225,23 @@ const t = {
     }
   }
 
+  /* 引文放不下时换行到标题下方，窄屏与双栏布局较窄的区间都不会溢出 */
+  .hero-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 20px clamp(20px, 2.5vw, 36px);
+    margin: 36px 0 34px;
+  }
+
   h1 {
     display: grid;
-    margin: 28px 0 28px;
+    margin: 0;
     line-height: 0.92;
   }
 
   .h1-mark {
-    font-size: clamp(72px, 10vw, 136px);
+    font-size: clamp(64px, 9vw, 124px);
     font-weight: 800;
     letter-spacing: -0.055em;
     background: linear-gradient(
@@ -232,11 +268,77 @@ const t = {
     }
   }
 
-  .h1-serif {
-    margin-top: 0.08em;
-    font: italic 400 clamp(44px, 5.6vw, 76px) / 1 var(--font-serif);
-    letter-spacing: -0.01em;
+  .hero-quote {
+    width: max-content;
+    margin: 0;
+    padding: 2px 0 2px clamp(16px, 2vw, 24px);
+    border-left: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  }
+
+  .hero-quote blockquote {
+    position: relative;
+    margin: 0;
+  }
+
+  .quote-line {
+    margin: 0;
+    white-space: nowrap;
+    font:
+      400 clamp(25px, 2.5vw, 32px) / 1.05 Georgia,
+      'Times New Roman',
+      serif;
+    letter-spacing: -0.02em;
+    color: var(--ink-2);
+  }
+
+  .quote-line span {
+    font-style: italic;
+    color: color-mix(in srgb, var(--accent) 65%, var(--ink));
+  }
+
+  /* 中文字面较大，字号略小于英文；不用斜体，也不收紧字距 */
+  .quote-line:lang(zh) {
+    font-size: clamp(21px, 1.9vw, 26px);
+    letter-spacing: 0;
+  }
+
+  .quote-line span:lang(zh),
+  .quote-source cite:lang(zh) {
+    font-style: normal;
+  }
+
+  .quote-greek {
+    margin: 10px 0 0;
+    font:
+      italic 400 26px / 1.25 Georgia,
+      'Times New Roman',
+      serif;
+    color: var(--ink-2);
+  }
+
+  .hero-quote figcaption {
+    display: grid;
+    width: max-content;
+    min-width: 100%;
+    gap: 7px;
+    white-space: nowrap;
+    margin-top: 3px;
+    text-align: right;
+    line-height: 1.45;
     color: var(--muted);
+  }
+
+  .quote-author {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: 0;
+    line-height: 1.25;
+    color: var(--ink-2);
+  }
+
+  .quote-source {
+    font-size: 15px;
   }
 
   .hero-lede {
