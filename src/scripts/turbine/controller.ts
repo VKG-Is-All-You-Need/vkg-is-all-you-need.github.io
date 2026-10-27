@@ -457,10 +457,10 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
   const TOUR: TourStep[] = [
     {
       focus: 'overview',
-      title: tr('两座电厂，八台燃气轮机', 'Two plants, eight gas turbines'),
+      title: tr('电厂与机组', 'Plants and turbines'),
       text: tr(
-        '这是一家虚构的发电公司：北港电厂和西岭电厂各有四台燃气轮机。每台机组头顶的卡片显示它此刻的状态，烟囱冒烟表示正在燃烧发电。',
-        'A fictional power company: the North Harbor and Westridge plants each run four gas turbines. The card above each turbine shows its current state, and smoke from a stack means it is burning fuel and generating power.',
+        '示例模拟一家虚构发电公司：北港电厂与西岭电厂各有四台燃气轮机。机组上方的卡片显示当前运行状态，烟囱排烟表示机组处于燃烧发电状态。',
+        'The example simulates a fictional power company: the North Harbor and Westridge plants each operate four gas turbines. The card above each turbine shows its current operating state, and smoke from the stack indicates that the turbine is firing.',
       ),
       duration: 8,
       enter() {
@@ -475,10 +475,10 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
       focus: 'turbine',
       turbine: 'A3',
       marker: tr('发电机', 'Generator'),
-      title: tr('一台燃气轮机', 'One gas turbine'),
+      title: tr('燃气轮机的结构', 'Structure of a gas turbine'),
       text: tr(
-        '压气机把空气压缩后送进燃烧室，与燃料一起燃烧；高温燃气推动涡轮，带动前端的发电机发电。进气端的叶片转得越快，转速越高。',
-        'The compressor squeezes air into the combustor, where it burns with fuel; the hot gas drives the turbine, which turns the generator at the front. The faster the inlet blades spin, the higher the rotor speed.',
+        '压气机将空气压缩后送入燃烧室，与燃料混合燃烧；高温燃气驱动涡轮，并带动前端的发电机发电。进气端叶片的转速即转子转速。',
+        'The compressor compresses air and feeds it into the combustor, where it burns with fuel; the hot gas drives the turbine, which in turn drives the generator at the front. The speed of the inlet blades is the rotor speed.',
       ),
       duration: 8,
       enter() {},
@@ -489,8 +489,8 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
       labels: true,
       title: tr('机组内部的传感器', 'Sensors inside the turbine'),
       text: tr(
-        '外壳做成了半透明：前段是压气机的多级叶片，中间是燃烧室，后段是涡轮。每台机组装有 18 或 19 个传感器，测量转速、进气温度、压气机出口压力、火焰、燃料流量、喷嘴温度、排气温度、轴承振动与温度以及有功功率，每个每秒产生一个读数。鼠标移到传感器上可以看到编号和读数。',
-        'The casing is see-through: compressor stages at the front, the combustor in the middle and the turbine behind it. Each turbine carries 18 or 19 sensors for rotor speed, inlet temperature, compressor discharge pressure, flame, fuel flow, burner tip temperature, exhaust temperature, bearing vibration and temperature, and active power, each producing a reading every second. Hover over a sensor to see its tag and reading.',
+        '外壳以半透明方式显示：前段为压气机的多级叶片，中段为燃烧室，后段为涡轮。每台机组装有 18 或 19 个传感器，测量转速、进气温度、压气机出口压力、火焰、燃料流量、喷嘴温度、排气温度、轴承振动与温度以及有功功率，采样间隔均为 1 秒。将指针移到传感器上可查看编号与读数。',
+        'The casing is rendered translucent: the compressor stages at the front, the combustor in the middle and the turbine at the rear. Each turbine carries 18 or 19 sensors measuring rotor speed, inlet temperature, compressor discharge pressure, flame, fuel flow, burner tip temperature, exhaust temperature, bearing vibration and temperature, and active power, all sampled once per second. Hover over a sensor to view its tag and reading.',
       ),
       duration: 13,
       enter() {},
@@ -498,10 +498,10 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
     {
       focus: 'sources',
       marker: tr('8 个数据源', '8 data sources'),
-      title: tr('数据分散在 8 个系统里', 'Data spread over eight systems'),
+      title: tr('八个数据源', 'Eight data sources'),
       text: tr(
-        '两座电厂各有一个历史库，表结构不同，温度一个存摄氏度、一个存华氏度；此外还有实时流、设备主数据、报警、维修、调度与气象系统，各自用不同的方式给机组编号。',
-        'Each plant has its own historian with a different table layout, one storing Celsius and the other Fahrenheit; there are also a live stream and the master data, alarm, maintenance, dispatch and weather systems, each numbering turbines its own way.',
+        '两座电厂各有一个历史库，表结构不同，温度单位分别为摄氏度与华氏度。此外还有实时流、设备主数据、控制系统事件、维修管理、调度计划与气象观测，各系统对机组的编号方式均不相同。',
+        'Each plant has its own historian with a different table layout, one storing Celsius and the other Fahrenheit. The live stream, equipment master data, control system events, maintenance management, dispatch schedule and weather observations complete the set, and each system identifies turbines differently.',
       ),
       duration: 9,
       enter() {},
@@ -510,10 +510,10 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
       focus: 'turbine',
       turbine: 'A3',
       marker: 'NH-GT3 = 10004713 = GA-60-0207',
-      title: tr('同一台机组，三个编号', 'One turbine, three identifiers'),
+      title: tr('同一台机组的三种编号', 'Three identifiers for one turbine'),
       text: tr(
-        '报警系统叫它 NH-GT3，维修系统叫它 10004713，设备主数据和调度计划叫它 GA-60-0207；西岭电厂的报警代码又是另一套写法。在 VKG 中，它们都映射到同一台机组，查询时只需写“A3”。',
-        'The alarm system calls it NH-GT3, the maintenance system 10004713, and the master data and dispatch plan GA-60-0207; the Westridge plant uses yet another code scheme for alarms. In the VKG they all map to the same turbine, so a query simply refers to A3.',
+        '控制系统事件以 NH-GT3 标识这台机组，维修管理以 10004713 标识，设备主数据与调度计划以 GA-60-0207 标识；西岭电厂的事件代码另有一套规则。在 VKG 中，这些编号都映射到同一个机组 IRI，查询中只需引用 A3。',
+        'The control system identifies this turbine as NH-GT3, maintenance management as 10004713, and the master data and dispatch schedule as GA-60-0207; the Westridge plant follows yet another event code scheme. In the VKG all of these map to the same turbine IRI, so a query refers to A3 alone.',
       ),
       duration: 10,
       enter() {},
@@ -521,10 +521,10 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
     {
       focus: 'ingest',
       marker: tr('实时流', 'Live stream'),
-      title: tr('实时数据与历史数据', 'Live and archived data'),
+      title: tr('实时数据与归档数据', 'Live and archived data'),
       text: tr(
-        '读数每秒流入实时流，但只保留最近 10 分钟；历史库每 10 分钟才批量写入一次（看那个方块）。要看完整的一小时，就得把两边拼起来。',
-        'Readings flow into the live stream every second, but it keeps only the last 10 minutes; the historians are loaded in batches every 10 minutes (watch the block). Seeing a full hour means joining both.',
+        '读数每秒写入实时流，实时流只保留最近 10 分钟；历史库每 10 分钟批量入库一次，场景中移动的方块即一次批量写入。查询完整的一小时需要同时访问两者。',
+        'Readings enter the live stream every second, and the stream retains only the last 10 minutes; the historians load data in batches every 10 minutes, shown as the moving block in the scene. Querying a full hour requires both.',
       ),
       duration: 9,
       enter() {
@@ -534,10 +534,10 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
     {
       focus: 'hub',
       marker: tr('一个本体', 'One ontology'),
-      title: tr('VKG：一个本体连起所有系统', 'The VKG: one ontology over all systems'),
+      title: tr('虚拟知识图谱', 'The virtual knowledge graph'),
       text: tr(
-        'VKG 不搬运、不复制数据。它用一个本体统一描述 8 个系统中的机组、传感器和事件；查询时把问题翻译成各系统能执行的 SQL，再把结果合并。',
-        'The VKG does not move or copy data. One ontology describes the turbines, sensors and events in all eight systems; at query time the question is translated into SQL each system can run, and the results are merged.',
+        'VKG 不移动、不复制数据。本体统一描述八个系统中的机组、传感器与事件；查询时，VKG 将查询改写为各系统可执行的 SQL，并合并返回的结果。',
+        'The VKG neither moves nor copies data. One ontology describes the turbines, sensors and events of all eight systems; at query time the VKG rewrites the query into SQL that each system can execute and merges the results.',
       ),
       duration: 9,
       enter() {},
@@ -546,10 +546,10 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
       focus: 'demo',
       turbine: 'A3',
       marker: tr('报警', 'Alarm'),
-      title: tr('一个例子：喷嘴过热', 'An example: an overheating burner tip'),
+      title: tr('示例：喷嘴温度异常', 'Example: burner tip overtemperature'),
       text: tr(
-        '查询“喷嘴温度 10 秒内一路上升并报警”的机组。它同时读取三个信号源和报警系统：A3 一报警，卡片立即变橙；20 分钟前西岭电厂 B1 的同类故障也被找出，尽管它的温度存的是华氏度。',
-        'Query for turbines whose burner tip temperature rose for 10 seconds straight and then raised an alarm. The query reads the three signal sources and the alarm system together: the moment A3 alarms, its card turns orange, and a similar fault at Westridge B1 twenty minutes earlier is found too, even though its temperatures are stored in Fahrenheit.',
+        '该查询查找喷嘴温度在 10 秒内单调上升并以报警结束的机组，同时读取三个信号源与控制系统事件。A3 报警时，其卡片随即变为橙色；20 分钟前西岭电厂 B1 的同类故障同样被识别，尽管其温度在历史库中以华氏度存储。',
+        'The query looks for turbines whose burner tip temperature rises monotonically for 10 seconds and ends in an alarm, reading the three signal sources and the control system events together. When A3 raises its alarm, its card turns orange; a similar fault at Westridge B1 twenty minutes earlier is identified as well, although its temperatures are stored in Fahrenheit.',
       ),
       duration: 13,
       enter() {
@@ -563,11 +563,11 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
     {
       focus: 'demo',
       turbine: 'A3',
-      marker: tr('查不到了', 'Not found'),
-      title: tr('关掉实时流会怎样', 'What if the live stream is off'),
+      marker: tr('未检出', 'Not detected'),
+      title: tr('实时流断开后的结果', 'Results without the live stream'),
       text: tr(
-        '最近 10 分钟的数据只在实时流里。关掉它，A3 刚发生的报警就查不出来了，只剩已经入库的 B1。VKG 的结果始终取决于当前接入了哪些数据。',
-        'The last 10 minutes exist only in the live stream. Switch it off and A3’s fresh alarm can no longer be found; only B1, already archived, remains. VKG results always depend on which sources are connected.',
+        '最近 10 分钟的数据仅存在于实时流中。断开实时流后，A3 刚刚发生的报警无法检出，结果中只剩已入库的 B1。VKG 的查询结果取决于当前接入的数据源。',
+        'The last 10 minutes of data exist only in the live stream. With the stream disconnected, the recent alarm at A3 can no longer be detected, and only B1, already archived, remains in the result. VKG query results depend on the sources currently connected.',
       ),
       duration: 9,
       enter() {
@@ -582,10 +582,10 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
       turbines: ['A1', 'A2'],
       turbine: 'A2',
       marker: tr('清吹未完成', 'Purge not finished'),
-      title: tr('一条规则，用于全部机组', 'One rule for every turbine'),
+      title: tr('一条规则适用于全部机组', 'One rule for every turbine'),
       text: tr(
-        '点火失败后要“清吹”残留燃料：火焰熄灭后 15 秒内升速，再在 20 秒内降速。两种型号的转速阈值不同，传统做法要为每台机组手写规则；语义规则只写一次，阈值从设备主数据读取。结果：A1 清吹完成，A2 的转速停在 760 rpm，没能完成。',
-        'After a failed ignition the turbine must purge leftover fuel: speed up within 15 s after flame out, then slow down within 20 s. The two models use different speed thresholds, so traditionally each turbine gets hand-written rules; the semantic rule is written once and reads thresholds from the master data. Result: A1 finishes purging, while A2 stalls at 760 rpm.',
+        '点火失败后需要清吹残留燃料：火焰熄灭后 15 秒内升速，并在之后 20 秒内降速。两种型号的转速阈值不同，传统做法需要为每台机组单独编写规则；语义规则只需编写一次，阈值从设备主数据读取。结果显示 A1 完成清吹，A2 的转速停留在 760 rpm，未能完成。',
+        'After a failed ignition, leftover fuel must be purged: the rotor speeds up within 15 s after flame out and slows down within the following 20 s. The two models use different speed thresholds, so the traditional approach requires separate rules for each turbine; the semantic rule is written once and reads the thresholds from the master data. The result shows that A1 completes purging, while A2 stalls at 760 rpm and does not.',
       ),
       duration: 14,
       enter() {
@@ -603,8 +603,8 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
       marker: tr('同批次 L17', 'Same batch L17'),
       title: tr('跨电厂追溯同批次零件', 'Tracing a part batch across plants'),
       text: tr(
-        '西岭电厂 B1 的喷嘴报警后，查询沿着“报警 → 零件批次 → 同批次零件 → 所在机组”查下去，发现北港电厂 A1 的 6 个喷嘴也来自批次 L17。这需要同时用到报警系统、维修系统和设备主数据。',
-        'After a burner tip alarm at Westridge B1, the query follows alarm → part batch → parts from the same batch → their turbines, and finds that the six tips of North Harbor A1 also come from batch L17. This takes the alarm system, the maintenance system and the master data together.',
+        '西岭电厂 B1 的喷嘴报警后，查询沿“报警 → 零件批次 → 同批次零件 → 所在机组”的路径追溯，发现北港电厂 A1 的 6 个喷嘴同样来自批次 L17。该查询同时使用控制系统事件、维修管理与设备主数据。',
+        'After a burner tip alarm at Westridge B1, the query follows the path alarm → part batch → parts from the same batch → their turbines, and finds that the six tips of North Harbor A1 also come from batch L17. The query combines control system events, maintenance management and the master data.',
       ),
       duration: 11,
       enter() {
@@ -619,10 +619,10 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
       turbines: ['A3', 'B3'],
       turbine: 'B3',
       marker: tr('计划内停机', 'Planned shutdown'),
-      title: tr('计划内还是计划外', 'Planned or unplanned'),
+      title: tr('计划内与计划外的出力下降', 'Planned and unplanned output drops'),
       text: tr(
-        '最近 15 分钟，A3 和 B3 的出力都明显下降。对照调度计划可以区分：B3 是按计划停机，A3 是计划外的降负荷，原因来自报警系统中的喷嘴温度高。',
-        'In the last 15 minutes, output fell sharply at both A3 and B3. The dispatch plan tells them apart: B3 is a planned shutdown, while A3 is an unplanned load reduction caused by the burner tip overtemperature in the alarm system.',
+        '最近 15 分钟内，A3 与 B3 的出力均明显下降。对照调度计划可以区分二者：B3 为计划停机，A3 为计划外降负荷，原因是控制系统事件中记录的喷嘴温度高。',
+        'Over the last 15 minutes, output fell sharply at both A3 and B3. The dispatch schedule distinguishes the two: B3 is a planned shutdown, while A3 is an unplanned load reduction caused by the burner tip overtemperature recorded in the control system events.',
       ),
       duration: 11,
       enter() {
@@ -634,10 +634,10 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
     },
     {
       focus: 'overview',
-      title: tr('自己试试', 'Try it yourself'),
+      title: tr('继续探索', 'Explore further'),
       text: tr(
-        '左侧有 13 条查询，涵盖时序模式、多源融合与实时监测。点任意一条，场景会自动演示；右侧可以开关数据源，底部可以拖动时间。',
-        'There are 13 queries on the left covering temporal patterns, data fusion and live monitoring. Click any of them and the scene plays it out; switch sources on the right and drag the time at the bottom.',
+        '左侧列出 13 条查询，分为时序模式、多源融合与实时监测三组。选择查询后，场景自动演示其过程；右侧可以开关数据源，底部可以调整时间。',
+        'The 13 queries on the left are grouped into temporal patterns, data fusion and live monitoring. Selecting a query plays it out in the scene; switch sources on the right and adjust the time at the bottom.',
       ),
       duration: 0,
       enter() {

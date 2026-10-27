@@ -511,11 +511,11 @@ const purging = (): TurbineQuery => ({
   story: { from: m(4), speed: 60 },
   explain: {
     hard: tr(
-      '点火失败后，要用高速气流把残留燃料吹干净（清吹）。判断是否吹净要看转速，而转速分散在两个结构不同的历史库和实时流里；两种型号的阈值也不同。传统做法要为每台机组单独写规则。',
+      '点火失败后，需要用高速气流清除燃烧室中的残留燃料，即清吹。清吹是否完成由转速判断，而转速数据分布在两个结构不同的历史库与实时流中，两种型号的阈值也不相同。传统做法需要为每台机组单独编写规则。',
       'After a failed ignition, the turbine blows out leftover fuel with fast airflow (purging). Whether purging finished depends on rotor speed, which is spread across two historians with different layouts and a live stream, and the two models use different thresholds. Traditionally, rules are written separately for every turbine.',
     ),
     vkg: tr(
-      '一条规则按“火焰熄灭 → 15 秒内升速 → 20 秒内降速”描述清吹。VKG 通过本体找到每台机组的转速传感器，从设备主数据读取各自的阈值，规则自动用于全部 8 台机组。',
+      '一条规则以“火焰熄灭 → 15 秒内升速 → 20 秒内降速”描述清吹过程。VKG 通过本体定位每台机组的转速传感器，从设备主数据读取各自的阈值，同一条规则适用于全部 8 台机组。',
       "One rule describes purging as “flame out → speed up within 15 s → slow down within 20 s”. The VKG finds each turbine's speed sensors through the ontology and reads its thresholds from the master data, so the rule applies to all eight turbines.",
     ),
   },
@@ -725,11 +725,11 @@ const tipFault = (): TurbineQuery => ({
   story: { from: m(40, 30), speed: 10 },
   explain: {
     hard: tr(
-      '喷嘴过热之前，温度会持续上升。北港电厂的温度以摄氏度存放，西岭电厂以华氏度存放；报警记录在另一个系统中，两座电厂的报警代码也不同。',
+      '喷嘴过热之前，其温度会持续上升。北港电厂的温度以摄氏度存储，西岭电厂以华氏度存储；报警记录在另一个系统中，两座电厂的报警代码也不相同。',
       'Before a burner tip overheats, its temperature keeps rising. North Harbor stores temperatures in Celsius and Westridge in Fahrenheit; alarms live in another system, and the two plants use different alarm codes.',
     ),
     vkg: tr(
-      '连续查询每秒检查最近 10 秒的温度是否一路上升并以报警结束。单位换算与报警代码的对应写在映射中，查询本身不关心数据来自哪里。',
+      '连续查询每秒检查一次最近 10 秒的温度是否单调上升并以报警结束。单位换算与报警代码的对应关系定义在映射中，查询本身与数据所在的位置无关。',
       'A continuous query checks every second whether the temperature over the last 10 seconds rose all the way and ended in an alarm. Unit conversion and alarm codes are handled in the mappings, so the query does not care where the data comes from.',
     ),
   },
@@ -876,11 +876,11 @@ const trip = (): TurbineQuery => ({
   story: { from: m(12, 30), speed: 30 },
   explain: {
     hard: tr(
-      '机组点火后很快停转，通常意味着跳闸。判断时要把火焰信号和转速信号按时间对齐，并与正常停机区分开。',
+      '机组点火后短时间内停转，通常表示发生了跳闸。识别跳闸需要将火焰信号与转速信号按时间对齐，并与正常停机相区分。',
       'A turbine that stops soon after ignition has usually tripped. Detecting it means aligning the flame and speed signals in time and telling a trip apart from a normal shutdown.',
     ),
     vkg: tr(
-      '规则用“火焰持续 10 秒以上，熄灭后 2 分钟内停转”刻画跳闸。正常停机的惰转时间更长，不会被误判。',
+      '规则以“火焰持续 10 秒以上，熄灭后 2 分钟内停转”描述跳闸。正常停机的惰转时间更长，因此不会被误判。',
       'The rule describes a trip as “flame for more than 10 s, then standstill within 2 minutes after flame out”. Normal shutdowns coast down for longer and are not mistaken for trips.',
     ),
   },
@@ -1037,11 +1037,11 @@ const rampChange = (): TurbineQuery => ({
   story: { from: m(49, 30), speed: 60 },
   explain: {
     hard: tr(
-      '从额定转速降到低速的快慢反映停机过程是否正常，需要同时看一台机组上全部转速传感器的最大值和最小值。',
+      '机组从额定转速降至低速所用的时间反映停机过程是否正常，判断时需要同时使用该机组全部转速传感器的最大值与最小值。',
       'How fast a turbine drops from rated speed to low speed shows whether a shutdown is normal. It requires the maximum and minimum over all speed sensors of the turbine.',
     ),
     vkg: tr(
-      '规则直接对“这台机组的所有转速传感器”取最大值和最小值，不必逐个列出传感器编号。',
+      '规则直接对“该机组的全部转速传感器”取最大值与最小值，无须逐个列出传感器编号。',
       'The rule takes the maximum and minimum over “all speed sensors of this turbine” directly, without listing sensor tags one by one.',
     ),
   },
@@ -1209,11 +1209,11 @@ const stuckSensor = (): TurbineQuery => ({
   story: { from: m(24), speed: 60 },
   explain: {
     hard: tr(
-      '传感器卡死后读数不再变化，但机组停机时读数同样不变。判断时要与同一部件上的其他传感器比较，而传感器装在哪个部件上记录在历史库的部件表里。',
+      '传感器卡死后读数保持不变，而机组停机时读数同样不变。识别卡死需要与同一部件上的其他传感器比较，传感器与部件的对应关系记录在历史库的部件表中。',
       "A stuck sensor stops changing, but so does every sensor on a stopped turbine. The check must compare it with other sensors on the same component, and which component a sensor sits on is recorded in the historians' component tables.",
     ),
     vkg: tr(
-      '本体描述了传感器与部件的关系，查询按这种关系找到同组传感器。传感器数量不同的机组也能用同一条查询。',
+      '本体描述传感器与部件之间的关系，查询据此确定同组传感器。传感器数量不同的机组可以使用同一条查询。',
       'The ontology describes how sensors relate to components, and the query finds sibling sensors through that relation. Turbines with different numbers of sensors share the same query.',
     ),
   },
@@ -1324,11 +1324,11 @@ const hottestTips = (): TurbineQuery => ({
   story: { from: m(44), speed: 10 },
   explain: {
     hard: tr(
-      '比较所有喷嘴的温度，需要同时查询两种表结构、两种温度单位，并把已入库的历史数据与最近 10 分钟的实时数据拼接起来。',
+      '比较全部喷嘴的温度，需要同时处理两种表结构与两种温度单位，并将已入库的归档数据与最近 10 分钟的实时数据合并。',
       'Comparing all burner tips means querying two table layouts and two temperature units at once, and joining archived data with the last 10 minutes of live data.',
     ),
     vkg: tr(
-      '映射把三个信号源统一为同一种“观测”，温度统一为摄氏度。一条查询直接给出两座电厂的排名。',
+      '映射将三个信号源统一为同一类观测，温度统一换算为摄氏度。一条查询即可给出两座电厂的排名。',
       'The mappings turn the three signal sources into one kind of observation, with temperatures in Celsius. A single query ranks the tips of both plants.',
     ),
   },
@@ -1484,11 +1484,11 @@ const exhaust = (): TurbineQuery => ({
   story: { from: m(19), speed: 10 },
   explain: {
     hard: tr(
-      '排气温度受负荷和天气影响。寒冷的北港电厂与温暖的西岭电厂，原始读数不能直接比较。',
+      '排气温度受负荷与环境温度影响。北港电厂气温较低，西岭电厂气温较高，两者的原始读数不能直接比较。',
       'Exhaust temperature depends on load and weather. Raw readings from the cold North Harbor plant and the warm Westridge plant cannot be compared directly.',
     ),
     vkg: tr(
-      '查询把实测值、设计参考曲线与当地气温放在一起计算偏差。关闭气象观测可以看到，缺少天气信息时结论会出错。',
+      '查询结合实测值、设计参考曲线与当地气温计算偏差。断开气象观测后，由于缺少环境温度，结论会出现偏差。',
       'The query computes the deviation from the measured value, the design reference curve and the local air temperature. Switch off the weather source to see the conclusion go wrong.',
     ),
   },
@@ -1590,11 +1590,11 @@ const faultHistory = (): TurbineQuery => ({
   story: { from: m(40, 50), speed: 10 },
   explain: {
     hard: tr(
-      '报警系统用机组代号（如 NH-GT3、11MBA）登记，维修系统用设备号（如 10004713）登记，两边的记录对不上。',
+      '控制系统事件以机组代号（如 NH-GT3、11MBA）登记，维修管理以设备号（如 10004713）登记，两类记录无法直接关联。',
       'The alarm system registers turbines by unit code (such as NH-GT3 or 11MBA) and the maintenance system by equipment number (such as 10004713), so the records do not match up.',
     ),
     vkg: tr(
-      '设备主数据中的对照表在映射里把三种编号连到同一台机组，查询可以从报警直接查到检修记录。',
+      '映射利用设备主数据中的对照表，将三种编号关联到同一台机组，查询可以从报警直接追溯到检修记录。',
       'The cross-reference in the master data links the three numbering schemes to one turbine in the mappings, so the query goes straight from an alarm to its maintenance history.',
     ),
   },
@@ -1749,11 +1749,11 @@ const batchRisk = (): TurbineQuery => ({
   story: { from: m(23), speed: 10 },
   explain: {
     hard: tr(
-      '一个零件出了问题，同一批次的零件可能也有隐患，但它们装在另一座电厂，记录在另一套系统里。',
+      '某个零件发生故障后，同一批次的零件可能存在相同隐患，而这些零件安装在另一座电厂，记录在另一套系统中。',
       'When one part fails, parts from the same batch may carry the same risk, but they are installed at another plant and recorded in other systems.',
     ),
     vkg: tr(
-      '查询沿着“报警 → 零件批次 → 同批次零件 → 所在机组 → 此刻温度”一路查下去，跨越三个系统和两座电厂。',
+      '查询沿“报警 → 零件批次 → 同批次零件 → 所在机组 → 当前温度”的路径追溯，跨越三个系统与两座电厂。',
       'The query follows alarm → part batch → parts of the same batch → their turbines → current temperature, across three systems and two plants.',
     ),
   },
@@ -1903,11 +1903,11 @@ const vibration = (): TurbineQuery => ({
   story: { from: m(29), speed: 10 },
   explain: {
     hard: tr(
-      '检修后振动偏高，可能是安装出了问题。需要先从维修系统找出近期检修过的轴承，再与同型号机组的振动比较。',
+      '检修后振动偏高可能意味着安装存在问题。判断时需要先从维修管理中找出近期检修的轴承，再与同型号机组的振动进行比较。',
       'Higher vibration after maintenance may point to an installation problem. It requires finding recently serviced bearings in the maintenance system and comparing them with turbines of the same model.',
     ),
     vkg: tr(
-      '查询结合维修记录、型号信息与实时振动，自动选出同型号的比较对象。',
+      '查询结合维修记录、型号信息与实时振动，自动确定同型号的比较对象。',
       'The query combines maintenance records, model information and live vibration, and picks the peer turbines automatically.',
     ),
   },
@@ -2058,11 +2058,11 @@ const state = (): TurbineQuery => ({
   story: { from: m(10), speed: 30 },
   explain: {
     hard: tr(
-      '机组状态要由转速、火焰和出力综合判断，而且必须用最新的数据。只看每 10 分钟入库一次的历史库，状态会滞后。',
+      '机组状态需要由转速、火焰与出力综合判断，并且依赖最新数据。仅使用每 10 分钟入库一次的历史库，判断结果会出现滞后。',
       "A turbine's state is judged from speed, flame and output together, and it needs the latest data. A historian loaded every 10 minutes is always behind.",
     ),
     vkg: tr(
-      '查询同时读取历史库与实时流，状态随新数据到达而更新。关闭实时流可以看到，状态停在最近一次入库的时刻。',
+      '查询同时读取历史库与实时流，状态随新数据的到达而更新。断开实时流后，状态停留在最近一次入库的时刻。',
       'The query reads the historians and the live stream together, so the state updates as data arrives. Switch off the live stream and the state freezes at the last batch load.',
     ),
   },
@@ -2194,11 +2194,11 @@ const dispatch = (): TurbineQuery => ({
   story: { from: m(44), speed: 60 },
   explain: {
     hard: tr(
-      '调度计划由电网下发，以序列号标识机组；实际出力来自传感器。两者编号不同，更新频率也不同。',
+      '调度计划由电网下达，以序列号标识机组；实际出力来自传感器。两者的标识方式与更新频率均不相同。',
       'The dispatch plan comes from the grid operator and identifies turbines by serial number; actual output comes from sensors. The two use different identifiers and update at different rates.',
     ),
     vkg: tr(
-      '映射把计划与实测对齐到同一台机组、同一条时间轴上，查询持续比较两者。',
+      '映射将计划值与实测值对齐到同一台机组与同一时间轴，查询持续比较两者。',
       'The mappings align plan and measurement to the same turbine and the same timeline, and the query compares them continuously.',
     ),
   },
@@ -2332,11 +2332,11 @@ const powerDrop = (): TurbineQuery => ({
   story: { from: m(44), speed: 60 },
   explain: {
     hard: tr(
-      '出力下降可能是计划内的停机，也可能是故障。区分两者需要调度计划，解释原因需要报警记录。',
+      '出力下降可能源于计划停机，也可能源于故障。区分两者需要调度计划，说明原因需要控制系统事件。',
       'A drop in output may be a planned shutdown or a fault. Telling them apart needs the dispatch plan, and explaining the cause needs the alarm records.',
     ),
     vkg: tr(
-      '一条查询同时读取出力、调度计划与报警事件，区分计划内与计划外的下降，并给出原因。',
+      '一条查询同时读取出力、调度计划与控制系统事件，区分计划内与计划外的下降，并给出原因。',
       'A single query reads output, the dispatch plan and alarm events, separates planned from unplanned drops, and gives the cause.',
     ),
   },
