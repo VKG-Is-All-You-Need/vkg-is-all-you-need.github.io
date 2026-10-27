@@ -132,6 +132,8 @@ const ONTOLOGY_HALF = { w: 500, d: 210 };
 const PILLAR_TOP = 40;
 const HALF_W = CITY.width / 2 + 30;
 const HALF_D = CITY.height / 2 + 30;
+/** 图谱层中节点中心的活动范围：距平面边缘留出光圈的宽度。 */
+const GRAPH_LIMIT = { x: HALF_W - 24, z: HALF_D - 24 };
 
 const SOURCE_COLOR = Object.fromEntries(
   SOURCES.map((source) => [source.id, new THREE.Color(source.color)]),
@@ -1613,6 +1615,11 @@ export function createCityScene(
       node.visible = point !== null;
       if (point) node.target.copy(toWorld(point, LAYER.graph));
     }
+    // 分开后的节点仍须留在图谱层内；贴边的节点不再外移，由相邻节点继续向内让开
+    const keepInside = (p: THREE.Vector3) => {
+      p.x = Math.min(GRAPH_LIMIT.x, Math.max(-GRAPH_LIMIT.x, p.x));
+      p.z = Math.min(GRAPH_LIMIT.z, Math.max(-GRAPH_LIMIT.z, p.z));
+    };
     for (let pass = 0; pass < 10; pass++) {
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
@@ -1626,6 +1633,8 @@ export function createCityScene(
             const push = ((180 - Math.abs(dx)) / 2) * (dx < 0 ? -1 : 1);
             a.x -= push;
             b.x += push;
+            keepInside(a);
+            keepInside(b);
             continue;
           }
           let distance = Math.hypot(dx, dz);
@@ -1640,6 +1649,8 @@ export function createCityScene(
           a.z -= dz * push;
           b.x += dx * push;
           b.z += dz * push;
+          keepInside(a);
+          keepInside(b);
         }
       }
     }
