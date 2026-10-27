@@ -600,6 +600,18 @@ const presets = ['all', 'live', 'archive', 'nomaster'].map((id, i) => ({
     transition: opacity 0.3s;
   }
 
+  .turbine :global(.pins .pin-source),
+  .turbine :global(.pins .pin-hub) {
+    pointer-events: auto;
+    cursor: pointer;
+  }
+
+  .turbine :global(.pins .pin-source:hover),
+  .turbine :global(.pins .pin-hub:hover) {
+    border-color: var(--accent);
+    color: var(--ink);
+  }
+
   .turbine :global(.pins .pin-source i) {
     width: 8px;
     height: 8px;
@@ -700,6 +712,178 @@ const presets = ['all', 'live', 'archive', 'nomaster'].map((id, i) => ({
     --k-pressure: #0c8f6c;
     --k-fuel: #e67700;
     --k-bearingTemp: #c2255c;
+  }
+
+  .detail :global(.card-swatch) {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
+    border-radius: 2px;
+    background: var(--source);
+  }
+
+  .detail :global(.card-desc) {
+    line-height: 1.65;
+    color: var(--ink-2);
+  }
+
+  .detail :global(.card-facts) {
+    display: grid;
+    gap: 3px;
+  }
+
+  .detail :global(.card-facts p) {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 8px;
+    line-height: 1.55;
+    color: var(--ink-2);
+  }
+
+  .detail :global(.card-facts span) {
+    color: var(--faint);
+  }
+
+  .detail :global(.card-toggle) {
+    justify-self: start;
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--accent);
+    background: var(--accent-soft);
+    font-size: 12px;
+    color: var(--accent-ink);
+  }
+
+  .detail :global(.card-toggle.is-off) {
+    border-color: var(--warn);
+    background: color-mix(in srgb, var(--warn) 12%, transparent);
+    color: var(--warn);
+  }
+
+  .detail :global(.card-schema) {
+    display: grid;
+    gap: 4px;
+  }
+
+  .detail :global(.card-schema p) {
+    display: grid;
+    gap: 1px;
+    font: 11px/1.5 var(--font-mono);
+    color: var(--muted);
+  }
+
+  .detail :global(.card-schema code) {
+    padding: 0;
+    background: none;
+    color: var(--ink);
+  }
+
+  .detail :global(.card-table) {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+
+  .detail :global(.card-table + .card-table) {
+    margin-top: 2px;
+  }
+
+  .detail :global(.card-table table) {
+    width: 100%;
+    border-collapse: collapse;
+    font: 10.5px/1.5 var(--font-mono);
+  }
+
+  .detail :global(.card-table th) {
+    padding: 3px 6px;
+    background: var(--surface-2);
+    font-weight: 500;
+    text-align: left;
+    color: var(--faint);
+    white-space: nowrap;
+  }
+
+  .detail :global(.card-table td) {
+    padding: 3px 6px;
+    border-top: 1px solid var(--line);
+    color: var(--ink-2);
+    white-space: nowrap;
+  }
+
+  .detail :global(.card-chip.is-static) {
+    cursor: default;
+  }
+
+  .detail :global(.card-chip.is-static code) {
+    padding: 0;
+    background: none;
+    font-size: 11px;
+  }
+
+  .detail :global(.card-chip.is-off) {
+    opacity: 0.5;
+    text-decoration: line-through;
+  }
+
+  .detail :global(.card-stats) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .detail :global(.card-stats p) {
+    display: grid;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: var(--surface-2);
+  }
+
+  .detail :global(.card-stats b) {
+    font: 600 15px var(--font-mono);
+    color: var(--accent-ink);
+  }
+
+  .detail :global(.card-stats span) {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .detail :global(.card-steps) {
+    display: grid;
+    gap: 4px;
+    padding-left: 18px;
+    line-height: 1.6;
+    color: var(--ink-2);
+  }
+
+  .detail :global(.card-classes) {
+    display: grid;
+    gap: 2px;
+  }
+
+  .detail :global(.card-classes p) {
+    display: flex;
+    justify-content: space-between;
+    font: 11px/1.6 var(--font-mono);
+    color: var(--accent-ink);
+  }
+
+  .detail :global(.card-classes code) {
+    padding: 0;
+    background: none;
+    color: var(--ink-2);
+  }
+
+  .detail :global(.card-code) {
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--code-bg);
+    color: var(--code-ink);
+    font: 10.5px/1.6 var(--font-mono);
+    white-space: pre;
+    overflow-x: auto;
   }
 
   .detail-empty {

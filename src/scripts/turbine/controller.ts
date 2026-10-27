@@ -27,7 +27,8 @@ import { ALL_SOURCES, SOURCES, sourceById, type SourceId } from '../../lib/turbi
 import { SPAN, formatTime, lastBatch, m } from '../../lib/turbine/time';
 import { prefersReducedMotion } from '../lifecycle';
 import { SignalChart, seriesColor, type OriginSpan } from './chart';
-import { sensorDetail, unitDetail } from './detail';
+import { hubDetail, sensorDetail, sourceDetail, unitDetail } from './detail';
+import { TURBINE_ONTOLOGY } from '../../lib/turbine/mapping';
 import type { TourFocus, TurbineScene, UnitCard, UnitVisual } from './scene';
 
 const PRESETS: Record<string, SourceId[]> = {
@@ -99,7 +100,11 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
   let storyEnd: number | null = null;
   let scene: TurbineScene | null = null;
   /** 右侧面板中展示的详情。 */
-  let detail: { type: 'unit'; id: TurbineId } | { type: 'sensor'; tag: string } | null = null;
+  let detail:
+    | { type: 'unit'; id: TurbineId }
+    | { type: 'sensor'; tag: string }
+    | { type: 'source'; id: SourceId | 'hub' }
+    | null = null;
   const detailBox = $<HTMLElement>('[data-turbine-detail]');
   const detailEmpty = detailBox.innerHTML;
   let lastDetailHtml = '';
@@ -325,7 +330,11 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
       ? detailEmpty
       : detail.type === 'unit'
         ? unitDetail(detail.id, ctx())
-        : sensorDetail(detail.tag, ctx());
+        : detail.type === 'sensor'
+          ? sensorDetail(detail.tag, ctx())
+          : detail.id === 'hub'
+            ? hubDetail(ctx(), TURBINE_ONTOLOGY)
+            : sourceDetail(detail.id, ctx(), queries);
     if (html !== lastDetailHtml) {
       lastDetailHtml = html;
       detailBox.innerHTML = html;
@@ -350,6 +359,15 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
     showSideTab('detail');
     sourcesPanel.scrollTop = 0;
     scene?.focusSensor(tag);
+    refresh();
+  }
+
+  function openSource(id: SourceId | 'hub') {
+    if (detail?.type === 'sensor') scene?.focusSensor(null);
+    detail = { type: 'source', id };
+    showSideTab('detail');
+    sourcesPanel.scrollTop = 0;
+    scene?.focusSource(id);
     refresh();
   }
 
@@ -799,7 +817,19 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
   onActivate(detailBox, (target) => {
     const unit = target.closest<HTMLElement>('[data-unit]');
     const sensor = target.closest<HTMLElement>('[data-sensor]');
+    const src = target.closest<HTMLElement>('[data-src]');
+    const toggle = target.closest<HTMLElement>('[data-toggle-source]');
+    const queryLink = target.closest<HTMLElement>('[data-query]');
     if (target.closest('[data-detail-close]')) closeDetail();
+    else if (toggle) {
+      const id = toggle.dataset.toggleSource as SourceId;
+      const next = new Set(sources);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      setSources(next);
+      refresh();
+    } else if (queryLink) selectQuery(queries.find((q) => q.id === queryLink.dataset.query)!);
+    else if (src) openSource(src.dataset.src as SourceId | 'hub');
     else if (sensor) openSensor(sensor.dataset.sensor!);
     else if (unit) {
       if (detail?.type === 'sensor') scene?.focusSensor(null);
@@ -962,6 +992,7 @@ export function initTurbine(root: HTMLElement, signal: AbortSignal): void {
         mode: themeMode(),
         onSelect: selectTurbine,
         onSelectSensor: openSensor,
+        onSelectSource: openSource,
       });
       stage.classList.add('is-ready');
       status.textContent = '';

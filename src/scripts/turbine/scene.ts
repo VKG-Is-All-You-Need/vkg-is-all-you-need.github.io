@@ -78,6 +78,8 @@ export interface TurbineScene {
   tour(step: TourFocus | null): void;
   /** 切换暗色与亮色配色。 */
   setMode(mode: SceneMode): void;
+  /** 镜头移向某个数据源底座，或移向知识图谱（传入 'hub'）。 */
+  focusSource(id: SourceId | 'hub'): void;
   /** 镜头移向某台机组。 */
   focusUnit(turbine: TurbineId): void;
   /** 镜头移近某个传感器并标出它；传入 null 时恢复显示全部机组。 */
@@ -380,6 +382,7 @@ export function createTurbineScene(
     mode: SceneMode;
     onSelect(turbine: TurbineId): void;
     onSelectSensor(tag: string): void;
+    onSelectSource(id: SourceId | 'hub'): void;
   },
 ): TurbineScene {
   const stage = createStage(container, pinLayer, {
@@ -821,12 +824,16 @@ export function createTurbineScene(
   const diskGeometry = new THREE.CylinderGeometry(20, 20, 6, 32);
   const sourceRingGeometry = new THREE.TorusGeometry(20, 0.6, 6, 48);
   const sourceRings = new Map<SourceId, THREE.MeshBasicMaterial>();
+  /** 可点击的数据源底座与知识图谱。 */
+  const sourcePickables: THREE.Object3D[] = [];
   const baseGeometry = new THREE.CylinderGeometry(24, 26, 10, 32);
   for (const source of SOURCES) {
     const x = SOURCE_X[source.id];
     const base = new THREE.Mesh(baseGeometry, baseMaterial);
     base.position.set(x, 5, SOURCE_Z);
     base.castShadow = true;
+    base.userData.source = source.id;
+    sourcePickables.push(base);
     scene.add(base);
     // 半透明的盘体，边缘是发光的环
     const material = new THREE.MeshStandardMaterial({
@@ -842,6 +849,8 @@ export function createTurbineScene(
     for (let i = 0; i < 3; i++) {
       const disk = new THREE.Mesh(diskGeometry, material);
       disk.position.set(x, 13 + i * 7.5, SOURCE_Z);
+      disk.userData.source = source.id;
+      sourcePickables.push(disk);
       scene.add(disk);
       for (const dy of [-3, 3]) {
         const ring = new THREE.Mesh(sourceRingGeometry, ringMaterial);
@@ -860,6 +869,7 @@ export function createTurbineScene(
         'pin-source',
       ),
     );
+    sourcePins.get(source.id)!.element.dataset.source = source.id;
   }
 
   const hubMaterial = new THREE.MeshBasicMaterial({
@@ -882,6 +892,9 @@ export function createTurbineScene(
   hubDisc.position.copy(HUB);
   hubDisc.rotation.x = -Math.PI / 2;
   scene.add(hubDisc);
+  hubRing.userData.source = 'hub';
+  hubDisc.userData.source = 'hub';
+  sourcePickables.push(hubRing, hubDisc);
   // 图谱中的节点与边：环内几个缓慢旋转的点
   const graph = new THREE.Group();
   graph.position.copy(HUB);
@@ -918,7 +931,7 @@ export function createTurbineScene(
     `<b>${escapeHtml(tr('虚拟知识图谱', 'Virtual knowledge graph'))}</b><span>${escapeHtml(tr('一个本体 · 八个数据源', 'One ontology · eight sources'))}</span>`,
     HUB.clone().add(new THREE.Vector3(0, 30, 0)),
     'pin-hub',
-  );
+  ).element.dataset.source = 'hub';
 
   /** 数据源到图谱的连线。 */
   const feedPaths = new Map<SourceId, THREE.Vector3[]>();
@@ -1116,11 +1129,11 @@ export function createTurbineScene(
 
   // ── 拾取与悬停 ──
   stage.onClick((event) => {
-    const hit = stage.pick(event, [...probes, ...pickables]);
-    const tag = hit?.object.userData.tag as string | undefined;
-    if (tag) options.onSelectSensor(tag);
-    else if (hit?.object.userData.turbine)
-      options.onSelect(hit.object.userData.turbine as TurbineId);
+    const hit = stage.pick(event, [...probes, ...pickables, ...sourcePickables]);
+    const data = hit?.object.userData ?? {};
+    if (data.tag) options.onSelectSensor(data.tag as string);
+    else if (data.source) options.onSelectSource(data.source as SourceId | 'hub');
+    else if (data.turbine) options.onSelect(data.turbine as TurbineId);
   });
   const probePin = stage.addPin('', new THREE.Vector3(), 'pin-probe', 'both', false);
   let hovered: string | null = null;
@@ -1141,7 +1154,7 @@ export function createTurbineScene(
     return `<b>${tag}</b><span>${escapeHtml(sensorKindLabel(sensor.kind))} · ${escapeHtml(componentLabel(componentById.get(sensor.component)!))}</span><em>${escapeHtml(reading)}</em>`;
   };
   stage.onHover((event) => {
-    const hit = stage.pick(event, [...probes, ...pickables]);
+    const hit = stage.pick(event, [...probes, ...pickables, ...sourcePickables]);
     const tag = hit?.object.userData.tag as string | undefined;
     stage.canvas.style.cursor = hit ? 'pointer' : '';
     hovered = tag ?? null;
@@ -1157,8 +1170,12 @@ export function createTurbineScene(
   // 卡片内容随播放刷新，按下时即响应，避免 click 因元素被替换而丢失
   pinLayer.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) return;
-    const card = (event.target as HTMLElement).closest<HTMLElement>('.pin-unit');
+    const target = event.target as HTMLElement;
+    const card = target.closest<HTMLElement>('.pin-unit');
+    const label = target.closest<HTMLElement>('.pin-source, .pin-hub');
     if (card?.dataset.turbine) options.onSelect(card.dataset.turbine as TurbineId);
+    else if (label?.dataset.source)
+      options.onSelectSource(label.dataset.source as SourceId | 'hub');
   });
 
   // ── 每帧 ──
@@ -1526,6 +1543,24 @@ export function createTurbineScene(
       const target = unit.group.position.clone().setY(40);
       moved = true;
       stage.flyToPose(target.clone().add(new THREE.Vector3(150, 190, 260)), target, 1200);
+    },
+    focusSource(id) {
+      stage.removePins('pin-focus');
+      isolateUnit(null);
+      moved = true;
+      if (id === 'hub') {
+        const target = HUB.clone().setY(HUB.y - 30);
+        stage.flyToPose(
+          target.clone().add(new THREE.Vector3(0, 300, 700)),
+          target.setY(HUB.y - 90),
+          1200,
+        );
+        return;
+      }
+      const top = sourceTop(id);
+      stage.addPin('<i></i>', top.clone().setY(top.y + 2), 'pin-focus');
+      const target = top.clone().setY(20);
+      stage.flyToPose(target.clone().add(new THREE.Vector3(60, 150, 300)), target, 1200);
     },
     focusSensor(tag) {
       stage.removePins('pin-focus');

@@ -372,3 +372,321 @@ export function sensorDetail(tag: string, ctx: TurbineContext): string {
       )
       .join('')}</div>`;
 }
+
+// ─────────────────────────── 数据源详情 ───────────────────────────
+
+/** 详情中可以跳转的查询。 */
+export interface QueryRef {
+  id: string;
+  title: string;
+  sources: SourceId[];
+}
+
+interface SourceInfo {
+  /** 这个系统如何标识机组。 */
+  identifies: string;
+  /** 映射到本体中的类与属性。 */
+  maps: string[];
+  /** 表结构，每张表的列。 */
+  schema: [string, string[]][];
+}
+
+const SOURCE_INFO = (): Record<SourceId, SourceInfo> => ({
+  hist_a: {
+    identifies: tr(
+      '机组代号（NH-GT1…）与数值传感器主键；传感器类型用数字编码，3 表示温度',
+      'Unit codes (NH-GT1…) and numeric sensor keys; sensor types are numeric codes, 3 meaning temperature',
+    ),
+    maps: [':TemperatureSensor', ':RotorSpeedSensor', ':monitors', 'sosa:Observation'],
+    schema: [
+      ['turbine_components', ['id', 'turbine_id', 'type_id', 'code']],
+      ['sensors', ['id', 'tag', 'component_id', 'type_id']],
+      ['measurements', ['sensor_id', 'ts', 'value']],
+    ],
+  },
+  hist_b: {
+    identifies: tr(
+      'KKS 风格的机组代号（11MBA…）；部件与传感器在同一张表中，温度为华氏度',
+      'KKS-style unit codes (11MBA…); components and sensors share one table, temperatures in Fahrenheit',
+    ),
+    maps: [':TemperatureSensor', ':RotorSpeedSensor', ':monitors', 'sosa:Observation'],
+    schema: [
+      [
+        'turbine_components',
+        ['id', 'turbine_id', 'code', 'sensor_id', 'sensor_tag', 'sensor_type'],
+      ],
+      ['measurements', ['sensor_id', 'time', 'value']],
+    ],
+  },
+  live: {
+    identifies: tr(
+      '传感器编号（如 T44B1T3），不含机组字段',
+      'Sensor tags (such as T44B1T3), with no turbine column',
+    ),
+    maps: ['sosa:Observation', 'sosa:madeBySensor', 'sosa:resultTime'],
+    schema: [['live_measurements', ['tag', 'ts', 'value']]],
+  },
+  master: {
+    identifies: tr(
+      '序列号（GA-60-0207…），并保存序列号、控制系统代号与维修设备号的对照',
+      'Serial numbers (GA-60-0207…), plus the cross-reference of serials, control system codes and equipment numbers',
+    ),
+    maps: [':GasTurbine', ':model', ':ratedPower', ':purgingSpeed', ':dcsCode', ':equipmentNo'],
+    schema: [
+      ['turbines', ['serial', 'model', 'plant', 'commissioned']],
+      ['models', ['id', 'rated_mw', 'exhaust_base', 'exhaust_slope', 'ambient_coef']],
+      ['parameters', ['serial', 'purging_speed', 'non_purging_speed', 'tip_limit']],
+      ['id_map', ['serial', 'dcs_code', 'equipment_no', 'sensor_tag']],
+    ],
+  },
+  events: {
+    identifies: tr(
+      '控制系统代号（NH-GT3、11MBA…）；两座电厂的事件代码不同，如 BT_TEMP_HI 与 E2041',
+      'Control system codes (NH-GT3, 11MBA…); the plants use different event codes, such as BT_TEMP_HI and E2041',
+    ),
+    maps: [':BurnerTipOvertemperature', ':Trip', ':Ignition', ':component', ':time'],
+    schema: [['alarm_log', ['unit', 'ts', 'code', 'component']]],
+  },
+  cmms: {
+    identifies: tr(
+      '维修设备号（10004711…）与部件位置',
+      'Maintenance equipment numbers (10004711…) and component positions',
+    ),
+    maps: [':WorkOrder', ':installedPart', ':batch', ':lastBurnerService'],
+    schema: [
+      ['work_orders', ['id', 'equipment_no', 'object', 'type', 'done_on']],
+      ['installed_parts', ['equipment_no', 'position', 'batch', 'installed_on']],
+    ],
+  },
+  dispatch: {
+    identifies: tr(
+      '序列号；计划按 15 分钟一段下达',
+      'Serial numbers; the plan is issued in 15-minute blocks',
+    ),
+    maps: [':DispatchPlan', ':unit', ':mw'],
+    schema: [['unit_schedule', ['serial', 'valid_from', 'valid_to', 'mw']]],
+  },
+  weather: {
+    identifies: tr('电厂所在地，不涉及机组', 'Plant site; no turbine identifiers'),
+    maps: [':WeatherObservation', ':site', ':airTemperature'],
+    schema: [['observations', ['site', 'ts', 'air_temp', 'humidity']]],
+  },
+});
+
+function table(head: string[], rows: (string | number)[][]): string {
+  return `<div class="card-table"><table><thead><tr>${head.map((h) => `<th>${escape(h)}</th>`).join('')}</tr></thead><tbody>${rows
+    .map((row) => `<tr>${row.map((c) => `<td>${escape(String(c))}</td>`).join('')}</tr>`)
+    .join('')}</tbody></table></div>`;
+}
+
+/** 按此刻从数据源中取的几行原始记录。 */
+function sampleRows(id: SourceId, ctx: TurbineContext): string {
+  const batch = lastBatch(ctx.now);
+  const rowsAt = (tag: string, times: number[], convert = (v: number) => v) => {
+    const values = observed(tag, ctx.now, new Set([id]) as ReadonlySet<SourceId>);
+    return times
+      .filter((t) => t >= 0 && !Number.isNaN(values[t]))
+      .map((t) => [t, convert(values[t])] as const);
+  };
+  switch (id) {
+    case 'hist_a': {
+      const sensor = sensorByTag.get('T44B1T3')!;
+      const rows = rowsAt(sensor.tag, [batch - 2, batch - 1, batch]);
+      return (
+        table(['id', 'tag', 'component_id', 'type_id'], [[sensor.dbId, sensor.tag, 3014, 3]]) +
+        table(
+          ['sensor_id', 'ts', 'value'],
+          rows.map(([t, v]) => [sensor.dbId, formatTime(t), fmt(v, 1)]),
+        )
+      );
+    }
+    case 'hist_b': {
+      const sensor = sensorByTag.get('T43B1T4')!;
+      const rows = rowsAt(sensor.tag, [batch - 2, batch - 1, batch], toFahrenheit);
+      return (
+        table(
+          ['turbine_id', 'code', 'sensor_id', 'sensor_type'],
+          [['11MBA', 'MBM13', sensor.dbId, 3]],
+        ) +
+        table(
+          ['sensor_id', 'time', 'value (°F)'],
+          rows.map(([t, v]) => [sensor.dbId, formatTime(t), fmt(v, 1)]),
+        )
+      );
+    }
+    case 'live': {
+      const tags = ['S21R1T1', 'T44B1T3', 'P01G1T4', 'V62D2T6'];
+      const rows = tags.flatMap((tag) =>
+        rowsAt(tag, [ctx.now]).map(([t, v]) => [tag, formatTime(t), fmt(v, 2)]),
+      );
+      return table(['tag', 'ts', 'value'], rows);
+    }
+    case 'master':
+      return table(
+        ['serial', 'model', 'dcs_code', 'equipment_no'],
+        TURBINES.slice(0, 4).map((t) => [t.serial, t.model, t.dcs, t.equipmentNo]),
+      );
+    case 'events':
+      return table(
+        ['unit', 'ts', 'code', 'component'],
+        eventsUntil(ctx.now)
+          .slice(-4)
+          .reverse()
+          .map((e) => [e.dcs, formatTime(e.t), e.code, e.component ?? '']),
+      );
+    case 'cmms':
+      return table(
+        ['equipment_no', 'object', 'done_on', 'batch'],
+        [...WORK_ORDERS]
+          .sort((a, b) => b.date.localeCompare(a.date))
+          .slice(0, 4)
+          .map((o) => [o.equipmentNo, o.component, o.date, o.batch ?? '']),
+      );
+    case 'dispatch': {
+      const from = Math.floor(ctx.now / 900) * 900;
+      return table(
+        ['serial', 'valid_from', 'mw'],
+        TURBINES.slice(0, 4).map((t) => [
+          t.serial,
+          formatTime(from),
+          fmt(plannedPower(t.id, from), 1),
+        ]),
+      );
+    }
+    case 'weather':
+      return table(
+        ['site', 'ts', 'air_temp', 'humidity'],
+        (['A', 'B'] as const).map((plant) => {
+          const w = weatherAt(plant, ctx.now);
+          return [PLANTS[plant].name, formatTime(w.t), w.temp, w.humidity];
+        }),
+      );
+  }
+}
+
+export function sourceDetail(id: SourceId, ctx: TurbineContext, queries: QueryRef[]): string {
+  const source = sourceById.get(id)!;
+  const info = SOURCE_INFO()[id];
+  const on = ctx.sources.has(id);
+  const used = queries.filter((q) => q.sources.includes(id));
+  return `
+    <div class="card-head">
+      <div>
+        <p class="card-kind" style="--source:${source.color}"><i class="card-swatch"></i>${escape(tr('数据源', 'Data source'))} · ${escape(source.system)}</p>
+        <h3 class="card-title">${escape(source.name)}</h3>
+      </div>
+      <button type="button" class="card-close" data-detail-close aria-label="${escape(tr('关闭详情', 'Close details'))}">×</button>
+    </div>
+    <p class="card-desc">${escape(source.description)}</p>
+    <div class="card-facts">
+      <p><span>${escape(tr('更新', 'Updates'))}</span>${escape(source.refresh)}</p>
+      <p><span>catalog</span><code>${source.catalog}</code></p>
+      <p><span>${escape(tr('机组标识', 'Turbine IDs'))}</span>${escape(info.identifies)}</p>
+    </div>
+    <button type="button" class="card-toggle${on ? '' : ' is-off'}" data-toggle-source="${id}">${escape(
+      on
+        ? tr('已接入 · 点击断开', 'Connected · click to disconnect')
+        : tr('未接入 · 点击接入', 'Not connected · click to connect'),
+    )}</button>
+    <p class="card-label">${escape(tr('表结构', 'Tables'))}</p>
+    <div class="card-schema">${info.schema
+      .map(
+        ([name, cols]) =>
+          `<p><code>${source.catalog}.${name}</code><span>${cols.join(', ')}</span></p>`,
+      )
+      .join('')}</div>
+    <p class="card-label">${escape(tr(`此刻的原始记录（${formatTime(ctx.now)}）`, `Raw records now (${formatTime(ctx.now)})`))}</p>
+    ${sampleRows(id, ctx)}
+    <p class="card-label">${escape(tr('在本体中映射为', 'Mapped to'))}</p>
+    <div class="card-chips">${info.maps.map((m) => `<span class="card-chip is-static"><code>${m}</code></span>`).join('')}</div>
+    <p class="card-label">${escape(tr(`用到它的查询（${used.length} 条）`, `Queries that use it (${used.length})`))}</p>
+    <div class="card-chips">${used
+      .map(
+        (q) =>
+          `<button type="button" class="card-chip" data-query="${q.id}">${escape(q.title)}</button>`,
+      )
+      .join('')}</div>
+    <p class="card-label">${escape(tr('其他数据源', 'Other sources'))}</p>
+    <div class="card-chips">${[...sourceById.values()]
+      .filter((s) => s.id !== id)
+      .map(
+        (s) =>
+          `<button type="button" class="card-chip" data-src="${s.id}"><i style="--c:${s.color}"></i>${escape(s.name)}</button>`,
+      )
+      .join(
+        '',
+      )}<button type="button" class="card-chip" data-src="hub">${escape(tr('虚拟知识图谱', 'Virtual knowledge graph'))}</button></div>`;
+}
+
+// ─────────────────────────── 知识图谱详情 ───────────────────────────
+
+export function hubDetail(ctx: TurbineContext, ontology: string): string {
+  const connected = [...sourceById.values()].filter((s) => ctx.sources.has(s.id));
+  const sensors = TURBINES.flatMap((t) => sensorsOf(t.id));
+  const components = TURBINES.flatMap((t) => componentsOf(t.id));
+  // 此刻可以查询到的观测：每个传感器在已接入数据源中可读的秒数
+  let observations = 0;
+  for (const plant of ['A', 'B'] as const) {
+    let readable = 0;
+    for (let t = 0; t <= ctx.now; t++) if (originOf(plant, t, ctx.now, ctx.sources)) readable++;
+    observations +=
+      readable * sensors.filter((s) => turbineById.get(s.turbine)!.plant === plant).length;
+  }
+  const count = (kinds: string[]) => sensors.filter((s) => kinds.includes(s.kind)).length;
+  const classes: [string, number | string][] = [
+    [':GasTurbine', TURBINES.length],
+    [':Component', components.length],
+    [':BurnerTip', components.filter((c) => c.kind === 'tip').length],
+    [':TemperatureSensor', count(['tip', 'exhaust', 'inlet', 'bearingTemp'])],
+    [':RotorSpeedSensor', count(['speed'])],
+    [':VibrationSensor', count(['vibration'])],
+    [':OperationalEvent', eventsUntil(ctx.now).length],
+    [':WorkOrder', WORK_ORDERS.length],
+    ['sosa:Observation', observations],
+  ];
+  const stats: [string, string][] = [
+    [tr('已接入数据源', 'Connected sources'), `${connected.length} / ${sourceById.size}`],
+    [tr('机组', 'Turbines'), String(TURBINES.length)],
+    [tr('传感器', 'Sensors'), String(sensors.length)],
+    [tr('可查询的观测', 'Queryable observations'), observations.toLocaleString('en-US')],
+    [tr('复制的数据', 'Data copied'), '0'],
+  ];
+  return `
+    <div class="card-head">
+      <div>
+        <p class="card-kind">${escape(tr('本体 + 映射', 'Ontology + mappings'))}</p>
+        <h3 class="card-title">${escape(tr('虚拟知识图谱', 'Virtual knowledge graph'))}</h3>
+      </div>
+      <button type="button" class="card-close" data-detail-close aria-label="${escape(tr('关闭详情', 'Close details'))}">×</button>
+    </div>
+    <p class="card-desc">${escape(
+      tr(
+        '虚拟知识图谱不存放数据。本体用统一的词汇描述机组、部件、传感器和事件，映射说明这些词汇对应各数据源中的哪些表与列。查询写在本体上，执行时被改写成各数据源的 SQL，结果再合并返回。',
+        'A virtual knowledge graph stores no data. The ontology describes turbines, components, sensors and events in one vocabulary, and the mappings state which tables and columns in each source correspond to that vocabulary. Queries are written against the ontology and rewritten into SQL for each source at run time; the results are then merged.',
+      ),
+    )}</p>
+    <div class="card-stats">${stats.map(([label, value]) => `<p><b>${escape(value)}</b><span>${escape(label)}</span></p>`).join('')}</div>
+    <p class="card-label">${escape(tr('一条查询的执行过程', 'How a query runs'))}</p>
+    <ol class="card-steps">
+      <li>${escape(tr('用本体推理扩展查询：问“温度传感器”，也会查到喷嘴、排气与轴承上的温度传感器。', 'Expand the query with the ontology: asking for temperature sensors also covers those on burner tips, exhaust and bearings.'))}</li>
+      <li>${escape(tr('按映射展开：每个类与属性换成对应数据源上的 SQL，历史库 B 的华氏度在这一步换算。', 'Unfold through the mappings: each class and property becomes SQL over the matching sources; Fahrenheit from Historian B is converted here.'))}</li>
+      <li>${escape(tr('联邦执行：SQL 分发到 8 个数据源，各自在原处计算。', 'Federated execution: the SQL is sent to the eight sources and evaluated where the data lives.'))}</li>
+      <li>${escape(tr('合并结果：不同编号的记录因映射到同一个 IRI 而汇合。', 'Merge the results: records with different identifiers meet because they map to the same IRI.'))}</li>
+    </ol>
+    <p class="card-label">${escape(tr('本体中的类与此刻的实例数', 'Classes and current instance counts'))}</p>
+    <div class="card-classes">${classes
+      .map(
+        ([name, n]) =>
+          `<p><code>${name}</code><span>${typeof n === 'number' ? n.toLocaleString('en-US') : n}</span></p>`,
+      )
+      .join('')}</div>
+    <p class="card-label">${escape(tr('数据源（点击查看）', 'Sources (click to inspect)'))}</p>
+    <div class="card-chips">${[...sourceById.values()]
+      .map(
+        (s) =>
+          `<button type="button" class="card-chip${ctx.sources.has(s.id) ? '' : ' is-off'}" data-src="${s.id}"><i style="--c:${s.color}"></i>${escape(s.name)}</button>`,
+      )
+      .join('')}</div>
+    <p class="card-label">${escape(tr('本体节选', 'Ontology excerpt'))}</p>
+    <pre class="card-code">${escape(ontology)}</pre>`;
+}
