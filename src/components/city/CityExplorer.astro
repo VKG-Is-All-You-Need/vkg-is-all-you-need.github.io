@@ -49,6 +49,12 @@ const t = {
     hint: '查询结果按来源分层展示：底层是八个独立的数据源，经映射汇入虚拟知识图谱，顶层是本体。由多个数据源描述的同一实体在图谱层合并为一个节点。',
     hintGo: '查看分层视图',
     hintLater: '稍后再看',
+    about: '介绍',
+    ontologyLink: '本体与映射',
+    tour: '导览',
+    tourPrev: '上一步',
+    tourNext: '下一步',
+    tourSkip: '跳过导览',
   },
   en: {
     days: 'Day',
@@ -81,6 +87,12 @@ const t = {
     hint: 'The layered view arranges query results by source: the eight independent data sources at the bottom feed into the virtual knowledge graph through mappings, with the ontology on top. An entity described by several sources becomes a single node in the graph layer.',
     hintGo: 'Open the layered view',
     hintLater: 'Later',
+    about: 'About',
+    ontologyLink: 'Ontology and mappings',
+    tour: 'Tour',
+    tourPrev: 'Back',
+    tourNext: 'Next',
+    tourSkip: 'Skip tour',
   },
 }[lang];
 
@@ -218,6 +230,15 @@ const presets = ['all', 'gis', 'mobility', 'people'].map((id, i) => ({
                 <span />
               </span>
             </label>
+            <button
+              type="button"
+              class="source-info"
+              data-info-source={source.id}
+              aria-label={`${t.about} ${source.name}`}
+              title={t.about}
+            >
+              i
+            </button>
           </li>
         ))}
       </ul>
@@ -229,7 +250,30 @@ const presets = ['all', 'gis', 'mobility', 'people'].map((id, i) => ({
         ))}
       </div>
       <p class="sources-hint">{t.sourcesHint}</p>
+      <button type="button" class="ontology-link" data-info-layer="ontology">
+        {t.ontologyLink} →
+      </button>
     </aside>
+
+    <section class="tour" data-tour hidden aria-live="polite">
+      <div class="tour-progress" aria-hidden="true">
+        <span data-tour-bar></span>
+      </div>
+      <p class="tour-step" data-tour-step></p>
+      <h3 class="tour-title" data-tour-title></h3>
+      <p class="tour-text" data-tour-text></p>
+      <div class="tour-actions">
+        <button type="button" class="tour-skip" data-tour-skip>
+          {t.tourSkip}
+        </button>
+        <button type="button" class="tour-prev" data-tour-prev>
+          {t.tourPrev}
+        </button>
+        <button type="button" class="tour-next" data-tour-next>
+          {t.tourNext}
+        </button>
+      </div>
+    </section>
 
     <div class="timeline" role="group" aria-label={t.time}>
       <button type="button" class="play" data-city-play aria-pressed="false" aria-label={t.play}>
@@ -279,6 +323,10 @@ const presets = ['all', 'gis', 'mobility', 'people'].map((id, i) => ({
         </div>
       </div>
       <div class="timeline-tools">
+        <button type="button" class="tour-button" data-city-tour>
+          <Icon name="sparkles" size={15} />
+          <span>{t.tour}</span>
+        </button>
         <div class="view-switch" role="group" aria-label={t.view}>
           <button type="button" data-city-view="city" aria-pressed="true">
             <Icon name="map" size={15} />
@@ -1408,6 +1456,417 @@ const presets = ['all', 'gis', 'mobility', 'people'].map((id, i) => ({
       right: 12px;
       bottom: 12px;
       margin: 0;
+    }
+  }
+  /* 数据源的介绍按钮与本体入口 */
+  .sources li {
+    position: relative;
+  }
+
+  .source-info {
+    position: absolute;
+    top: 50%;
+    right: 46px;
+    translate: 0 -50%;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    font: italic 600 11px var(--font-serif, serif);
+    color: var(--muted);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .sources li:hover .source-info,
+  .source-info:focus-visible {
+    opacity: 1;
+  }
+
+  .sources li:hover .source-need {
+    visibility: hidden;
+  }
+
+  .source-info:hover {
+    border-color: var(--accent);
+    color: var(--accent-ink);
+  }
+
+  .ontology-link {
+    align-self: flex-start;
+    font-size: 12.5px;
+    color: var(--accent-ink);
+  }
+
+  .ontology-link:hover {
+    text-decoration: underline;
+  }
+
+  /* 分层视图中可以点击的标签 */
+  .city :global(.pins .pin-source),
+  .city :global(.pins .pin-layer),
+  .city :global(.pins .pin-class) {
+    pointer-events: auto;
+    cursor: pointer;
+  }
+
+  .city :global(.pins .pin-source:hover),
+  .city :global(.pins .pin-layer:hover),
+  .city :global(.pins .pin-class:hover) {
+    border-color: var(--accent);
+    box-shadow: 0 0 14px var(--glow);
+  }
+
+  /* 数据源、层与类的介绍 */
+  .detail-card:global(.is-info) {
+    width: min(400px, calc(100% - 640px));
+  }
+
+  .detail-card :global(.card-swatch) {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
+    border-radius: 2px;
+    background: var(--source);
+  }
+
+  .detail-card :global(.card-desc) {
+    margin: 6px 0 4px;
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--ink-2);
+  }
+
+  .detail-card :global(.card-facts) {
+    display: grid;
+    gap: 3px;
+    margin-top: 6px;
+    font-size: 12.5px;
+  }
+
+  .detail-card :global(.card-facts p) {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 8px;
+    line-height: 1.55;
+    color: var(--ink-2);
+  }
+
+  .detail-card :global(.card-facts span) {
+    color: var(--faint);
+  }
+
+  .detail-card :global(.card-toggle) {
+    margin-top: 8px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--accent);
+    background: var(--accent-soft);
+    font-size: 12px;
+    color: var(--accent-ink);
+  }
+
+  .detail-card :global(.card-toggle.is-off) {
+    border-color: var(--warn);
+    background: color-mix(in srgb, var(--warn) 12%, transparent);
+    color: var(--warn);
+  }
+
+  .detail-card :global(.card-label) {
+    margin: 10px 0 4px;
+    font-size: 11.5px;
+    color: var(--faint);
+  }
+
+  .detail-card :global(.card-chips) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .detail-card :global(.card-chip) {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface-2);
+    font-size: 11.5px;
+    color: var(--ink-2);
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+  }
+
+  .detail-card :global(button.card-chip:hover) {
+    border-color: var(--accent);
+    box-shadow: 0 0 10px var(--accent-soft);
+    color: var(--ink);
+  }
+
+  .detail-card :global(.card-chip i) {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--c);
+  }
+
+  .detail-card :global(.card-chip em) {
+    font: normal 11px var(--font-mono);
+    color: var(--accent-ink);
+  }
+
+  .detail-card :global(.card-chip code) {
+    padding: 0;
+    background: none;
+    font-size: 11px;
+  }
+
+  .detail-card :global(.card-chip.is-off) {
+    opacity: 0.5;
+    text-decoration: line-through;
+  }
+
+  .detail-card :global(.card-code) {
+    margin: 0;
+    max-height: 220px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--code-bg);
+    color: var(--code-ink);
+    font: 10.5px/1.6 var(--font-mono);
+    white-space: pre;
+    overflow: auto;
+  }
+
+  .detail-card :global(.card-stats) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .detail-card :global(.card-stats p) {
+    display: grid;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: var(--surface-2);
+  }
+
+  .detail-card :global(.card-stats b) {
+    font: 600 16px var(--font-mono);
+    color: var(--accent-ink);
+  }
+
+  .detail-card :global(.card-stats span) {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .detail-card :global(.card-list) {
+    display: grid;
+    gap: 2px;
+    font-size: 12.5px;
+  }
+
+  .detail-card :global(.card-list li) {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: var(--surface-2);
+  }
+
+  .detail-card :global(.card-dots) {
+    display: inline-flex;
+    gap: 3px;
+    align-items: center;
+  }
+
+  .detail-card :global(.card-dots i) {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--c);
+  }
+
+  /* 导览 */
+  .tour {
+    position: absolute;
+    left: 50%;
+    bottom: 96px;
+    z-index: 4;
+    width: min(560px, calc(100% - 32px));
+    translate: -50% 0;
+    padding: 16px 20px 14px;
+    border-radius: 16px;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    animation: card-in 0.45s var(--ease);
+  }
+
+  .tour[hidden] {
+    display: none;
+  }
+
+  .tour-progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 3px;
+    background: var(--line);
+  }
+
+  .tour-progress span {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: var(--accent);
+  }
+
+  .tour-step {
+    font: 12px var(--font-mono);
+    color: var(--accent-ink);
+  }
+
+  .tour-title {
+    margin-top: 2px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .tour-text {
+    margin-top: 6px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+
+  .tour-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .tour-actions button {
+    height: 32px;
+    padding: 0 14px;
+    border-radius: 999px;
+    font-size: 13px;
+  }
+
+  .tour-skip {
+    margin-right: auto;
+    color: var(--faint);
+  }
+
+  .tour-skip:hover {
+    color: var(--ink);
+  }
+
+  .tour-prev {
+    border: 1px solid var(--line-strong);
+    color: var(--ink-2);
+  }
+
+  .tour-prev:disabled {
+    opacity: 0.4;
+  }
+
+  .tour-next {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .timeline-tools .tour-button {
+    border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+    color: var(--accent-ink);
+  }
+
+  .city-stage :is(.panel, .top, .detail-card) {
+    transition: opacity 0.4s var(--ease);
+  }
+
+  .city-stage:global(.is-touring) :is(.panel, .top, .detail-card, .view-hint) {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .city :global(.pins .pin-marker) {
+    gap: 8px;
+    padding: 4px 10px 4px 6px;
+    border-color: var(--accent);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 0 24px var(--glow);
+    animation: marker-in 0.6s var(--ease) 1.2s both;
+  }
+
+  .city :global(.pins .pin-marker i) {
+    position: relative;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .city :global(.pins .pin-marker i::after) {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    animation: marker-pulse 1.6s ease-out infinite;
+  }
+
+  @keyframes marker-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+
+  @keyframes marker-pulse {
+    from {
+      opacity: 0.9;
+      transform: scale(0.6);
+    }
+    to {
+      opacity: 0;
+      transform: scale(1.8);
+    }
+  }
+
+  @media (max-width: 1080px) {
+    .detail-card:global(.is-info) {
+      width: auto;
+    }
+
+    .tour {
+      position: relative;
+      left: auto;
+      bottom: auto;
+      order: -1;
+      width: auto;
+      margin-inline: 12px;
+      translate: none;
+    }
+
+    .city-stage:global(.is-touring) :is(.panel, .detail-card) {
+      display: none;
     }
   }
 </style>

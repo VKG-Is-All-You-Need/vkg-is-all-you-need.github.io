@@ -79,8 +79,24 @@ export type FocusTarget =
   | { type: 'sensor'; id: string }
   | { type: 'point'; at: Point };
 
+/** 分层视图中可以点击查看介绍的对象：数据源、各层与本体中的类。 */
+export type InfoTarget =
+  | { type: 'source'; id: SourceId }
+  | { type: 'layer'; id: LayerKey }
+  | { type: 'class'; name: string };
+
+export type LayerKey = 'data' | 'mapping' | 'graph' | 'ontology';
+
+/** 导览中的一步：镜头飞向街区中的对象或分层视图中的某一层，并在该处标出提示点。 */
+export interface CityTourStep {
+  focus?: FocusTarget;
+  layer?: LayerKey | 'overview';
+  marker?: string;
+}
+
 export interface SceneCallbacks {
   onSelect(selection: Selection | null): void;
+  onInfo(target: InfoTarget): void;
 }
 
 export interface CityScene {
@@ -95,6 +111,8 @@ export interface CityScene {
   focus(target: FocusTarget): void;
   setView(view: View): void;
   resetView(): void;
+  /** 导览：传入 null 时移除提示点。 */
+  tour(step: CityTourStep | null): void;
   /** 场景上方浮层面板占用的边距（像素），取景时只使用剩余区域。 */
   setInsets(insets: Insets): void;
   dispose(): void;
@@ -1175,7 +1193,7 @@ export function createCityScene(
     new THREE.Vector3(-ONTOLOGY_HALF.w, LAYER.ontology, ONTOLOGY_HALF.d),
     'pin-layer pin-layer-onto',
     'layers',
-  );
+  ).element.dataset.layer = 'ontology';
   stage.addPin(
     layerLabel(
       tr('虚拟知识图谱', 'Virtual knowledge graph'),
@@ -1184,7 +1202,7 @@ export function createCityScene(
     new THREE.Vector3(-HALF_W, LAYER.graph, HALF_D),
     'pin-layer pin-layer-graph',
     'layers',
-  );
+  ).element.dataset.layer = 'graph';
   stage.addPin(
     layerLabel(
       tr('映射', 'Mappings'),
@@ -1193,7 +1211,7 @@ export function createCityScene(
     new THREE.Vector3(-HALF_W, LAYER.mapping, HALF_D),
     'pin-layer pin-layer-map',
     'layers',
-  );
+  ).element.dataset.layer = 'mapping';
   stage.addPin(
     layerLabel(
       tr('数据源', 'Data sources'),
@@ -1202,7 +1220,7 @@ export function createCityScene(
     new THREE.Vector3(-HALF_W, 0, HALF_D),
     'pin-layer pin-layer-data',
     'layers',
-  );
+  ).element.dataset.layer = 'data';
 
   // 数据源：街区前方一排数据库
   interface Pillar {
@@ -1212,6 +1230,8 @@ export function createCityScene(
     pin: Pin;
   }
   const pillars = new Map<SourceId, Pillar>();
+  /** 分层视图中可点击的网格：数据源与本体类。 */
+  const infoMeshes: THREE.Object3D[] = [];
   const discGeometry = new THREE.CylinderGeometry(16, 16, 9, 40);
   stage.markShared(discGeometry);
   SOURCES.forEach((source, i) => {
@@ -1226,6 +1246,8 @@ export function createCityScene(
     for (let k = 0; k < 3; k++) {
       const disc = new THREE.Mesh(discGeometry, material);
       disc.position.copy(base).setY(6 + k * 12);
+      disc.userData.source = source.id;
+      infoMeshes.push(disc);
       layerRoot.add(disc);
     }
     const pin = stage.addPin(
@@ -1235,6 +1257,7 @@ export function createCityScene(
       'layers',
     );
     pin.element.style.setProperty('--source', source.color);
+    pin.element.dataset.source = source.id;
     pillars.set(source.id, { source, material, top: base.clone().setY(PILLAR_TOP), pin });
   });
 
@@ -1291,13 +1314,14 @@ export function createCityScene(
           }),
         );
         mesh.position.copy(position);
+        mesh.userData.cls = name;
         classGroup.add(mesh);
         stage.addPin(
           escapeHtml(name),
           position.clone().setY(LAYER.ontology + 14),
           'pin-class',
           'layers',
-        );
+        ).element.dataset.cls = name;
         classNodes.set(name, { mesh, position });
       });
     }
@@ -1882,10 +1906,34 @@ export function createCityScene(
     const id = hit.object.userData.id as number | undefined;
     return id === undefined ? null : { type: 'building', id };
   };
-  stage.onClick((event) => callbacks.onSelect(pickAt(event)));
+  /** 分层视图中点到的数据源或本体类。 */
+  const pickInfo = (event: PointerEvent): InfoTarget | null => {
+    if (stage.mix < 0.5) return null;
+    const hit = stage.pick(event, [...infoMeshes, ...classGroup.children]);
+    if (hit?.object.userData.source) return { type: 'source', id: hit.object.userData.source };
+    if (hit?.object.userData.cls) return { type: 'class', name: hit.object.userData.cls };
+    return null;
+  };
+  stage.onClick((event) => {
+    const info = pickInfo(event);
+    if (info) callbacks.onInfo(info);
+    else callbacks.onSelect(pickAt(event));
+  });
+  // 标签内容会随状态重绘，按下时即响应
+  pinLayer.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) return;
+    const el = (event.target as HTMLElement).closest<HTMLElement>(
+      '.pin-source, .pin-layer, .pin-class',
+    );
+    if (!el) return;
+    if (el.dataset.source) callbacks.onInfo({ type: 'source', id: el.dataset.source as SourceId });
+    else if (el.dataset.layer)
+      callbacks.onInfo({ type: 'layer', id: el.dataset.layer as LayerKey });
+    else if (el.dataset.cls) callbacks.onInfo({ type: 'class', name: el.dataset.cls });
+  });
   stage.onHover((event) => {
     const picked = pickAt(event);
-    stage.canvas.style.cursor = picked ? 'pointer' : '';
+    stage.canvas.style.cursor = picked || pickInfo(event) ? 'pointer' : '';
     const id = picked?.type === 'building' ? picked.id : null;
     if (id !== hovered) {
       hovered = id;
@@ -2446,7 +2494,7 @@ export function createCityScene(
       : null;
   };
 
-  return {
+  const scene3d: CityScene = {
     setTime(t, isPlaying, nextSpeed) {
       simT = t;
       playing = isPlaying;
@@ -2591,6 +2639,67 @@ export function createCityScene(
       }
     },
     resetView: goHome,
+    tour(step) {
+      stage.removePins('pin-marker');
+      if (!step) return;
+      let anchor: THREE.Vector3 | null = null;
+      if (step.focus) {
+        scene3d.focus(step.focus);
+        const f = step.focus;
+        anchor =
+          f.type === 'node'
+            ? toWorld(nodeById.get(f.id)!, 12)
+            : f.type === 'building'
+              ? toWorld(centerOf(f.id), heightOf(buildingOf(f.id)) + 8)
+              : f.type === 'sensor'
+                ? toWorld(sensorById.get(f.id)!.at, 20)
+                : f.type === 'point'
+                  ? toWorld(f.at, 10)
+                  : null;
+      } else if (step.layer) {
+        follow = null;
+        const s = frame(1.4, 2.8);
+        const poses: Record<
+          LayerKey,
+          { target: THREE.Vector3; offset: THREE.Vector3; mark: THREE.Vector3 }
+        > = {
+          data: {
+            target: new THREE.Vector3(0, 20, HALF_D + 70),
+            offset: new THREE.Vector3(160, 300, 760),
+            mark: new THREE.Vector3(0, PILLAR_TOP, HALF_D + 70),
+          },
+          mapping: {
+            target: new THREE.Vector3(0, LAYER.mapping - 40, 60),
+            offset: new THREE.Vector3(320, 260, 1500),
+            mark: new THREE.Vector3(-HALF_W * 0.55, LAYER.mapping, HALF_D),
+          },
+          graph: {
+            target: new THREE.Vector3(0, LAYER.graph - 40, 60),
+            offset: new THREE.Vector3(260, 380, 1050),
+            mark: new THREE.Vector3(-HALF_W * 0.55, LAYER.graph, HALF_D),
+          },
+          ontology: {
+            target: new THREE.Vector3(0, LAYER.ontology - 30, 0),
+            offset: new THREE.Vector3(200, 300, 860),
+            mark: new THREE.Vector3(-ONTOLOGY_HALF.w * 0.6, LAYER.ontology, ONTOLOGY_HALF.d),
+          },
+        };
+        if (step.layer === 'overview') {
+          goHome();
+        } else {
+          const pose = poses[step.layer];
+          stage.flyToPose(
+            pose.target.clone().add(pose.offset.clone().multiplyScalar(s)),
+            pose.target,
+            1800,
+          );
+          anchor = pose.mark;
+        }
+      }
+      if (anchor && step.marker) {
+        stage.addPin(`<i></i><span>${escapeHtml(step.marker)}</span>`, anchor, 'pin-marker');
+      }
+    },
     setInsets(next) {
       insets = next;
     },
@@ -2598,4 +2707,5 @@ export function createCityScene(
       stage.dispose();
     },
   };
+  return scene3d;
 }

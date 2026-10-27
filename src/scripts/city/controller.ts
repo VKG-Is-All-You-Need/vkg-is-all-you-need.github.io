@@ -59,7 +59,17 @@ import {
 import { busCrews, vehicleByDriver, vehicleById, vehicleByOwner } from '../../lib/city/vehicles';
 import { observationAt } from '../../lib/city/weather';
 import { prefersReducedMotion } from '../lifecycle';
-import type { CityScene, FocusTarget, Insets, Selection, SelectionInfo, View } from './scene';
+import type {
+  CityScene,
+  CityTourStep,
+  FocusTarget,
+  InfoTarget,
+  Insets,
+  Selection,
+  SelectionInfo,
+  View,
+} from './scene';
+import { infoCard, type ClassUsage } from './info';
 
 const PRESETS: Record<string, SourceId[]> = {
   all: ALL_SOURCES,
@@ -1023,6 +1033,23 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
   let lastResultHtml = '';
   let lastCardHtml = '';
   let lastSelectionKey = '';
+  /** 详情卡片中显示的数据源、层或类的介绍；与对象详情互斥。 */
+  let infoTarget: InfoTarget | null = null;
+  let lastResult: CityResult | null = null;
+  let classUsage: ClassUsage | null = null;
+  /** 各类出现在哪些查询中：按每条查询的建议时刻求值一次。 */
+  const usage = (): ClassUsage => {
+    if (!classUsage) {
+      classUsage = new Map();
+      for (const query of queries) {
+        const result = query.run({ t: query.suggest, sources: new Set(ALL_SOURCES), detail: true });
+        for (const cls of result.classes) {
+          classUsage.set(cls, [...(classUsage.get(cls) ?? []), query.id]);
+        }
+      }
+    }
+    return classUsage;
+  };
 
   // ── 结果 ──
   const renderResult = (result: CityResult) => {
@@ -1057,6 +1084,23 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
 
   // ── 详情卡片 ──
   const renderCard = () => {
+    if (infoTarget) {
+      const html = infoCard(infoTarget, sources, queries, lastResult, usage());
+      if (html !== lastCardHtml) {
+        lastCardHtml = html;
+        card.innerHTML = html;
+        card.scrollTop = 0;
+      }
+      card.classList.remove('is-collapsed');
+      card.classList.add('is-info');
+      card.hidden = false;
+      if (lastSelectionKey) {
+        lastSelectionKey = '';
+        scene?.select(null);
+      }
+      return;
+    }
+    card.classList.remove('is-info');
     if (!selection) {
       card.hidden = true;
       lastCardHtml = '';
@@ -1141,6 +1185,7 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
 
   const refresh = (fresh = false) => {
     const result = active.run({ t, sources, detail });
+    lastResult = result;
     renderResult(result);
     scene?.showResult(result, fresh);
     renderCard();
@@ -1302,7 +1347,24 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
     else if (via === 'scene') trail = [];
     if (!sameSelection(next, selection)) cardCollapsed = false;
     selection = next;
+    if (next) infoTarget = null;
     renderCard();
+  };
+
+  /** 打开数据源、层或类的介绍。 */
+  const openInfo = (next: InfoTarget) => {
+    selection = null;
+    trail = [];
+    infoTarget = next;
+    lastCardHtml = '';
+    renderCard();
+  };
+
+  const toggleSource = (id: SourceId) => {
+    if (sources.has(id)) sources.delete(id);
+    else sources.add(id);
+    syncSources();
+    refresh();
   };
 
   // ── 事件 ──
@@ -1367,8 +1429,22 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
     (event) => {
       const target = event.target as Element;
       const link = target.closest<HTMLElement>('[data-card-link]');
-      if (target.closest('[data-card-close]')) select(null);
-      else if (target.closest('[data-card-collapse]')) {
+      const infoSource = target.closest<HTMLElement>('[data-info-source]');
+      const infoClass = target.closest<HTMLElement>('[data-info-class]');
+      const infoLayer = target.closest<HTMLElement>('[data-info-layer]');
+      const toggle = target.closest<HTMLElement>('[data-toggle-source]');
+      const queryLink = target.closest<HTMLElement>('[data-query]');
+      if (target.closest('[data-card-close]')) {
+        infoTarget = null;
+        select(null);
+      } else if (toggle) toggleSource(toggle.dataset.toggleSource as SourceId);
+      else if (queryLink) showQuery(queries.find((q) => q.id === queryLink.dataset.query)!);
+      else if (infoSource)
+        openInfo({ type: 'source', id: infoSource.dataset.infoSource as SourceId });
+      else if (infoClass) openInfo({ type: 'class', name: infoClass.dataset.infoClass! });
+      else if (infoLayer) {
+        openInfo({ type: 'layer', id: infoLayer.dataset.infoLayer as 'data' });
+      } else if (target.closest('[data-card-collapse]')) {
         cardCollapsed = !cardCollapsed;
         renderCard();
       } else if (target.closest('[data-card-back]')) {
@@ -1481,6 +1557,278 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
     .addEventListener('click', () => setView('layers'), { signal });
   root.querySelector('[data-city-hint-close]')!.addEventListener('click', dismissHint, { signal });
 
+  // ── 导览：镜头依次飞向街区中的对象与分层视图的各层，配合讲解 ──
+  interface TourStep extends CityTourStep {
+    title: string;
+    text: string;
+    duration: number;
+    enter(): void;
+  }
+  const byId = (id: CityQuery['id']) => queries.find((q) => q.id === id)!;
+  /** 当前查询结果中第一个可以定位的对象。 */
+  const firstTarget = (): FocusTarget | undefined => {
+    const result = active.run({ t, sources, detail });
+    const i = result.rows.findIndex((row, k) => row.hit && focusFor(active, row) && k >= 0);
+    return i >= 0 ? (focusFor(active, result.rows[i]) ?? undefined) : undefined;
+  };
+  const setAllSources = () => {
+    sources = new Set(ALL_SOURCES);
+    syncSources();
+  };
+  const TOUR: TourStep[] = [
+    {
+      title: tr('街区与数据源', 'The district and its data sources'),
+      text: tr(
+        '示例模拟一座虚构街区一周的运行：车辆在道路上行驶，居民通勤、乘车与消费，每天的天气各不相同。这些活动分别由八个相互独立的系统记录。',
+        'The example simulates one week in a fictional district: vehicles move along the roads, residents commute, ride and shop, and the weather differs from day to day. Eight independent systems record these activities separately.',
+      ),
+      duration: 9,
+      enter() {
+        setView('city');
+        setAllSources();
+        showQuery(byId('queues'));
+        if (!reduced) setPlaying(true);
+        scene?.tour({ layer: 'overview' });
+      },
+    },
+    {
+      marker: tr('红灯前排队', 'Queue at a red light'),
+      title: tr('交通时序', 'Traffic time series'),
+      text: tr(
+        '交通时序每 5 秒记录一次信号相位与车辆位置，路口名称存放在城市基础数据中。查询“红灯前排队 3 辆车以上的路口”需要同时访问这两个数据源。',
+        'The traffic time series records signal phases and vehicle positions every 5 seconds, while intersection names are stored in the base city data. The query for intersections with three or more vehicles queued at a red light accesses both sources.',
+      ),
+      duration: 10,
+      enter() {
+        showQuery(byId('queues'));
+        const focus = firstTarget();
+        scene?.tour({ focus, marker: this.marker });
+      },
+    },
+    {
+      marker: tr('温湿度传感器', 'Temperature sensor'),
+      title: tr('传感器与气象', 'Sensors and weather'),
+      text: tr(
+        '物联网平台中的温湿度传感器只记录编号与坐标，气象站观测存放在气象数据源中。查询将每个传感器的读数与相邻传感器及气象站比较，识别读数异常的传感器。',
+        'Temperature and humidity sensors on the IoT platform record only an ID and coordinates; weather station observations are kept in the weather source. The query compares each reading with neighbouring sensors and the weather station to identify sensors with anomalous readings.',
+      ),
+      duration: 10,
+      enter() {
+        showQuery(byId('sensorAnomaly'));
+        scene?.tour({ focus: firstTarget(), marker: this.marker });
+      },
+    },
+    {
+      marker: tr('客流 + 销售', 'Footfall + sales'),
+      title: tr('商店的客流与销售', 'Shop footfall and sales'),
+      text: tr(
+        '客流计数器属于物联网平台，订单数存放在商户系统中，降雨记录在气象观测中。三者按建筑编号与时间对齐后，可以得出降雨时客流下降最多的商店。',
+        'Footfall counters belong to the IoT platform, order counts are stored in the merchant system, and rainfall is recorded in the weather observations. Aligned by building ID and time, the three sources identify the shops whose footfall drops most when it rains.',
+      ),
+      duration: 10,
+      enter() {
+        showQuery(byId('rainFootfall'));
+        scene?.tour({ focus: firstTarget(), marker: this.marker });
+      },
+    },
+    {
+      title: tr('分布在五个数据源中的人物记录', 'Records of one person across five sources'),
+      text: tr(
+        '虚构居民的住址存放在社区应用中，雇佣关系与考勤存放在企业系统中，乘车与消费记录分别存放在出行服务与商户系统中。这些系统使用统一的居民编号，映射将各条记录关联到同一个 IRI，形成该居民当天的完整行程。',
+        'A fictional resident’s address is stored in the community app, employment and attendance in the company system, and rides and purchases in the mobility service and the merchant system. These systems share a resident ID, so the mappings link every record to the same IRI and yield the resident’s complete itinerary for the day.',
+      ),
+      duration: 11,
+      enter() {
+        showQuery(byId('persona'));
+        scene?.tour({ focus: firstTarget() });
+      },
+    },
+    {
+      title: tr('分层视图', 'The layered view'),
+      text: tr(
+        '分层视图从另一个角度呈现同一条查询：底层为八个数据源，其上依次为映射、虚拟知识图谱与本体。结果中的每个实体都连接到描述它的数据源。',
+        'The layered view presents the same query from another angle: the eight sources form the bottom layer, followed by the mappings, the virtual knowledge graph and the ontology. Each entity in the result is connected to the sources that describe it.',
+      ),
+      duration: 9,
+      enter() {
+        showQuery(byId('commuteCars'));
+        setView('layers');
+        scene?.tour({ layer: 'overview' });
+      },
+    },
+    {
+      layer: 'data',
+      marker: tr('8 个数据源', '8 data sources'),
+      title: tr('数据源层', 'Source layer'),
+      text: tr(
+        '每个圆柱代表一个独立的数据库，标签为其在联邦查询引擎中的 catalog 名。VKG 不复制数据，查询时直接访问各数据源。点击圆柱可查看其表结构与映射。',
+        'Each cylinder represents an independent database, labelled with its catalog name in the federated query engine. The VKG copies no data and accesses each source at query time. Click a cylinder to view its tables and mappings.',
+      ),
+      duration: 10,
+      enter() {
+        scene?.tour({ layer: 'data', marker: this.marker });
+      },
+    },
+    {
+      layer: 'mapping',
+      marker: tr('映射', 'Mappings'),
+      title: tr('映射层', 'Mapping layer'),
+      text: tr(
+        '映射将各数据源的表转换为统一的词汇：SQL 查询选取记录，IRI 模板为记录命名。交通时序中的车牌与企业系统中的停车许可生成相同的 :vehicle/{plate}，因而指向同一辆车。',
+        'Mappings translate each source’s tables into a shared vocabulary: an SQL query selects the records and an IRI template names them. A plate in the traffic time series and a parking permit in the company system produce the same :vehicle/{plate} and therefore refer to the same vehicle.',
+      ),
+      duration: 10,
+      enter() {
+        scene?.tour({ layer: 'mapping', marker: this.marker });
+      },
+    },
+    {
+      layer: 'graph',
+      marker: tr('同一 IRI 汇合', 'Same IRI, one entity'),
+      title: tr('虚拟知识图谱层', 'Virtual knowledge graph layer'),
+      text: tr(
+        '映射生成的实体位于这一层。连接多条彩色连线的节点由多个数据源共同描述，例如企业系统中的员工与交通时序中的车辆在图谱中相互关联。',
+        'Entities produced by the mappings reside on this layer. A node with several coloured links is described by multiple sources; for example, an employee from the company system is connected to a vehicle from the traffic time series.',
+      ),
+      duration: 11,
+      enter() {
+        scene?.tour({ layer: 'graph', marker: this.marker });
+      },
+    },
+    {
+      layer: 'ontology',
+      marker: tr('类与子类', 'Classes and subclasses'),
+      title: tr('本体层', 'Ontology layer'),
+      text: tr(
+        '本体定义类以及类之间的关系：员工是人的子类，公交车与出租车是运营车辆的子类。查询基于这些类编写，查询上位类时，子类的实例通过推理一并返回。点击类可查看其定义与来源。',
+        'The ontology defines classes and their relations: employee is a subclass of person, and buses and taxis are subclasses of service vehicle. Queries are written over these classes, and querying a superclass also returns instances of its subclasses through reasoning. Click a class to view its definition and sources.',
+      ),
+      duration: 10,
+      enter() {
+        scene?.tour({ layer: 'ontology', marker: this.marker });
+      },
+    },
+    {
+      layer: 'overview',
+      title: tr('断开数据源后的结果', 'Results after disconnecting a source'),
+      text: tr(
+        '断开企业与门禁系统后，员工与车牌的对应关系不再可用，“开车上班的员工”查询无法回答，图谱中的相应连线随之消失。VKG 的查询结果取决于当前接入的数据源。',
+        'With the company and access system disconnected, the link between employees and plates is no longer available: the query for employees who drive to work cannot be answered, and the corresponding links disappear from the graph. VKG query results depend on the sources currently connected.',
+      ),
+      duration: 10,
+      enter() {
+        sources = new Set(ALL_SOURCES.filter((id) => id !== 'hr'));
+        syncSources();
+        refresh();
+        scene?.tour({ layer: 'overview' });
+      },
+    },
+    {
+      title: tr('继续探索', 'Explore further'),
+      text: tr(
+        '左侧列出 11 条查询。在城市视图中点击建筑、车辆或行人，可查看其在各数据源中的记录；在分层视图中点击数据源、层或类，可查看相应介绍。',
+        'The 11 queries are listed on the left. In the city view, click a building, vehicle or person to view its records in each source; in the layered view, click a source, layer or class to view its description.',
+      ),
+      duration: 0,
+      enter() {
+        setAllSources();
+        setView('city');
+        refresh();
+        scene?.tour({ layer: 'overview' });
+      },
+    },
+  ];
+
+  const tourBox = root.querySelector<HTMLElement>('[data-tour]')!;
+  const tourBar = root.querySelector<HTMLElement>('[data-tour-bar]')!;
+  const tourNext = root.querySelector<HTMLButtonElement>('[data-tour-next]')!;
+  const tourPrev = root.querySelector<HTMLButtonElement>('[data-tour-prev]')!;
+  let touring = -1;
+  let tourTimer = 0;
+  const TOUR_KEY = 'city-tour-seen';
+  const tourSeen = () => {
+    try {
+      return localStorage.getItem(TOUR_KEY) === '1';
+    } catch {
+      return false;
+    }
+  };
+
+  const showTourStep = (index: number) => {
+    window.clearTimeout(tourTimer);
+    touring = index;
+    const step = TOUR[index];
+    stage.classList.add('is-touring');
+    tourBox.hidden = false;
+    hint.hidden = true;
+    infoTarget = null;
+    select(null);
+    scene?.setInsets(insets());
+    root.querySelector<HTMLElement>('[data-tour-step]')!.textContent =
+      `${index + 1} / ${TOUR.length}`;
+    root.querySelector<HTMLElement>('[data-tour-title]')!.textContent = step.title;
+    root.querySelector<HTMLElement>('[data-tour-text]')!.textContent = step.text;
+    tourPrev.disabled = index === 0;
+    const last = index === TOUR.length - 1;
+    tourNext.textContent = last ? tr('开始探索', 'Start exploring') : tr('下一步', 'Next');
+    step.enter();
+    tourBar.style.transition = 'none';
+    tourBar.style.width = last ? '100%' : '0';
+    if (!last && step.duration) {
+      void tourBar.offsetWidth;
+      tourBar.style.transition = `width ${step.duration}s linear`;
+      tourBar.style.width = '100%';
+      tourTimer = window.setTimeout(() => showTourStep(index + 1), step.duration * 1000);
+    }
+  };
+
+  const endTour = () => {
+    window.clearTimeout(tourTimer);
+    if (touring < 0) return;
+    touring = -1;
+    stage.classList.remove('is-touring');
+    tourBox.hidden = true;
+    scene?.tour(null);
+    setAllSources();
+    refresh();
+    scene?.setInsets(insets());
+    scene?.resetView();
+    try {
+      localStorage.setItem(TOUR_KEY, '1');
+      localStorage.setItem(HINT_KEY, '1');
+    } catch {
+      // 隐私模式下 localStorage 可能不可用，忽略即可。
+    }
+    layersButton.classList.remove('is-new');
+  };
+
+  tourNext.addEventListener(
+    'click',
+    () => (touring >= TOUR.length - 1 ? endTour() : showTourStep(touring + 1)),
+    { signal },
+  );
+  tourPrev.addEventListener('click', () => touring > 0 && showTourStep(touring - 1), { signal });
+  root.querySelector('[data-tour-skip]')!.addEventListener('click', endTour, { signal });
+  root
+    .querySelector('[data-city-tour]')!
+    .addEventListener('click', () => showTourStep(0), { signal });
+  signal.addEventListener('abort', () => window.clearTimeout(tourTimer));
+
+  // 数据源面板中的介绍按钮与本体入口
+  sourcesPanel.addEventListener(
+    'click',
+    (event) => {
+      const target = event.target as HTMLElement;
+      const button = target.closest<HTMLElement>('[data-info-source], [data-info-layer]');
+      if (!button) return;
+      event.preventDefault();
+      if (button.dataset.infoSource) {
+        openInfo({ type: 'source', id: button.dataset.infoSource as SourceId });
+      } else openInfo({ type: 'layer', id: button.dataset.infoLayer as 'ontology' });
+    },
+    { signal },
+  );
+
   // ── 全屏：优先使用 Fullscreen API；不支持时（如 iPhone Safari）以固定定位铺满窗口 ──
   type FullscreenTarget = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
   type FullscreenDocument = Document & {
@@ -1570,7 +1918,7 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
 
   /** 浮于场景之上的面板所占的边距；窄屏下面板排在场景下方，不占用场景。 */
   const insets = (): Insets => {
-    if (getComputedStyle(queriesPanel).position !== 'absolute') {
+    if (touring >= 0 || getComputedStyle(queriesPanel).position !== 'absolute') {
       return { left: 0, right: 0, top: 0, bottom: 0 };
     }
     const area = viewport.getBoundingClientRect();
@@ -1601,7 +1949,7 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
       scene = createCityScene(
         viewport,
         pinLayer,
-        { onSelect: select },
+        { onSelect: select, onInfo: openInfo },
         { view, reducedMotion: reduced, t, sources, detail, nightView },
       );
       stage.classList.add('is-ready');
@@ -1612,7 +1960,8 @@ export function initCity(root: HTMLElement, signal: AbortSignal): void {
       lastSelectionKey = '';
       refresh(true);
       if (!reduced) setPlaying(true);
-      window.setTimeout(showHint, 1500);
+      if (tourSeen()) window.setTimeout(showHint, 1500);
+      else window.setTimeout(() => !signal.aborted && touring < 0 && showTourStep(0), 600);
     } catch (error) {
       console.error(error);
       stage.classList.add('is-fallback');
